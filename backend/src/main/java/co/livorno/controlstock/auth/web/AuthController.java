@@ -26,6 +26,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
+    @PreAuthorize("permitAll()")
     public LoginResponse login(@Valid @RequestBody LoginRequest solicitud) {
         return service.login(solicitud);
     }

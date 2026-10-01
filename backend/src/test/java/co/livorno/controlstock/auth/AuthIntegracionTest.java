@@ -53,12 +53,30 @@ class AuthIntegracionTest {
 
     @Test
     void login_adminDePrueba_yoResponde200() throws Exception {
-        String token = login("  Admin.Prueba@Livorno.test ".trim(), "ClaveAdminPrueba123!");
+        String token = login("ADMIN.PRUEBA@LIVORNO.TEST", "ClaveAdminPrueba123!");
 
         mvc.perform(get("/api/auth/yo").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("admin.prueba@livorno.test"))
                 .andExpect(jsonPath("$.rol").value("ADMIN"));
+    }
+
+    @Test
+    void actuator_health_esPublicoYSinDetalles() throws Exception {
+        mvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"))
+                .andExpect(jsonPath("$.components").doesNotExist());
+    }
+
+    @Test
+    void actuator_envEInfo_noEstanAccesibles() throws Exception {
+        for (String ruta : new String[] {"/actuator/env", "/actuator/info"}) {
+            mvc.perform(get(ruta)).andExpect(status().isUnauthorized());
+            String token = login("admin.prueba@livorno.test", "ClaveAdminPrueba123!");
+            mvc.perform(get(ruta).header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                    .andExpect(status().isNotFound());
+        }
     }
 
     @Test

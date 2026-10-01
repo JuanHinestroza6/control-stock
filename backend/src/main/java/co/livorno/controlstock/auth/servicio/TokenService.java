@@ -1,5 +1,6 @@
 package co.livorno.controlstock.auth.servicio;
 
+import co.livorno.controlstock.auth.config.ConfiguracionSeguridad;
 import co.livorno.controlstock.auth.config.PropiedadesJwt;
 import co.livorno.controlstock.usuario.modelo.Usuario;
 import java.time.Clock;
@@ -30,6 +31,7 @@ public class TokenService {
         Instant ahora = clock.instant();
         Instant expira = ahora.plus(propiedades.expiracion());
         JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer(ConfiguracionSeguridad.ISSUER)
                 .subject(String.valueOf(usuario.getId()))
                 .claim("rol", usuario.getRol().name())
                 .claim("nombre", usuario.getNombre())

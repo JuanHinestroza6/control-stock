@@ -18,6 +18,10 @@ public record PropiedadesJwt(String secret, @DefaultValue("8h") Duration expirac
             throw new IllegalStateException("JWT_SECRET (app.jwt.secret) es obligatorio y debe medir al menos "
                     + MIN_BYTES_SECRETO + " bytes (UTF-8).");
         }
+        if (secret.toLowerCase(java.util.Locale.ROOT).startsWith("cambiar")) {
+            throw new IllegalStateException("JWT_SECRET (app.jwt.secret) conserva el valor de ejemplo de .env.example; "
+                    + "genera uno aleatorio (p. ej. openssl rand -base64 48).");
+        }
         if (expiracion == null || expiracion.isZero() || expiracion.isNegative()) {
             throw new IllegalStateException("app.jwt.expiracion debe ser una duracion positiva.");
         }

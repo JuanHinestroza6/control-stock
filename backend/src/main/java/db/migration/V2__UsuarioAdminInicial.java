@@ -6,6 +6,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Locale;
 import java.util.Map;
 import org.flywaydb.core.api.migration.BaseJavaMigration;
 import org.flywaydb.core.api.migration.Context;
@@ -20,6 +21,7 @@ public class V2__UsuarioAdminInicial extends BaseJavaMigration {
 
     static final String PH_EMAIL = "admin-email";
     static final String PH_PASSWORD = "admin-password";
+    static final int MIN_LONGITUD_PASSWORD = 12;
 
     @Override
     public void migrate(Context context) throws Exception {
@@ -32,11 +34,16 @@ public class V2__UsuarioAdminInicial extends BaseJavaMigration {
         if (existeAdmin(conexion)) {
             return;
         }
-        String email = placeholders.getOrDefault(PH_EMAIL, "").trim().toLowerCase();
+        String email = placeholders.getOrDefault(PH_EMAIL, "").trim().toLowerCase(java.util.Locale.ROOT);
         String password = placeholders.getOrDefault(PH_PASSWORD, "");
         if (email.isEmpty() || password.isBlank()) {
             throw new IllegalStateException("No existe ningun usuario ADMIN y faltan las variables de entorno "
                     + "ADMIN_EMAIL y/o ADMIN_PASSWORD para crear el administrador inicial.");
+        }
+        if (password.length() < MIN_LONGITUD_PASSWORD
+                || password.toLowerCase(Locale.ROOT).startsWith("cambiar")) {
+            throw new IllegalStateException("ADMIN_PASSWORD debe tener al menos " + MIN_LONGITUD_PASSWORD
+                    + " caracteres y no puede ser el valor de ejemplo (empieza por 'cambiar').");
         }
         LocalDateTime ahora = LocalDateTime.now(ZoneId.of("America/Bogota"));
         String sql = "INSERT INTO usuario (nombre, email, password_hash, rol, activo, creado_en, actualizado_en) "

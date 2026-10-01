@@ -34,4 +34,12 @@ class PropiedadesJwtTest {
         assertThatThrownBy(() -> new PropiedadesJwt("ñ".repeat(15), Duration.ofHours(1)))
                 .isInstanceOf(IllegalStateException.class);
     }
+
+    @Test
+    void crear_secretoDeEjemploQueEmpiezaPorCambiar_falla() {
+        assertThatThrownBy(() -> new PropiedadesJwt("cambiar-por-un-secreto-aleatorio-de-minimo-32-bytes", Duration.ofHours(8)))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("valor de ejemplo");
+        assertThatThrownBy(() -> new PropiedadesJwt("CAMBIAR-por-un-secreto-aleatorio-de-minimo-32-bytes", Duration.ofHours(8)))
+                .isInstanceOf(IllegalStateException.class);
+    }
 }

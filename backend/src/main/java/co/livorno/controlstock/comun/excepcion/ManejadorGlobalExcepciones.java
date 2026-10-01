@@ -63,6 +63,33 @@ public class ManejadorGlobalExcepciones extends ResponseEntityExceptionHandler {
         return validacionProblema(errores);
     }
 
+    /** Excepciones estandar de Spring MVC (404, 405, 415...): mismos ProblemDetail, textos en espanol. */
+    @Override
+    protected ResponseEntity<Object> handleExceptionInternal(Exception ex, Object body, HttpHeaders headers,
+            HttpStatusCode status, WebRequest request) {
+        ResponseEntity<Object> respuesta = super.handleExceptionInternal(ex, body, headers, status, request);
+        if (respuesta != null && respuesta.getBody() instanceof ProblemDetail pd) {
+            switch (status.value()) {
+                case 404 -> traducir(pd, "Recurso no encontrado", "La ruta solicitada no existe.");
+                case 405 -> traducir(pd, "Método no permitido", "El método HTTP no está permitido para esta ruta.");
+                case 406 -> traducir(pd, "Formato no aceptable", "No se puede responder en el formato solicitado.");
+                case 415 -> traducir(pd, "Tipo de contenido no soportado",
+                        "El tipo de contenido de la solicitud no es compatible.");
+                default -> {
+                    if (status.is4xxClientError()) {
+                        traducir(pd, "Solicitud inválida", "La solicitud no es válida.");
+                    }
+                }
+            }
+        }
+        return respuesta;
+    }
+
+    private static void traducir(ProblemDetail pd, String titulo, String detalle) {
+        pd.setTitle(titulo);
+        pd.setDetail(detalle);
+    }
+
     @ExceptionHandler(RecursoNoEncontradoException.class)
     public ProblemDetail noEncontrado(RecursoNoEncontradoException ex) {
         return problema(HttpStatus.NOT_FOUND, "Recurso no encontrado", ex.getMessage());

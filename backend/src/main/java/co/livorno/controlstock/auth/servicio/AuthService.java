@@ -30,7 +30,7 @@ public class AuthService {
 
     /** Credenciales incorrectas, usuario inexistente o inactivo: mismo error, sin distinguir. */
     public LoginResponse login(LoginRequest solicitud) {
-        String email = solicitud.email().trim().toLowerCase();
+        String email = solicitud.email().trim().toLowerCase(java.util.Locale.ROOT);
         Usuario usuario = usuarios.findByEmail(email).orElse(null);
         String hash = usuario != null ? usuario.getPasswordHash() : hashRelleno;
         boolean coincide = encoder.matches(solicitud.password(), hash); // siempre se ejecuta (tiempo constante)

@@ -94,6 +94,28 @@ class ManejadorGlobalExcepcionesTest {
     }
 
     @Test
+    void rutaInexistente_responde404EnEspanol() throws Exception {
+        mvc.perform(get("/prueba/no-existe"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Recurso no encontrado"))
+                .andExpect(jsonPath("$.detail").value("La ruta solicitada no existe."));
+    }
+
+    @Test
+    void metodoNoPermitido_responde405EnEspanol() throws Exception {
+        mvc.perform(post("/prueba/404"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.title").value("Método no permitido"));
+    }
+
+    @Test
+    void tipoDeContenidoNoSoportado_responde415EnEspanol() throws Exception {
+        mvc.perform(post("/prueba/validar").contentType(MediaType.TEXT_PLAIN).content("hola"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.title").value("Tipo de contenido no soportado"));
+    }
+
+    @Test
     void recursoNoEncontrado_responde404() throws Exception {
         mvc.perform(get("/prueba/404"))
                 .andExpect(status().isNotFound())

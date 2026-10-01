@@ -42,6 +42,42 @@ class V2__UsuarioAdminInicialTest {
     }
 
     @Test
+    void insertar_passwordMenorA12Caracteres_lanzaExcepcion() throws Exception {
+        PreparedStatement insert = mock(PreparedStatement.class);
+        Connection con = conexionConAdmins(0, insert);
+
+        assertThatThrownBy(() -> V2__UsuarioAdminInicial.insertarAdminSiNoExiste(
+                con, Map.of("admin-email", "a@livorno.test", "admin-password", "Corta123!!!"), new BCryptPasswordEncoder()))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("12");
+        verify(insert, never()).executeUpdate();
+    }
+
+    @Test
+    void insertar_passwordDeEjemploQueEmpiezaPorCambiar_lanzaExcepcion() throws Exception {
+        PreparedStatement insert = mock(PreparedStatement.class);
+        Connection con = conexionConAdmins(0, insert);
+
+        assertThatThrownBy(() -> V2__UsuarioAdminInicial.insertarAdminSiNoExiste(
+                con, Map.of("admin-email", "a@livorno.test", "admin-password", "cambiar-password-admin"),
+                new BCryptPasswordEncoder()))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("cambiar");
+        verify(insert, never()).executeUpdate();
+    }
+
+    @Test
+    void insertar_passwordDe12Caracteres_insertaAdmin() throws Exception {
+        PreparedStatement insert = mock(PreparedStatement.class);
+        Connection con = conexionConAdmins(0, insert);
+
+        V2__UsuarioAdminInicial.insertarAdminSiNoExiste(
+                con, Map.of("admin-email", " Admin@Livorno.TEST ", "admin-password", "Doce12345678"),
+                new BCryptPasswordEncoder());
+
+        verify(insert).setString(2, "admin@livorno.test");
+        verify(insert).executeUpdate();
+    }
+
+    @Test
     void insertar_conAdminExistenteYSinPlaceholders_noHaceNadaNiFalla() throws Exception {
         PreparedStatement insert = mock(PreparedStatement.class);
         Connection con = conexionConAdmins(1, insert);

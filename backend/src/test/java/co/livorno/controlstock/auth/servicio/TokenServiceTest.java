@@ -64,6 +64,18 @@ class TokenServiceTest {
     }
 
     @Test
+    void decodificar_tokenConOtroIssuer_lanzaExcepcion() {
+        var claims = org.springframework.security.oauth2.jwt.JwtClaimsSet.builder()
+                .issuer("otro-emisor").subject("7")
+                .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(600)).build();
+        String token = config.jwtEncoder(PROPS).encode(org.springframework.security.oauth2.jwt.JwtEncoderParameters.from(
+                org.springframework.security.oauth2.jwt.JwsHeader.with(
+                        org.springframework.security.oauth2.jose.jws.MacAlgorithm.HS256).build(), claims)).getTokenValue();
+
+        assertThatThrownBy(() -> config.jwtDecoder(PROPS).decode(token)).isInstanceOf(JwtException.class);
+    }
+
+    @Test
     void decodificar_tokenFirmadoConOtroSecreto_lanzaExcepcion() {
         String token = servicio(OTRAS, Instant.now()).emitir(usuario()).token();
 

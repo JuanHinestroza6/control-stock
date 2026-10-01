@@ -57,6 +57,22 @@ class ConfiguracionSeguridadTest {
                 .andExpect(jsonPath("$.title").value("No autenticado"));
     }
 
+    @Autowired org.springframework.security.oauth2.jwt.JwtEncoder encoder;
+
+    @Test
+    void peticion_tokenConOtroIssuer_responde401() throws Exception {
+        var claims = org.springframework.security.oauth2.jwt.JwtClaimsSet.builder()
+                .issuer("otro-emisor").subject("1")
+                .issuedAt(java.time.Instant.now()).expiresAt(java.time.Instant.now().plusSeconds(600)).build();
+        String token = encoder.encode(org.springframework.security.oauth2.jwt.JwtEncoderParameters.from(
+                org.springframework.security.oauth2.jwt.JwsHeader.with(
+                        org.springframework.security.oauth2.jose.jws.MacAlgorithm.HS256).build(), claims)).getTokenValue();
+
+        mvc.perform(get("/api/prueba/admin").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.instance").value("/api/prueba/admin"));
+    }
+
     @Test
     void peticion_tokenMalformado_responde401() throws Exception {
         mvc.perform(get("/api/prueba/admin").header(HttpHeaders.AUTHORIZATION, "Bearer no.es.jwt"))

@@ -41,7 +41,7 @@ public class Usuario extends EntidadAuditable {
 
     public Usuario(String nombre, String email, String passwordHash, Rol rol) {
         this.nombre = nombre;
-        this.email = email.trim().toLowerCase();
+        this.email = email.trim().toLowerCase(java.util.Locale.ROOT);
         this.passwordHash = passwordHash;
         this.rol = rol;
     }
