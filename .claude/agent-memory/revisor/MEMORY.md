@@ -1,0 +1,1 @@
+- [Pendientes revisión Fase 0](project_fase0_pendientes.md) — admin inicial (placeholders vs app.admin), TZ runtime, compose 0.0.0.0, JWT en localStorage

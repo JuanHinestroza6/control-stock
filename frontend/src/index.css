@@ -1,0 +1,34 @@
+@import '@fontsource/montserrat/500.css';
+@import '@fontsource/montserrat/700.css';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import 'tailwindcss';
+
+/* Sistema de diseño del PPI (sección 4.6). No usar hex sueltos en componentes. */
+@theme {
+  --color-fondo: #ffffff;
+  --color-fondo-suave: #f9fafb;
+  --color-oxford: #111827;
+  --color-acento: #0288d1;
+  --color-ok: #10b981;
+  --color-alerta: #f59e0b;
+  --color-critico: #ef4444;
+
+  --font-titulo: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+  --font-cuerpo: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-fondo-suave font-cuerpo text-sm text-oxford antialiased;
+  }
+
+  h1 {
+    @apply font-titulo text-2xl font-bold;
+  }
+
+  h2 {
+    @apply font-titulo text-lg font-medium;
+  }
+}
