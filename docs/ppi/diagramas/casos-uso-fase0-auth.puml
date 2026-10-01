@@ -1,0 +1,54 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+left to right direction
+title Diagrama de casos de uso - Fase 0 (REQ-06 y REQ-12)
+
+actor "Usuario autenticado" as Usuario
+actor "Administrador\n(ADMIN)" as Admin
+actor "Encargado de inventario\n(INVENTARIO)" as Inventario
+actor "Vendedor\n(VENDEDOR)" as Vendedor
+actor "Contabilidad\n(CONTABILIDAD)" as Contabilidad
+
+Usuario <|-- Admin
+Usuario <|-- Inventario
+Usuario <|-- Vendedor
+Usuario <|-- Contabilidad
+
+rectangle "Control Stock - Autenticación y acceso (REQ-12)" {
+  usecase "Iniciar sesión" as UC_Login
+  usecase "Consultar mi sesión\n(GET /api/auth/yo)" as UC_Yo
+  usecase "Cerrar sesión\n(el cliente descarta el token)" as UC_Salir
+  usecase "Navegar módulos según rol" as UC_Menu
+  usecase "Verificar bloqueo por\nintentos fallidos (429)" as UC_Bloqueo
+}
+
+rectangle "Gestión de usuarios y roles (REQ-06)" {
+  usecase "Administrar usuarios" as UC_CrudUsuarios <<Fase 1>>
+  usecase "Asignar y cambiar roles" as UC_Roles <<Fase 1>>
+  usecase "Restablecer contraseña" as UC_Clave <<Fase 1>>
+}
+
+' El inicio de sesión lo realiza cualquier persona con cuenta, aún sin sesión; se modela con el actor general.
+Usuario --> UC_Login
+Usuario --> UC_Yo
+Usuario --> UC_Salir
+Usuario --> UC_Menu
+UC_Login .> UC_Bloqueo : <<include>>
+
+Admin --> UC_CrudUsuarios
+Admin --> UC_Roles
+Admin --> UC_Clave
+UC_Roles .> UC_CrudUsuarios : <<extend>>
+
+note bottom of UC_Menu
+  Módulos visibles por rol según modulos.ts;
+  "Usuarios" solo para ADMIN.
+end note
+note right of UC_CrudUsuarios
+  Pendiente: solo existe la entrada de menú "Usuarios".
+  Códigos CU-xx: por asignar según el documento Word.
+end note
+@enduml
