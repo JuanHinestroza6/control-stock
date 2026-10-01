@@ -1,0 +1,9 @@
+# Perfil de desarrollo local (SPRING_PROFILES_ACTIVE=dev)
+logging:
+  level:
+    co.livorno.controlstock: DEBUG
+    org.flywaydb: INFO
+
+spring:
+  jpa:
+    show-sql: false
