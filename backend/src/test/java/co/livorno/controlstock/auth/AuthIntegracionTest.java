@@ -10,7 +10,15 @@ import co.livorno.controlstock.usuario.modelo.Rol;
 import co.livorno.controlstock.usuario.modelo.Usuario;
 import co.livorno.controlstock.usuario.repositorio.UsuarioRepository;
 import com.jayway.jsonpath.JsonPath;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.Instant;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -85,5 +93,82 @@ class AuthIntegracionTest {
         } finally {
             repo.deleteById(u.getId());
         }
+    }
+
+    @Autowired JwtEncoder jwtEncoder;
+
+    private String tokenPara(String sub, Instant emitido, Instant expira) {
+        JwtClaimsSet claims = JwtClaimsSet.builder().subject(sub).issuedAt(emitido).expiresAt(expira).build();
+        return jwtEncoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
+                .getTokenValue();
+    }
+
+    @Test
+    void login_respuesta_cumpleContratoDelFrontendYNoExponeHash() throws Exception {
+        String cuerpo = mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"ADMIN.PRUEBA@livorno.test\",\"password\":\"ClaveAdminPrueba123!\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tipo").value("Bearer"))
+                .andExpect(jsonPath("$.usuario.id").isNumber())
+                .andExpect(jsonPath("$.usuario.nombre").isString())
+                .andExpect(jsonPath("$.usuario.rol").value("ADMIN"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(cuerpo).doesNotContain("passwordHash").doesNotContain("password_hash").doesNotContain("$2");
+        assertThat(Instant.parse(JsonPath.<String>read(cuerpo, "$.expiraEn"))).isAfter(Instant.now());
+    }
+
+    @Test
+    void yo_rolCambiadoEnBdTrasEmitirToken_reflejaElRolVigente() throws Exception {
+        Usuario u = repo.save(new Usuario("Cambia Rol", "cambia.rol@livorno.test", encoder.encode("Clave123!"),
+                Rol.VENDEDOR));
+        try {
+            String token = login("cambia.rol@livorno.test", "Clave123!");
+            mvc.perform(get("/api/auth/yo").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                    .andExpect(jsonPath("$.rol").value("VENDEDOR"));
+
+            jdbc.update("UPDATE usuario SET rol = 'INVENTARIO' WHERE id = ?", u.getId());
+
+            mvc.perform(get("/api/auth/yo").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.rol").value("INVENTARIO"));
+        } finally {
+            repo.deleteById(u.getId());
+        }
+    }
+
+    @Test
+    void yo_tokenValidoDeUsuarioInexistente_responde401() throws Exception {
+        String token = tokenPara("999999999", Instant.now(), Instant.now().plusSeconds(600));
+
+        mvc.perform(get("/api/auth/yo").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.title").value("No autenticado"));
+    }
+
+    @Test
+    void yo_tokenConSubNoNumerico_responde401() throws Exception {
+        String token = tokenPara("no-es-numero", Instant.now(), Instant.now().plusSeconds(600));
+
+        mvc.perform(get("/api/auth/yo").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void yo_tokenVencido_responde401() throws Exception {
+        Instant hace2h = Instant.now().minusSeconds(7200);
+        String token = tokenPara("1", hace2h, hace2h.plusSeconds(60));
+
+        mvc.perform(get("/api/auth/yo").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void login_emailVacioYPasswordVacia_responde400ConErrores() throws Exception {
+        mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"\",\"password\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errores[?(@.campo=='email')]").exists())
+                .andExpect(jsonPath("$.errores[?(@.campo=='password')]").exists());
     }
 }

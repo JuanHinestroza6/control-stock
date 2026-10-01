@@ -1,5 +1,6 @@
 package co.livorno.controlstock.auth.servicio;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -8,9 +9,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import co.livorno.controlstock.auth.dto.LoginRequest;
+import co.livorno.controlstock.auth.dto.LoginResponse;
 import co.livorno.controlstock.usuario.modelo.Rol;
 import co.livorno.controlstock.usuario.modelo.Usuario;
 import co.livorno.controlstock.usuario.repositorio.UsuarioRepository;
+import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,5 +53,34 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> service.login(new LoginRequest("ana@livorno.test", "clave")))
                 .isInstanceOf(BadCredentialsException.class);
+    }
+
+    @Test
+    void login_emailConMayusculasYEspacios_normalizaYEmiteToken() {
+        Usuario u = new Usuario("Ana", "ana@livorno.test", "hash-real", Rol.VENDEDOR);
+        Instant expira = Instant.parse("2026-10-02T00:00:00Z");
+        when(repo.findByEmail("ana@livorno.test")).thenReturn(Optional.of(u));
+        when(encoder.matches("clave", "hash-real")).thenReturn(true);
+        when(tokens.emitir(u)).thenReturn(new TokenService.TokenEmitido("tok", expira));
+
+        LoginResponse r = service.login(new LoginRequest("  ANA@Livorno.TEST ", "clave"));
+
+        assertThat(r.token()).isEqualTo("tok");
+        assertThat(r.tipo()).isEqualTo("Bearer");
+        assertThat(r.expiraEn()).isEqualTo(expira);
+        assertThat(r.usuario().email()).isEqualTo("ana@livorno.test");
+        assertThat(r.usuario().rol()).isEqualTo("VENDEDOR");
+    }
+
+    @Test
+    void login_passwordIncorrectaConUsuarioActivo_fallaSinEmitirToken() {
+        Usuario u = new Usuario("Ana", "ana@livorno.test", "hash-real", Rol.VENDEDOR);
+        when(repo.findByEmail("ana@livorno.test")).thenReturn(Optional.of(u));
+        when(encoder.matches("mala", "hash-real")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.login(new LoginRequest("ana@livorno.test", "mala")))
+                .isInstanceOf(BadCredentialsException.class);
+
+        verify(tokens, never()).emitir(org.mockito.ArgumentMatchers.any());
     }
 }
