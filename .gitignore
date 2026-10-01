@@ -21,3 +21,14 @@ frontend/dist/
 *.iml
 .DS_Store
 Thumbs.db
+
+# Secretos (variantes de .env; solo se versiona el ejemplo)
+.env.*
+!.env.example
+
+# Frontend (extra)
+frontend/coverage/
+*.tsbuildinfo
+
+# Backend (extra)
+backend/HELP.md

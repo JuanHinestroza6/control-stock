@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancela ejecuciones antiguas de la misma rama / PR
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (Java 21 + Maven)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    # Valores SOLO de prueba (no son secretos reales). Las pruebas usan el perfil `test`;
+    # estas variables evitan fallos de resolucion de placeholders en application.yml.
+    env:
+      DB_USER: test
+      DB_PASSWORD: test
+      JWT_SECRET: clave-solo-para-ci-minimo-32-bytes-0123456789
+      ADMIN_EMAIL: admin.ci@livorno.test
+      ADMIN_PASSWORD: ClaveAdminCi123!
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Configurar JDK 21 (Temurin)
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Permisos de ejecucion del Maven Wrapper
+        run: chmod +x mvnw
+
+      # Docker esta disponible en ubuntu-latest: las pruebas con Testcontainers (mysql:8.4) se ejecutan.
+      - name: Verificar (compilar, pruebas, verify)
+        run: ./mvnw -B verify
+
+  frontend:
+    name: Frontend (Node 24 + Vite)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Configurar Node 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Pruebas
+        run: npm run test -- --run
+
+      - name: Build
+        run: npm run build
