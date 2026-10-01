@@ -4,7 +4,7 @@ skinparam defaultFontName Arial
 skinparam classAttributeIconSize 0
 skinparam linetype ortho
 left to right direction
-title Diagrama de casos de uso - Fase 0 (REQ-06 y REQ-12)
+title Diagrama de casos de uso - Fase 0 (CU-02, CU-12, CU-13)
 
 actor "Usuario autenticado" as Usuario
 actor "Administrador\n(ADMIN)" as Admin
@@ -17,17 +17,21 @@ Usuario <|-- Inventario
 Usuario <|-- Vendedor
 Usuario <|-- Contabilidad
 
-rectangle "Control Stock - Autenticación y acceso (REQ-12)" {
-  usecase "Iniciar sesión" as UC_Login
+rectangle "Control Stock - Seguridad y control (REQ-02, no funcional)" {
+  usecase "CU-13 Iniciar sesión" as UC_Login
+  usecase "Verificar bloqueo por\nintentos fallidos (429)" as UC_Bloqueo
   usecase "Consultar mi sesión\n(GET /api/auth/yo)" as UC_Yo
   usecase "Cerrar sesión\n(el cliente descarta el token)" as UC_Salir
-  usecase "Navegar módulos según rol" as UC_Menu
-  usecase "Verificar bloqueo por\nintentos fallidos (429)" as UC_Bloqueo
 }
 
-rectangle "Gestión de usuarios y roles (REQ-06)" {
-  usecase "Administrar usuarios" as UC_CrudUsuarios <<Fase 1>>
-  usecase "Asignar y cambiar roles" as UC_Roles <<Fase 1>>
+rectangle "Controlar el acceso y roles de usuario (REQ-06)" {
+  usecase "CU-02 Gestión de usuarios y roles" as UC_Roles
+  usecase "Navegar módulos según rol" as UC_Menu
+  usecase "Asignar y cambiar roles" as UC_AsignarRol <<Fase 1>>
+}
+
+rectangle "Registrar y gestionar usuarios (REQ-12)" {
+  usecase "CU-12 Registrar y gestionar usuarios" as UC_Usuarios <<Fase 1>>
   usecase "Restablecer contraseña" as UC_Clave <<Fase 1>>
 }
 
@@ -37,18 +41,23 @@ Usuario --> UC_Yo
 Usuario --> UC_Salir
 Usuario --> UC_Menu
 UC_Login .> UC_Bloqueo : <<include>>
+UC_Menu .> UC_Roles : <<include>>
 
-Admin --> UC_CrudUsuarios
-Admin --> UC_Roles
+Admin --> UC_AsignarRol
+Admin --> UC_Usuarios
 Admin --> UC_Clave
-UC_Roles .> UC_CrudUsuarios : <<extend>>
+UC_AsignarRol .> UC_Roles : <<extend>>
+UC_Clave .> UC_Usuarios : <<extend>>
 
 note bottom of UC_Menu
   Módulos visibles por rol según modulos.ts;
   "Usuarios" solo para ADMIN.
 end note
-note right of UC_CrudUsuarios
+note right of UC_Login
+  CU-13 no existe en el documento Word:
+  se crea en la fase 0 (REQ-02, NEC-06).
+end note
+note right of UC_Usuarios
   Pendiente: solo existe la entrada de menú "Usuarios".
-  Códigos CU-xx: por asignar según el documento Word.
 end note
 @enduml

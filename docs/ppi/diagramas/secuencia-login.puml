@@ -3,7 +3,7 @@ skinparam shadowing false
 skinparam defaultFontName Arial
 skinparam classAttributeIconSize 0
 skinparam linetype ortho
-title Diagrama de secuencia - Inicio de sesión (REQ-12)
+title Diagrama de secuencia - CU-13 Iniciar sesión (REQ-02 Seguridad y control)
 
 actor Usuario
 participant "LoginPage\n(useLogin)" as Pagina

@@ -1,48 +1,82 @@
-# REQ-06 — Gestión de usuarios y roles (FO-ERS)
+# REQ-06 — Controlar el Acceso y Roles de Usuario (FO-ERS)
 
-> Estado a la fecha: Fase 0 completada (modelo, roles y usuario inicial); administración desde la interfaz **pendiente — Fase 1**.
-> Nota: `docs/dominio.md` agrupa REQ-06 y REQ-12 como "Usuarios y roles". El reparto aquí propuesto (REQ-06 = administración de cuentas y roles; REQ-12 = autenticación y control de acceso) debe contrastarse con los nombres exactos del documento Word.
+> Estado a la fecha: control de acceso por rol implementado en la Fase 0 (backend y frontend); asignación de roles desde la
+> interfaz **pendiente — Fase 1** (ver REQ-12).
 
 | Campo | Contenido |
 |---|---|
 | **Código** | REQ-06 |
-| **Nombre** | Gestión de usuarios y roles |
+| **Nombre** | Controlar el Acceso y Roles de Usuario |
 | **Tipo** | Funcional |
-| **Stakeholder** | Administrador (dueño de Livorno Clothing) |
-| **Necesidad** | NEC-xx (verificar en el Word la necesidad de control de personal y permisos; no se asigna número sin ver la tabla de necesidades) |
+| **Stakeholder** | Gerente |
+| **Necesidad** | NEC-06 |
+| **Caso de uso** | CU-02 "Gestión de usuarios y roles" |
+| **Relacionados** | CU-13 "Iniciar sesión" (requisito no funcional REQ-02 "Seguridad y control", NEC-06); REQ-12 |
 | **Prioridad** | Alta |
-| **Módulos** | `usuario`, `auth` |
+| **Módulos** | `auth`, `usuario`, `comun` (seguridad); frontend: `componentes/layout`, `hooks` |
 
 ## Descripción
 
-El sistema debe mantener cuentas de usuario con nombre, correo electrónico único, contraseña almacenada como hash BCrypt, rol y estado activo/inactivo, y permitir al rol ADMIN administrarlas. Los roles definidos son ADMIN, INVENTARIO, VENDEDOR y CONTABILIDAD, con los permisos de la matriz de `docs/dominio.md`.
+El sistema debe restringir menús, rutas y endpoints según el rol del usuario (ADMIN, INVENTARIO, VENDEDOR, CONTABILIDAD),
+de acuerdo con la matriz de permisos de `docs/dominio.md`, y aplicar siempre el rol y el estado vigentes del usuario.
 
 ## Alcance implementado (Fase 0)
 
-- Entidad `Usuario` (`id, nombre, email único, passwordHash, rol, activo, creadoEn, actualizadoEn`) y enumeración `Rol` con los cuatro roles; tabla `usuario` creada por la migración `V1__crear_tabla_usuario.sql` con restricción `CHECK` sobre el rol y correo único.
-- Creación del primer ADMIN mediante la migración Java `V2__UsuarioAdminInicial`, que lee `ADMIN_EMAIL` y `ADMIN_PASSWORD` del entorno, exige contraseña de 12 o más caracteres, rechaza valores de ejemplo (`cambiar...`), guarda el hash BCrypt y solo inserta si no existe un ADMIN (ADR-003).
-- Un usuario desactivado o con rol modificado en la base de datos pierde acceso o adopta el nuevo rol en la siguiente petición (el usuario se recarga en cada solicitud).
-- El menú del frontend incluye la entrada "Usuarios", visible únicamente para ADMIN (`modulos.ts`); el módulo en sí no está implementado.
+- Cuatro roles definidos (`Rol`: ADMIN, INVENTARIO, VENDEDOR, CONTABILIDAD) con restricción `CHECK` en la tabla `usuario`.
+- Seguridad por método con `@PreAuthorize`; todo endpoint exige autenticación salvo el inicio de sesión y `/actuator/health`.
+  Respuestas 401/403 en formato `ProblemDetail`. CORS restringido a orígenes configurados.
+- En cada petición se recarga el usuario por id: inactivo o inexistente produce 401; se aplica el rol vigente en base de datos
+  (un cambio de rol o una desactivación surten efecto en la siguiente petición).
+- Frontend: `RutaProtegida` (sin sesión redirige a `/login` conservando el destino; rol no permitido muestra acceso denegado)
+  y `Sidebar` filtrado por rol según `modulos.ts`.
+- Visibilidad del menú: Inicio, Productos y Analítica para todos; Inventario: ADMIN, INVENTARIO, CONTABILIDAD; Ventas: ADMIN,
+  VENDEDOR, CONTABILIDAD; Reservas y Alertas: ADMIN, INVENTARIO, VENDEDOR; Compras: ADMIN, INVENTARIO, CONTABILIDAD;
+  Reportes: ADMIN, CONTABILIDAD; Usuarios: ADMIN.
+
+### Autenticación que soporta este requisito (CU-13 "Iniciar sesión", REQ-02 "Seguridad y control")
+
+- `POST /api/auth/login` (público): correo normalizado (sin espacios, en minúsculas). Responde
+  `LoginResponse{token, tipo "Bearer", expiraEn, usuario{id, nombre, email, rol}}`. Credenciales inválidas, usuario inexistente
+  y usuario inactivo producen el mismo 401 "Credenciales inválidas" (sin enumeración de usuarios; siempre se ejecuta BCrypt).
+- Token JWT HS256 firmado con `JWT_SECRET` (mínimo 32 bytes; la aplicación no arranca si falta o es de ejemplo), emisor
+  `control-stock`, reclamos `sub` (id), `rol`, `nombre`, `exp`; vigencia de 8 horas, sin refresh token (ADR-003).
+- `GET /api/auth/yo` (autenticado) devuelve el usuario de la sesión. No hay endpoint de cierre de sesión: el cliente descarta el token.
+- Limitador de intentos en memoria por correo + IP: tras 5 fallos en 15 minutos responde 429 con `Retry-After`.
+- Frontend: página de login con validación; sesión en `localStorage` con verificación de expiración, limpieza ante 401 y entre pestañas.
 
 ## Pendiente — Fase 1
 
-- Pendiente — Fase 1: listado, alta, edición y desactivación de usuarios por el ADMIN.
-- Pendiente — Fase 1: asignación y cambio de rol desde la interfaz.
-- Pendiente — Fase 1: cambio y restablecimiento de contraseña.
-- Pendiente — Fase 1: pantalla del módulo "Usuarios" y endpoints REST de administración (aún no existen; los detalles se definirán en el plan de la fase).
+- Pendiente — Fase 1: aplicar `@PreAuthorize` por rol a los endpoints de cada módulo conforme se creen (hoy solo existen los
+  de `auth`; la prueba de 403 usa un endpoint de prueba).
+- Pendiente — Fase 1: asignación y cambio de rol desde la interfaz por el ADMIN (CU-02; la administración de cuentas es REQ-12).
 
 ## Criterios de aceptación
 
 | # | Criterio | Estado | Pruebas |
 |---|---|---|---|
-| CA-1 | Al migrar una base vacía con credenciales válidas se crea exactamente un ADMIN con hash BCrypt verificable | Cumplido | `UsuarioAdminInicialTest`, `V2__UsuarioAdminInicialTest` |
-| CA-2 | Repetir la migración no duplica al ADMIN | Cumplido | `UsuarioAdminInicialTest`, `V2__UsuarioAdminInicialTest` |
-| CA-3 | La migración falla con mensaje claro si no hay credenciales, la contraseña tiene menos de 12 caracteres o es de ejemplo | Cumplido | `V2__UsuarioAdminInicialTest` |
-| CA-4 | El rol se persiste como texto y los campos de auditoría se llenan | Cumplido | `UsuarioAdminInicialTest` |
-| CA-5 | Solo existen los roles ADMIN, INVENTARIO, VENDEDOR y CONTABILIDAD (restricción `CHECK` de V1 y enumeración `Rol`) | Cumplido | `UsuarioAdminInicialTest` |
-| CA-6 | Un cambio de rol o desactivación en base de datos se refleja en la siguiente petición | Cumplido | `ConvertidorUsuarioJwtTest`, `AuthIntegracionTest` |
-| CA-7 | El ADMIN crea, edita y desactiva usuarios y cambia roles desde la interfaz | Pendiente — Fase 1 | Por definir |
+| CA-1 | Petición sin token a un endpoint protegido devuelve 401 `ProblemDetail`; login y `/actuator/health` son públicos | Cumplido | `ConfiguracionSeguridadTest`, `AuthIntegracionTest` |
+| CA-2 | Un rol insuficiente recibe 403 y el rol aplicado es el vigente en base de datos | Cumplido | `ConfiguracionSeguridadTest`, `ConvertidorUsuarioJwtTest`, `AuthIntegracionTest` |
+| CA-3 | Un cambio de rol o una desactivación en base de datos se refleja en la siguiente petición (inactivo → 401) | Cumplido | `ConvertidorUsuarioJwtTest`, `AuthIntegracionTest` |
+| CA-4 | Solo existen los roles ADMIN, INVENTARIO, VENDEDOR y CONTABILIDAD | Cumplido | `UsuarioAdminInicialTest` |
+| CA-5 | CORS acepta solo orígenes configurados | Cumplido | `ConfiguracionSeguridadTest` |
+| CA-6 | Sin sesión se redirige a `/login` conservando el destino; con rol no permitido se muestra acceso denegado | Cumplido | `RutaProtegida.test.tsx`, `flujoSesion.test.tsx`, `modulos.test.ts` |
+| CA-7 | El menú muestra solo los módulos permitidos para cada rol | Cumplido | `Sidebar.test.tsx`, `modulos.test.ts`, `Topbar.test.tsx` |
+| CA-8 | El ADMIN asigna y cambia roles desde la interfaz | Pendiente — Fase 1 | Por definir |
 
-## Inconsistencias detectadas
+### Criterios de CU-13 "Iniciar sesión" (REQ-02)
 
-- `docs/dominio.md` unifica REQ-06 y REQ-12 bajo "Usuarios y roles"; confirmar contra el Word cómo se dividen.
+| # | Criterio | Pruebas |
+|---|---|---|
+| CA-13.1 | Login correcto devuelve 200 con token, expiración y datos del usuario, sin exponer el hash | `AuthIntegracionTest`, `AuthControllerTest`, `AuthServiceTest` |
+| CA-13.2 | Contraseña incorrecta, correo inexistente o usuario inactivo devuelven 401 con el mismo mensaje | `AuthIntegracionTest`, `AuthServiceTest` |
+| CA-13.3 | Correo o contraseña vacíos devuelven 400 con errores por campo | `AuthIntegracionTest`, `LoginPage.test.tsx` |
+| CA-13.4 | Token vencido (8 h), malformado, con otro emisor o firmado con otro secreto devuelve 401 | `TokenServiceTest`, `ConfiguracionSeguridadTest`, `AuthIntegracionTest`, `PropiedadesJwtTest` |
+| CA-13.5 | Tras 5 fallos el sexto intento devuelve 429 aunque la clave sea correcta; aplica igual a correos inexistentes | `AuthIntegracionTest`, `LimitadorIntentosLoginTest`, `AuthServiceTest` |
+| CA-13.6 | La sesión se limpia al expirar, al salir y al cerrar sesión en otra pestaña | `SesionProvider.test.tsx`, `lib/auth.test.ts`, `flujoSesion.test.tsx` |
+
+## Observaciones
+
+- CU-13 "Iniciar sesión" no existe en el documento Word: se crea en esta fase y se liga al requisito no funcional REQ-02.
+- `docs/dominio.md` usa REQ-02 para "Registrar operaciones de stock" (funcional); en el Word, REQ-02 "Seguridad y control" es
+  no funcional. Confirmar si el Word numera aparte los no funcionales y ajustar la trazabilidad de `dominio.md`.
+- El limitador de intentos es en memoria y usa `getRemoteAddr()`: detrás de un proxy inverso deberá revisarse.
