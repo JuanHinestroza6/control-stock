@@ -2,6 +2,7 @@
 
 - Estado: aceptada
 - Fecha: 2026-10-01
+- Modificado por: ADR-002 (Spring Boot 4.1.1 y MySQL 8.4 en lugar de "3.x" y "MySQL 8").
 
 ## Contexto
 El documento PPI (sección 4.1) define Java + Spring Boot, MySQL y un frontend web responsivo con React o Angular.

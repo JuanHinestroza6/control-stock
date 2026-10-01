@@ -18,9 +18,11 @@ frontend/src/
 └── App.tsx       rutas con React Router y guardas por rol
 ```
 
+React fijado en 18.3.1 (create-vite instala 19 por defecto), por eso React Router 7 (la 8 exige React 19). Linter: oxlint (`npm run lint`).
+
 ## Sistema de diseño (del documento PPI, sección 4.6)
 
-Configurar en `tailwind.config` como tokens; no usar colores hex sueltos en componentes.
+Configurar como tokens con `@theme` en `src/index.css` (Tailwind 4); no usar colores hex sueltos en componentes.
 
 | Token | Valor | Uso |
 |---|---|---|

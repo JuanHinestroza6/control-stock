@@ -8,7 +8,7 @@ apartados (stock reservado vs. disponible), clasificación ABC, punto de reorden
 
 ## Stack (decidido — ver docs/decisiones/ADR-001-stack.md)
 
-- Backend: Java 21, Spring Boot 3.x, Maven Wrapper, Spring Data JPA, Spring Security + JWT, Bean Validation, Flyway, MySQL 8.
+- Backend: Java 21, Spring Boot 4.1.1, Maven Wrapper, Spring Data JPA, Spring Security + JWT, Bean Validation, Flyway, MySQL 8.4 (ver ADR-002).
 - Frontend: React 18 + Vite + TypeScript, React Router, TanStack Query, Axios, Tailwind CSS, Recharts.
 - Pruebas: JUnit 5, Mockito, Spring Boot Test, Testcontainers (MySQL). Frontend: Vitest + Testing Library.
 - Reportes: Apache POI (Excel) y OpenPDF (PDF).
