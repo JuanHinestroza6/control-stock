@@ -1,6 +1,10 @@
 # Perfil de pruebas. Credenciales y secretos SOLO de prueba (no reales).
 # En pruebas con Testcontainers, @ServiceConnection sobreescribe el datasource.
 spring:
+  flyway:
+    placeholders:
+      admin-email: admin.prueba@livorno.test
+      admin-password: ClaveAdminPrueba123!
   datasource:
     url: jdbc:mysql://localhost:3306/control_stock_test
     username: test
@@ -12,6 +16,3 @@ app:
     expiracion: 1h
   cors:
     origenes: http://localhost:5173
-  admin:
-    email: admin.prueba@livorno.test
-    password: ClaveAdminPrueba123!
