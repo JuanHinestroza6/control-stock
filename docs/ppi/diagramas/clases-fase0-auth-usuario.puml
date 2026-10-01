@@ -1,0 +1,180 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+title Diagrama de clases - Fase 0 (módulos comun, usuario y auth)
+
+package "comun" {
+  package "modelo" {
+    abstract class EntidadAuditable <<MappedSuperclass>> {
+      - creadoEn : LocalDateTime
+      - actualizadoEn : LocalDateTime
+    }
+  }
+  package "seguridad" {
+    class UsuarioActual {
+      + opcional() : Optional<UsuarioAutenticado>
+      + obtener() : UsuarioAutenticado
+      + id() : Long
+    }
+    class UsuarioAutenticado <<record>> {
+      id : Long
+      email : String
+      nombre : String
+      rol : String
+    }
+  }
+  package "excepcion" {
+    class ExcepcionNegocio
+    class ConflictoException
+    class RecursoNoEncontradoException
+    class DemasiadosIntentosException {
+      - segundosRestantes : long
+      + getSegundosRestantes() : long
+    }
+    class ErrorCampo <<record>> {
+      campo : String
+      mensaje : String
+    }
+    class ManejadorGlobalExcepciones <<RestControllerAdvice>> {
+      + violaciones(ConstraintViolationException) : ProblemDetail
+      + noEncontrado(RecursoNoEncontradoException) : ProblemDetail
+      + negocio(ExcepcionNegocio) : ProblemDetail
+      + conflicto(ConflictoException) : ProblemDetail
+      + demasiadosIntentos(DemasiadosIntentosException) : ResponseEntity<ProblemDetail>
+      + noAutenticado(AuthenticationException) : ProblemDetail
+      + accesoDenegado(AccessDeniedException) : ProblemDetail
+      + bloqueoOptimista(OptimisticLockingFailureException) : ProblemDetail
+      + integridad(DataIntegrityViolationException) : ProblemDetail
+      + inesperado(Exception) : ProblemDetail
+    }
+  }
+}
+ExcepcionNegocio -[hidden]- ConflictoException
+RuntimeException <|-- ExcepcionNegocio
+RuntimeException <|-- ConflictoException
+RuntimeException <|-- RecursoNoEncontradoException
+RuntimeException <|-- DemasiadosIntentosException
+ManejadorGlobalExcepciones ..> ErrorCampo
+ManejadorGlobalExcepciones ..> ExcepcionNegocio
+ManejadorGlobalExcepciones ..> ConflictoException
+ManejadorGlobalExcepciones ..> RecursoNoEncontradoException
+ManejadorGlobalExcepciones ..> DemasiadosIntentosException
+UsuarioActual ..> UsuarioAutenticado
+
+package "usuario" {
+  enum Rol {
+    ADMIN
+    INVENTARIO
+    VENDEDOR
+    CONTABILIDAD
+  }
+  class Usuario <<Entity>> {
+    - id : Long
+    - nombre : String
+    - email : String
+    - passwordHash : String
+    - rol : Rol
+    - activo : boolean
+    + desactivar()
+    + activar()
+  }
+  interface UsuarioRepository <<Repository>> {
+    + findByEmail(email : String) : Optional<Usuario>
+  }
+}
+EntidadAuditable <|-- Usuario
+Usuario "*" --> "1" Rol
+UsuarioRepository ..> Usuario : gestiona
+
+package "auth" {
+  class AuthController <<RestController>> {
+    + login(LoginRequest, HttpServletRequest) : LoginResponse
+    + yo() : UsuarioSesionResponse
+  }
+  class AuthService <<Service>> {
+    - hashRelleno : String
+    + login(LoginRequest, ip : String) : LoginResponse
+  }
+  class TokenService <<Service>> {
+    + emitir(Usuario) : TokenEmitido
+  }
+  class TokenEmitido <<record>> {
+    token : String
+    expiraEn : Instant
+  }
+  class LimitadorIntentosLogin <<Service>> {
+    - intentos : ConcurrentHashMap<String, Intentos>
+    + verificarNoBloqueado(email, ip)
+    + registrarFallo(email, ip)
+    + registrarExito(email, ip)
+    + limpiar()
+  }
+  class ConvertidorUsuarioJwt {
+    + convert(Jwt) : AbstractAuthenticationToken
+  }
+  class ManejadorErroresSeguridad {
+    + commence(...)
+    + handle(...)
+  }
+  class ConfiguracionSeguridad <<Configuration>> {
+    + ISSUER : String = "control-stock"
+    + jwtDecoder(PropiedadesJwt) : JwtDecoder
+    + jwtEncoder(PropiedadesJwt) : JwtEncoder
+    + passwordEncoder() : PasswordEncoder
+    + filtros(HttpSecurity, UsuarioRepository) : SecurityFilterChain
+  }
+  class PropiedadesJwt <<record>> {
+    secret : String
+    expiracion : Duration = 8h
+  }
+  class PropiedadesLogin <<record>> {
+    maxIntentos : int = 5
+    ventana : Duration = 15m
+  }
+  class LoginRequest <<record>> {
+    email : String
+    password : String
+  }
+  class LoginResponse <<record>> {
+    token : String
+    tipo : String
+    expiraEn : Instant
+    usuario : UsuarioSesionResponse
+  }
+  class UsuarioSesionResponse <<record>> {
+    id : Long
+    nombre : String
+    email : String
+    rol : String
+  }
+}
+AuthController --> AuthService
+AuthController --> UsuarioActual
+AuthController ..> LoginRequest
+AuthController ..> LoginResponse
+AuthController ..> UsuarioSesionResponse
+AuthService --> UsuarioRepository
+AuthService --> TokenService
+AuthService --> LimitadorIntentosLogin
+AuthService ..> LoginResponse
+TokenService --> PropiedadesJwt
+TokenService ..> Usuario
+TokenService +-- TokenEmitido
+LimitadorIntentosLogin --> PropiedadesLogin
+LimitadorIntentosLogin ..> DemasiadosIntentosException : lanza
+LoginResponse *-- UsuarioSesionResponse
+UsuarioSesionResponse ..> Usuario
+UsuarioSesionResponse ..> UsuarioAutenticado
+ConvertidorUsuarioJwt --> UsuarioRepository
+ConfiguracionSeguridad ..> ConvertidorUsuarioJwt : crea
+ConfiguracionSeguridad ..> ManejadorErroresSeguridad : crea
+ConfiguracionSeguridad ..> PropiedadesJwt
+
+note bottom of AuthService
+  Siempre ejecuta BCrypt (hash de relleno si el email no existe).
+  Credenciales inválidas, usuario inexistente o inactivo: mismo
+  BadCredentialsException (401).
+end note
+@enduml
