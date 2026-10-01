@@ -5,7 +5,7 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
 ## Estado actual
 
 - Semana: 1
-- Fase en curso: 0 — Setup (código completo y revisado; falta CI en verde tras el push y documentación PPI)
+- Fase en curso: 0 — Setup (código completo, revisado y con CI en verde; falta merge del PR #1 y documentación PPI)
 - Última actualización: 2026-10-01
 
 ## Hecho
@@ -17,14 +17,15 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
 - [x] Backend: comun (ProblemDetail, auditoría con Clock), usuario (V1 + V2 ADMIN desde entorno), auth (JWT HS256 con
       issuer, convertidor que recarga usuario, CORS, login/yo, limitador de intentos 429). 78/78 pruebas con Testcontainers
 - [x] Revisión final de fase 0: sin críticos; importantes y menores corregidos
+- [x] Rama `fase-0-setup` publicada y PR #1 hacia main abierto; CI en verde (backend y frontend) en el primer run
 
 ## En curso
 
-- [ ] Push a origin/main y CI en verde (primer run del workflow)
+- [ ] PR #1 (https://github.com/JuanHinestroza6/control-stock/pull/1): pendiente de revisión del equipo y merge
 
 ## Próximos pasos
 
-1. Confirmar CI en verde en GitHub (`gh run watch`).
+1. Merge del PR #1; luego `git switch main && git pull` (si se usa squash, alinear el main local con origin/main).
 2. Agente `documentador-ppi`: fichas REQ-06/REQ-12 y diagramas de la fase 0 (clases auth/usuario, secuencia de login).
 3. Iniciar `/fase 1`: CRUD de categorías, productos y variantes; matriz talla × color; CRUD de usuarios.
 
@@ -39,3 +40,5 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
 - Slices `@WebMvcTest`: el convertidor JWT ya no es bean `Converter`, no hace falta mockear `UsuarioRepository`.
 - El limitador de login es en memoria y usa `getRemoteAddr()`; detrás de un proxy inverso habrá que revisarlo.
 - Rama local `appmod/java-upgrade-20261001225110` creada por una extensión del IDE (ya deshabilitada): borrar si no se usa.
+- El main local tiene 12 commits sin push (los mismos de `fase-0-setup`); no hacer push directo a main, entrar por el PR.
+- CI fijado en `ubuntu-24.04` (ubuntu-latest pasa a Ubuntu 26 el 2026-10-19); migrar a propósito cuando convenga.
