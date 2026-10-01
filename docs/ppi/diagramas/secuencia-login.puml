@@ -1,0 +1,87 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+title Diagrama de secuencia - Inicio de sesión (REQ-12)
+
+actor Usuario
+participant "LoginPage\n(useLogin)" as Pagina
+participant "api/auth\n(Axios)" as Api
+participant AuthController as Controller
+participant AuthService as Service
+participant LimitadorIntentosLogin as Limitador
+participant UsuarioRepository as Repo
+database "MySQL" as BD
+participant PasswordEncoder as Encoder
+participant TokenService as Tokens
+participant BearerTokenFilter as Filtro
+participant ConvertidorUsuarioJwt as Conv
+
+Usuario -> Pagina : correo y contraseña
+Pagina -> Pagina : validar campos (obligatorios, formato de correo)
+Pagina -> Api : login({email, password})
+Api -> Controller : POST /api/auth/login
+Controller -> Service : login(solicitud, request.getRemoteAddr())
+Service -> Service : email = trim + minúsculas
+Service -> Limitador : verificarNoBloqueado(email, ip)
+
+alt Clave bloqueada (5 fallos en 15 min)
+  Limitador --> Service : DemasiadosIntentosException(segundosRestantes)
+  Service --> Controller : excepción
+  Controller --> Api : 429 ProblemDetail + Retry-After
+  Api --> Pagina : error 429
+  Pagina --> Usuario : mensaje de espera
+else No bloqueada
+  Service -> Repo : findByEmail(email)
+  Repo -> BD : SELECT usuario
+  BD --> Repo : fila o vacío
+  Repo --> Service : Optional<Usuario>
+  note right of Service
+    Si no existe se usa hashRelleno,
+    de modo que BCrypt siempre se ejecuta.
+  end note
+  Service -> Encoder : matches(password, hash o hashRelleno)
+  Encoder --> Service : coincide
+
+  alt Usuario inexistente, inactivo o contraseña incorrecta
+    Service -> Limitador : registrarFallo(email, ip)
+    Service --> Controller : BadCredentialsException("Credenciales inválidas")
+    Controller --> Api : 401 ProblemDetail
+    Api --> Pagina : error 401 (no se limpia la sesión: ruta pública)
+    Pagina --> Usuario : "Credenciales inválidas"
+  else Credenciales válidas
+    Service -> Limitador : registrarExito(email, ip)
+    Service -> Tokens : emitir(usuario)
+    Tokens --> Service : TokenEmitido(token JWT HS256, expiraEn = ahora + 8 h)
+    Service --> Controller : LoginResponse(token, "Bearer", expiraEn, usuario)
+    Controller --> Api : 200 LoginResponse
+    Api --> Pagina : LoginResponse
+    Pagina -> Pagina : sesionDesdeLogin + guardarSesion\n(localStorage "control-stock.sesion")
+    Pagina --> Usuario : redirige a / (o al destino previo)
+  end
+end
+
+== Petición autenticada posterior ==
+
+Usuario -> Pagina : navega a un módulo
+Pagina -> Api : yo()
+Api -> Api : interceptor agrega Authorization: Bearer token
+Api -> Filtro : GET /api/auth/yo
+Filtro -> Filtro : JwtDecoder valida firma HS256, emisor y exp
+Filtro -> Conv : convert(jwt)
+Conv -> Repo : findById(sub)
+Repo -> BD : SELECT usuario por id
+BD --> Repo : usuario
+Repo --> Conv : Optional<Usuario>
+alt Usuario inexistente, inactivo, token inválido o vencido
+  Conv --> Filtro : BadCredentialsException
+  Filtro --> Api : 401 ProblemDetail
+  Api -> Api : limpiar sesión y volver a /login
+else Usuario activo
+  Conv --> Filtro : autenticación con ROLE_<rol vigente en BD>
+  Filtro -> Controller : yo() con @PreAuthorize("isAuthenticated()")
+  Controller --> Api : 200 UsuarioSesionResponse
+  Api --> Pagina : usuario
+end
+@enduml
