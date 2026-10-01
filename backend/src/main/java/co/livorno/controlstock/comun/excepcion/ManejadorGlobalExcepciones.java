@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -75,6 +76,11 @@ public class ManejadorGlobalExcepciones extends ResponseEntityExceptionHandler {
     @ExceptionHandler(ConflictoException.class)
     public ProblemDetail conflicto(ConflictoException ex) {
         return problema(HttpStatus.CONFLICT, "Conflicto", ex.getMessage());
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ProblemDetail noAutenticado(AuthenticationException ex) {
+        return problema(HttpStatus.UNAUTHORIZED, "No autenticado", "Credenciales inválidas");
     }
 
     @ExceptionHandler(AccessDeniedException.class)

@@ -48,7 +48,7 @@ management:
 
 app:
   jwt:
-    secret: ${JWT_SECRET} # minimo 32 bytes (HS256); la app no arranca si es mas corto
+    secret: ${JWT_SECRET:} # minimo 32 bytes (HS256); la app no arranca si es mas corto
     expiracion: ${JWT_EXPIRACION:8h}
   cors:
     origenes: ${CORS_ORIGENES:http://localhost:5173}
