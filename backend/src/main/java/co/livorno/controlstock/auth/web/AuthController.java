@@ -5,6 +5,7 @@ import co.livorno.controlstock.auth.dto.LoginResponse;
 import co.livorno.controlstock.auth.dto.UsuarioSesionResponse;
 import co.livorno.controlstock.auth.servicio.AuthService;
 import co.livorno.controlstock.comun.seguridad.UsuarioActual;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,8 +28,8 @@ public class AuthController {
 
     @PostMapping("/login")
     @PreAuthorize("permitAll()")
-    public LoginResponse login(@Valid @RequestBody LoginRequest solicitud) {
-        return service.login(solicitud);
+    public LoginResponse login(@Valid @RequestBody LoginRequest solicitud, HttpServletRequest request) {
+        return service.login(solicitud, request.getRemoteAddr());
     }
 
     @GetMapping("/yo")

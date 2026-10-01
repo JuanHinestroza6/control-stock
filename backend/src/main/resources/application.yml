@@ -52,3 +52,7 @@ app:
     expiracion: ${JWT_EXPIRACION:8h}
   cors:
     origenes: ${CORS_ORIGENES:http://localhost:5173}
+  login:
+    # Limitador en memoria de intentos fallidos (clave = email + IP)
+    max-intentos: ${LOGIN_MAX_INTENTOS:5}
+    ventana: ${LOGIN_VENTANA:15m}

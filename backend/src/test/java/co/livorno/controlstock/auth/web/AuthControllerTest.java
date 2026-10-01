@@ -1,6 +1,7 @@
 package co.livorno.controlstock.auth.web;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -45,7 +46,7 @@ class AuthControllerTest {
 
     @Test
     void login_credencialesValidas_responde200ConContrato() throws Exception {
-        when(authService.login(any(LoginRequest.class))).thenReturn(LoginResponse.de("tok", Instant.parse("2026-10-02T00:00:00Z"),
+        when(authService.login(any(LoginRequest.class), anyString())).thenReturn(LoginResponse.de("tok", Instant.parse("2026-10-02T00:00:00Z"),
                 new UsuarioSesionResponse(1L, "Ana", "ana@livorno.test", "VENDEDOR")));
 
         mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(CUERPO))
@@ -59,7 +60,7 @@ class AuthControllerTest {
 
     @Test
     void login_credencialesInvalidas_responde401() throws Exception {
-        when(authService.login(any(LoginRequest.class))).thenThrow(new BadCredentialsException("x"));
+        when(authService.login(any(LoginRequest.class), anyString())).thenThrow(new BadCredentialsException("x"));
 
         mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(CUERPO))
                 .andExpect(status().isUnauthorized())

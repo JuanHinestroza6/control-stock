@@ -105,6 +105,17 @@ public class ManejadorGlobalExcepciones extends ResponseEntityExceptionHandler {
         return problema(HttpStatus.CONFLICT, "Conflicto", ex.getMessage());
     }
 
+    @ExceptionHandler(DemasiadosIntentosException.class)
+    public ResponseEntity<ProblemDetail> demasiadosIntentos(DemasiadosIntentosException ex) {
+        long segundos = ex.getSegundosRestantes();
+        long minutos = Math.max(1, (segundos + 59) / 60);
+        String detalle = "Demasiados intentos fallidos. Intenta de nuevo en " + minutos
+                + (minutos == 1 ? " minuto." : " minutos.");
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(segundos))
+                .body(problema(HttpStatus.TOO_MANY_REQUESTS, "Demasiados intentos", detalle));
+    }
+
     @ExceptionHandler(AuthenticationException.class)
     public ProblemDetail noAutenticado(AuthenticationException ex) {
         return problema(HttpStatus.UNAUTHORIZED, "No autenticado", "Credenciales inválidas");

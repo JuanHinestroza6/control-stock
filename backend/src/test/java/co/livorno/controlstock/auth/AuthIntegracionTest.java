@@ -61,6 +61,56 @@ class AuthIntegracionTest {
                 .andExpect(jsonPath("$.rol").value("ADMIN"));
     }
 
+    @Autowired co.livorno.controlstock.auth.servicio.LimitadorIntentosLogin limitador;
+
+    @org.junit.jupiter.api.BeforeEach
+    void limpiarLimitador() {
+        limitador.limpiar();
+    }
+
+    private void intentar(String email, String password, int esperado) throws Exception {
+        mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}"))
+                .andExpect(status().is(esperado));
+    }
+
+    @Test
+    void login_tras5FallosSeguidos_el6responde429AunqueLaClaveSeaCorrecta() throws Exception {
+        for (int i = 0; i < 5; i++) {
+            intentar("admin.prueba@livorno.test", "mala", 401);
+        }
+
+        mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"admin.prueba@livorno.test\",\"password\":\"ClaveAdminPrueba123!\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string(HttpHeaders.RETRY_AFTER, "900"))
+                .andExpect(jsonPath("$.detail").value("Demasiados intentos fallidos. Intenta de nuevo en 15 minutos."));
+    }
+
+    @Test
+    void login_emailInexistente_seBloqueaIgualQueUnoExistente() throws Exception {
+        for (int i = 0; i < 5; i++) {
+            intentar("fantasma@livorno.test", "mala", 401);
+        }
+
+        mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"fantasma@livorno.test\",\"password\":\"mala\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.detail").value("Demasiados intentos fallidos. Intenta de nuevo en 15 minutos."));
+    }
+
+    @Test
+    void login_exitosoTrasFallos_limpiaElContador() throws Exception {
+        for (int i = 0; i < 4; i++) {
+            intentar("admin.prueba@livorno.test", "mala", 401);
+        }
+        intentar("admin.prueba@livorno.test", "ClaveAdminPrueba123!", 200);
+        for (int i = 0; i < 4; i++) {
+            intentar("admin.prueba@livorno.test", "mala", 401);
+        }
+    }
+
     @Test
     void actuator_health_esPublicoYSinDetalles() throws Exception {
         mvc.perform(get("/actuator/health"))

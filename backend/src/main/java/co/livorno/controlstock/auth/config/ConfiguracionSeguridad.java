@@ -33,7 +33,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 @EnableMethodSecurity
-@EnableConfigurationProperties(PropiedadesJwt.class)
+@EnableConfigurationProperties({PropiedadesJwt.class, PropiedadesLogin.class})
 public class ConfiguracionSeguridad {
 
     public static final String ISSUER = "control-stock";
