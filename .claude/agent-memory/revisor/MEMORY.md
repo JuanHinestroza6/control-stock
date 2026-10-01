@@ -1,0 +1,1 @@
+- [Pendientes revisión Fase 0](project_fase0_pendientes.md) — abiertos tras cierre backend F0: secreto de .env.example válido, sin rate-limit login, Locale.ROOT, permitAll explícito

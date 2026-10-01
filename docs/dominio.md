@@ -16,13 +16,13 @@ Fuente de verdad del modelo de datos y las reglas de negocio. Si el código cont
 ## Entidades
 
 ```
-Usuario        id, nombre, email (único), passwordHash, rol, activo, creadoEn
-Categoria      id, nombre (único)
+Usuario        id, nombre, email (único), passwordHash, rol, activo, creadoEn, actualizadoEn
+Categoria      id, nombre (único), creadoEn, actualizadoEn
 Producto       id, codigo (único), nombre, categoriaId, precioCompra, precioVenta,
-               leadTimeDias (default 15), loteMinimo (default 1), activo, creadoEn
+               leadTimeDias (default 15), loteMinimo (default 1), activo, creadoEn, actualizadoEn
 Variante       id, productoId, sku (único), talla, color,
                stockFisico, stockReservado, stockMinimo, puntoReorden (nullable),
-               claseAbc (A|B|C, nullable), activo, version
+               claseAbc (A|B|C, nullable), activo, version, creadoEn, actualizadoEn
 Movimiento     id, varianteId, tipo, cantidad (>0),
                fisicoAntes, fisicoDespues, reservadoAntes, reservadoDespues,
                usuarioId, fecha, referenciaTipo, referenciaId, observacion
@@ -37,6 +37,10 @@ Pronostico     id, productoId, varianteId (nullable), periodo (YYYY-MM), cantida
 PlanCompra     id, fecha, usuarioId, estado
 DetallePlan    id, planId, varianteId, cantidadSugerida, cantidadAprobada, justificacion
 ```
+
+Auditoría: Usuario, Categoria, Producto y Variante heredan de `EntidadAuditable` (`creadoEn`, `actualizadoEn`, llenados por
+JPA Auditing con un `Clock` en America/Bogota). Movimiento y las demás entidades con fecha propia (`fecha`, `creadaEn`,
+`calculadoEn`) no heredan; Movimiento es inmutable. Base de datos: MySQL 8.4 LTS (ADR-002).
 
 Tallas válidas: `XS, S, M, L, XL, XXL` (y `UNICA` para accesorios). Colores: texto libre normalizado en mayúsculas.
 SKU sugerido: `{codigoProducto}-{talla}-{COLOR3}` → `LIV001-M-NEG`.

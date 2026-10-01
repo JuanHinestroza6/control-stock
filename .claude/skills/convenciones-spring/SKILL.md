@@ -1,6 +1,6 @@
 ---
 name: convenciones-spring
-description: Convenciones de código backend de Control Stock en Java 21 y Spring Boot 3 - estructura de paquetes por módulo y capa, entidades JPA, repositorios, servicios, DTOs record, controllers, manejo de errores con ProblemDetail, seguridad con @PreAuthorize, migraciones Flyway y pruebas. Úsalo siempre que escribas, revises o pruebes código Java del backend.
+description: Convenciones de código backend de Control Stock en Java 21 y Spring Boot 4.1 - estructura de paquetes por módulo y capa, entidades JPA, repositorios, servicios, DTOs record, controllers, manejo de errores con ProblemDetail, seguridad con @PreAuthorize, migraciones Flyway y pruebas. Úsalo siempre que escribas, revises o pruebes código Java del backend.
 ---
 
 # Convenciones Spring Boot
@@ -125,3 +125,5 @@ public class ProductoController {
 - Nombres: `metodo_condicion_resultadoEsperado`. Estructura dado/cuando/entonces con comentarios.
 - Usa AssertJ (`assertThat`).
 - Si Docker no está disponible, las pruebas con Testcontainers se marcan con `@Testcontainers(disabledWithoutDocker = true)`.
+- Boot 4 (ADR-002): mocks de beans con `@MockitoBean` (`@MockBean` no existe). Testcontainers 2:
+  `org.testcontainers.mysql.MySQLContainer` con `@ServiceConnection`, imagen `mysql:8.4`. Jackson 3 (`tools.jackson.*`).

@@ -1,0 +1,2 @@
+- [Entorno y versiones](project_entorno_y_versiones.md) — sin JDK/Docker local (2026-10-01); Boot 3.x fuera de Initializr; MySQL 8.4
+- [Decisiones Fase 0](project_decisiones_fase0.md) — JWT resource-server 8h, admin por migración Java, auditoría con Clock, [DECIDIR] pendientes

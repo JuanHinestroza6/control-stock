@@ -1,0 +1,28 @@
+# Infra local: MySQL 8.4. Las variables se leen de .env (copiar .env.example -> .env).
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: control-stock-mysql
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Copia .env.example a .env y define DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME:?Copia .env.example a .env y define DB_NAME}
+      MYSQL_USER: ${DB_USER:?Copia .env.example a .env y define DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Copia .env.example a .env y define DB_PASSWORD}
+      TZ: America/Bogota
+    ports:
+      - "127.0.0.1:${DB_PORT:-3306}:3306"  # solo localhost, no expuesto a la red
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  mysql_data:
