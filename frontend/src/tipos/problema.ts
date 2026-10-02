@@ -10,5 +10,7 @@ export interface ProblemDetail {
   status?: number
   detail?: string
   instance?: string
+  /** Código de negocio opcional (p. ej. CAMBIO_PASSWORD_REQUERIDO en 403). */
+  codigo?: string
   errores?: ErrorCampo[]
 }

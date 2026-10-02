@@ -10,6 +10,8 @@ export interface UsuarioSesion {
   nombre: string
   email: string
   rol: Rol
+  /** Contraseña temporal: solo se permite /cuenta hasta cambiarla. */
+  debeCambiarPassword: boolean
 }
 
 export interface LoginResponse {

@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router'
-import { alExpirarSesion } from '../api/cliente'
+import { alExpirarSesion, alRequerirCambioPassword } from '../api/cliente'
 import { CLAVE_SESION, borrarSesion, guardarSesion, leerSesion, type Sesion } from '../lib/auth'
 import type { EstadoLogin } from '../tipos/navegacion'
 import { ContextoSesion, type SesionContexto } from './sesionContexto'
@@ -43,6 +43,15 @@ export function SesionProvider({ children }: { children: ReactNode }) {
         navigate('/login', { replace: true, state: estado })
       }),
     [navigate, queryClient],
+  )
+
+  useEffect(
+    () =>
+      alRequerirCambioPassword((marcada) => {
+        setSesion(marcada)
+        navigate('/cuenta', { replace: true })
+      }),
+    [navigate],
   )
 
   // Sincroniza entre pestañas: cerrar sesión (o iniciarla) en una pestaña se refleja en las demás.

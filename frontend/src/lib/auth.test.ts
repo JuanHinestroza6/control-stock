@@ -4,7 +4,7 @@ import { CLAVE_SESION, borrarSesion, guardarSesion, leerSesion, sesionDesdeLogin
 const ahora = new Date('2026-10-01T10:00:00Z')
 
 function sesion(expiraEn: string, rol: Sesion['usuario']['rol'] = 'ADMIN'): Sesion {
-  return { token: 'abc', expiraEn, usuario: { id: 1, nombre: 'Ana', email: 'ana@livorno.co', rol } }
+  return { token: 'abc', expiraEn, usuario: { id: 1, nombre: 'Ana', email: 'ana@livorno.co', rol, debeCambiarPassword: false } }
 }
 
 describe('lib/auth', () => {
@@ -71,11 +71,17 @@ describe('lib/auth', () => {
   })
 
   it('sesionDesdeLogin conserva token, expiración y usuario y descarta el resto', () => {
-    const usuario = { id: 2, nombre: 'Luis', email: 'luis@livorno.co', rol: 'INVENTARIO' as const }
+    const usuario = { id: 2, nombre: 'Luis', email: 'luis@livorno.co', rol: 'INVENTARIO' as const, debeCambiarPassword: false }
     expect(sesionDesdeLogin({ token: 't', tipo: 'Bearer', expiraEn: '2026-10-01T18:00:00Z', usuario })).toEqual({
       token: 't',
       expiraEn: '2026-10-01T18:00:00Z',
       usuario,
     })
+  })
+
+  it('leerSesion normaliza sesiones antiguas sin debeCambiarPassword a false', () => {
+    const { debeCambiarPassword: _omitido, ...usuario } = sesion('2026-10-01T18:00:00Z').usuario
+    localStorage.setItem(CLAVE_SESION, JSON.stringify({ token: 'abc', expiraEn: '2026-10-01T18:00:00Z', usuario }))
+    expect(leerSesion(ahora)?.usuario.debeCambiarPassword).toBe(false)
   })
 })

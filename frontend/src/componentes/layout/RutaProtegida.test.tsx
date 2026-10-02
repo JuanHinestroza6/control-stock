@@ -22,6 +22,7 @@ function rutas() {
           </RutaProtegida>
         }
       />
+      <Route path="/cuenta" element={<RutaProtegida><p>Mi cuenta</p></RutaProtegida>} />
       <Route element={<RutaProtegida />}>
         <Route path="/" element={<p>Inicio privado</p>} />
       </Route>
@@ -49,5 +50,16 @@ describe('RutaProtegida', () => {
   it('con un rol permitido muestra el contenido', () => {
     renderizarApp(rutas(), { ruta: '/usuarios', rol: 'ADMIN' })
     expect(screen.getByText('Gestión de usuarios')).toBeInTheDocument()
+  })
+
+  it('con contraseña temporal redirige cualquier ruta a /cuenta', () => {
+    renderizarApp(rutas(), { ruta: '/', rol: 'ADMIN', debeCambiarPassword: true })
+    expect(screen.getByText('Mi cuenta')).toBeInTheDocument()
+    expect(screen.queryByText('Inicio privado')).not.toBeInTheDocument()
+  })
+
+  it('con contraseña temporal permite quedarse en /cuenta', () => {
+    renderizarApp(rutas(), { ruta: '/cuenta', rol: 'VENDEDOR', debeCambiarPassword: true })
+    expect(screen.getByText('Mi cuenta')).toBeInTheDocument()
   })
 })
