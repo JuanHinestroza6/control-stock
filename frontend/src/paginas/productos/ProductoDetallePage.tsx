@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { BadgeStock } from '../../componentes/dominio/BadgeStock'
+import { MatrizTallaColor } from '../../componentes/dominio/MatrizTallaColor'
 import { Badge } from '../../componentes/ui/Badge'
 import { Boton } from '../../componentes/ui/Boton'
 import { DialogoConfirmacion } from '../../componentes/ui/DialogoConfirmacion'
@@ -13,6 +14,7 @@ import {
   useActualizarVariante,
   useCambiarEstadoProducto,
   useCambiarEstadoVariante,
+  useMatriz,
   useVariantes,
 } from '../../hooks/useVariantes'
 import { mensajeError } from '../../lib/errores'
@@ -38,6 +40,7 @@ function Detalle({ producto }: { producto: ProductoDetalleResponse }) {
   const puedeEditar = puedeEditarCatalogo(usuario?.rol)
   const [incluirInactivas, setIncluirInactivas] = useState(false)
   const variantes = useVariantes(producto.id, incluirInactivas)
+  const matriz = useMatriz(producto.id, incluirInactivas)
   const estadoProducto = useCambiarEstadoProducto(producto.id)
   const estadoVariante = useCambiarEstadoVariante(producto.id)
   const actualizar = useActualizarVariante(producto.id)
@@ -116,6 +119,17 @@ function Detalle({ producto }: { producto: ProductoDetalleResponse }) {
     tablaVariantes = <Tabla columnas={columnas} filas={variantes.data} claveFila={(v) => v.id} descripcion="Variantes del producto" />
   }
 
+  let contenidoMatriz
+  if (matriz.isPending) {
+    contenidoMatriz = <EstadoCarga filas={3} />
+  } else if (matriz.isError) {
+    contenidoMatriz = <EstadoError mensaje={mensajeError(matriz.error)} onReintentar={() => void matriz.refetch()} />
+  } else if (matriz.data.celdas.length === 0) {
+    contenidoMatriz = <EstadoVacio mensaje="Aún no hay variantes para mostrar la matriz." />
+  } else {
+    contenidoMatriz = <MatrizTallaColor matriz={matriz.data} />
+  }
+
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -161,7 +175,10 @@ function Detalle({ producto }: { producto: ProductoDetalleResponse }) {
         </dl>
       </Tarjeta>
 
-      {/* F7: aquí va la MatrizTallaColor. */}
+      <div className="flex flex-col gap-3">
+        <h2>Matriz talla x color</h2>
+        {contenidoMatriz}
+      </div>
 
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

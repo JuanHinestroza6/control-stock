@@ -54,6 +54,14 @@ beforeEach(() => {
   vi.resetAllMocks()
   vi.mocked(api.obtenerProducto).mockResolvedValue(PRODUCTO)
   vi.mocked(apiVariantes.listarVariantes).mockResolvedValue([variante(1), variante(2, { activo: false })])
+  vi.mocked(apiVariantes.obtenerMatriz).mockResolvedValue({
+    productoId: 5,
+    tallas: ['M'],
+    colores: ['NEGRO'],
+    celdas: [
+      { talla: 'M', color: 'NEGRO', varianteId: 1, sku: 'MATRIZ-M-NEGRO', stockFisico: 0, stockReservado: 0, stockDisponible: 0, estadoStock: 'AGOTADO', activo: true },
+    ],
+  })
 })
 
 describe('ProductoDetallePage', () => {
@@ -62,7 +70,7 @@ describe('ProductoDetallePage', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Hoodie Basic' })).toBeInTheDocument()
     expect(screen.getByText('Precio de compra')).toBeInTheDocument()
     expect(await screen.findByText('LIV005-M-NEG1')).toBeInTheDocument()
-    expect(screen.getByText('Agotado')).toBeInTheDocument()
+    expect(screen.getAllByText('Agotado').length).toBeGreaterThan(0)
     expect(screen.getByText('Inactiva')).toBeInTheDocument()
   })
 
@@ -87,6 +95,20 @@ describe('ProductoDetallePage', () => {
     vi.mocked(apiVariantes.listarVariantes).mockResolvedValue([])
     renderizarApp(<App />, { ruta: '/productos/5', rol: 'ADMIN' })
     expect(await screen.findByText('Este producto aún no tiene variantes.')).toBeInTheDocument()
+  })
+
+  it('muestra la matriz y la pide con incluirInactivas segun el checkbox', async () => {
+    renderizarApp(<App />, { ruta: '/productos/5', rol: 'ADMIN' })
+    expect(await screen.findByRole('table', { name: 'Stock disponible por talla y color' })).toBeInTheDocument()
+    expect(apiVariantes.obtenerMatriz).toHaveBeenLastCalledWith(5, false)
+    await userEvent.click(screen.getByLabelText('Mostrar inactivas'))
+    await waitFor(() => expect(apiVariantes.obtenerMatriz).toHaveBeenLastCalledWith(5, true))
+  })
+
+  it('matriz sin celdas muestra el estado vacio', async () => {
+    vi.mocked(apiVariantes.obtenerMatriz).mockResolvedValue({ productoId: 5, tallas: [], colores: [], celdas: [] })
+    renderizarApp(<App />, { ruta: '/productos/5', rol: 'ADMIN' })
+    expect(await screen.findByText('Aún no hay variantes para mostrar la matriz.')).toBeInTheDocument()
   })
 
   it('"Mostrar inactivas" cambia el parámetro de la consulta', async () => {
