@@ -40,7 +40,7 @@ export function useMovimientos(filtros: FiltrosMovimientos, habilitado = true) {
 export function useRegistrarEntrada() {
   const qc = useQueryClient()
   return useMutation<MovimientoResponse[], unknown, EntradaRequest>({
-    mutationFn: registrarEntrada,
+    mutationFn: (datos) => registrarEntrada(datos),
     onSuccess: () => invalidarStock(qc),
   })
 }
@@ -48,7 +48,7 @@ export function useRegistrarEntrada() {
 export function useRegistrarAjuste() {
   const qc = useQueryClient()
   return useMutation<MovimientoResponse, unknown, AjusteRequest>({
-    mutationFn: registrarAjuste,
+    mutationFn: (datos) => registrarAjuste(datos),
     onSuccess: () => invalidarStock(qc),
   })
 }

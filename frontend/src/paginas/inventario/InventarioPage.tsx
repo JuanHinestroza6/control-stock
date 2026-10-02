@@ -99,7 +99,7 @@ export function InventarioPage() {
       celda: (v) => (
         <div className="flex flex-wrap gap-3">
           {puedeMover && v.activo && (
-            <Link to={`/inventario/entradas/nueva?varianteId=${v.varianteId}`} className={clasesLink} aria-label={`Entrada de ${v.sku}`}>
+            <Link to={`/inventario/entradas/nueva?productoId=${v.productoId}`} className={clasesLink} aria-label={`Entrada de ${v.sku}`}>
               Entrada
             </Link>
           )}

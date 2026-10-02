@@ -31,7 +31,7 @@ export function useVenta(id: number | undefined) {
 export function useRegistrarVenta() {
   const qc = useQueryClient()
   return useMutation<VentaDetalleResponse, unknown, RegistrarVentaRequest>({
-    mutationFn: registrarVenta,
+    mutationFn: (datos) => registrarVenta(datos),
     onSuccess: () => invalidarStock(qc, ['ventas', 'venta']),
   })
 }
