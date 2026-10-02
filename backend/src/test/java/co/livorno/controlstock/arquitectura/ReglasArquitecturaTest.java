@@ -16,6 +16,5 @@ class ReglasArquitecturaTest {
     static final ArchRule soloMovimientoServiceAplicaMovimientos = noClasses()
             .that().doNotHaveFullyQualifiedName("co.livorno.controlstock.inventario.servicio.MovimientoService")
             .should().callMethod(Variante.class, "aplicarMovimiento", int.class, int.class)
-            .because("el stock solo cambia a través de MovimientoService (regla de oro 1)")
-            .allowEmptyShould(true);
+            .because("el stock solo cambia a través de MovimientoService (regla de oro 1)");
 }

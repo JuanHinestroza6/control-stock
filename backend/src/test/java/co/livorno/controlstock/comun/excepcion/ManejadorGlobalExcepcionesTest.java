@@ -58,6 +58,8 @@ class ManejadorGlobalExcepcionesTest {
 
         @GetMapping("/bloqueo")
         String bloqueo() { throw new OptimisticLockingFailureException("version"); }
+        @GetMapping("/bloqueo-pesimista")
+        String bloqueoPesimista() { throw new org.springframework.dao.PessimisticLockingFailureException("lock"); }
 
         @GetMapping("/integridad")
         String integridad() { throw new DataIntegrityViolationException("Duplicate entry xyz for key"); }
@@ -154,7 +156,16 @@ class ManejadorGlobalExcepcionesTest {
 
     @Test
     void bloqueoOptimista_responde409() throws Exception {
-        mvc.perform(get("/prueba/bloqueo")).andExpect(status().isConflict());
+        mvc.perform(get("/prueba/bloqueo")).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Conflicto de concurrencia"))
+                .andExpect(jsonPath("$.detail").value(
+                        "Los datos cambiaron mientras registrabas la operación. Revisa y vuelve a confirmar."));
+    }
+
+    @Test
+    void bloqueoPesimista_responde409ConElMismoMensaje() throws Exception {
+        mvc.perform(get("/prueba/bloqueo-pesimista")).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Conflicto de concurrencia"));
     }
 
     @Test
