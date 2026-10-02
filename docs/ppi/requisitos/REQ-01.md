@@ -1,17 +1,17 @@
-# REQ-01 — Visualizar stock en tiempo real (FO-ERS)
+# REQ-01 — Visualizar Stock y Atributos en Tiempo Real (FO-ERS)
 
 > Estado a la fecha: matriz por producto (Fase 1); inventario actual y kardex consultable (Fase 2).
 
 | Campo | Contenido |
 |---|---|
 | **Código** | REQ-01 |
-| **Nombre** | Visualizar stock en tiempo real |
+| **Nombre** | Visualizar Stock y Atributos en Tiempo Real |
 | **Tipo** | Funcional |
-| **Stakeholder** | Por asignar (contrastar con el Word) |
-| **Necesidad** | Por asignar (contrastar con el Word) |
-| **Caso de uso** | Por asignar (contrastar con el Word) |
+| **Stakeholder** | Contabilidad |
+| **Necesidad** | NEC-01 |
+| **Caso de uso** | CU-04 |
 | **Relacionados** | REQ-11 (catálogo y matriz); REQ-02 (movimientos que alimentan el kardex); REQ-04 (alertas, Fase 4) |
-| **Prioridad** | Por asignar (contrastar con el Word) |
+| **Prioridad** | Alta |
 | **Módulos** | `catalogo` (matriz), `inventario` (`InventarioService`, `KardexService`); frontend: `paginas/inventario` (`InventarioPage`, `KardexPage`) |
 
 ## Descripción
@@ -42,5 +42,5 @@ El sistema debe mostrar el stock físico, reservado y disponible de cada variant
 
 ## Observaciones
 
-- Stakeholder, NEC, CU y prioridad del Word: por asignar.
+- Datos del Word: Contabilidad, NEC-01, CU-04, prioridad Alta.
 - Complementa REQ-11, cuya ficha ya declaraba la matriz bajo REQ-01.

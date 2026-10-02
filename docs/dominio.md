@@ -190,14 +190,14 @@ usuario autenticado porque el VENDEDOR la usa para buscar al vender. Anular vent
 
 | Requisito PPI | Módulo |
 |---|---|
-| REQ-01 Visualizar stock en tiempo real | catalogo, inventario |
-| REQ-02 Registrar operaciones de stock | inventario |
+| REQ-01 Visualizar stock y atributos en tiempo real (CU-04) | catalogo, inventario |
+| REQ-02 Registrar automáticamente operaciones de stock (CU-03) | inventario |
 | REQ-03 Reportes de rentabilidad | reporte |
 | REQ-04 Alertas de stock mínimo | inventario (alertas) + analitica (ROP) |
 | REQ-05 Productos más vendidos | analitica |
 | REQ-06 Controlar el acceso y roles de usuario (CU-02) | auth, usuario |
 | REQ-07 Reportes contables | reporte |
-| REQ-08 Devoluciones | venta |
+| REQ-08 Gestionar el registro de devoluciones (CU-09) | venta |
 | REQ-09 Tendencias históricas | analitica |
 | REQ-10 Planeación de compras | compra + analitica (pronóstico) |
 | REQ-11 Gestión de productos (CU-11) | catalogo |

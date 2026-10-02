@@ -1,4 +1,4 @@
-# REQ-08 — Devoluciones (FO-ERS)
+# REQ-08 — Gestionar el Registro de Devoluciones (FO-ERS)
 
 > Aviso de inconsistencia del Word: en el documento oficial REQ-08 y REQ-09 tienen el nombre y la descripción cruzados
 > (nota en `docs/dominio.md`). Esta ficha usa el nombre "Devoluciones" con la descripción que le corresponde; al pegarla,
@@ -8,13 +8,13 @@
 | Campo | Contenido |
 |---|---|
 | **Código** | REQ-08 |
-| **Nombre** | Devoluciones |
+| **Nombre** | Gestionar el Registro de Devoluciones |
 | **Tipo** | Funcional |
-| **Stakeholder** | Por asignar (contrastar con el Word) |
-| **Necesidad** | Por asignar (contrastar con el Word) |
-| **Caso de uso** | Por asignar (contrastar con el Word) |
+| **Stakeholder** | Vendedor |
+| **Necesidad** | NEC-08 |
+| **Caso de uso** | CU-09 |
 | **Relacionados** | REQ-02 (movimientos y kardex); REQ-01 (stock visible); REQ-03 y REQ-07 (reportes que consumirán las devoluciones) |
-| **Prioridad** | Por asignar (contrastar con el Word) |
+| **Prioridad** | Baja |
 | **Módulos** | `venta` (`DevolucionService`, `Devolucion`), `inventario` (`MovimientoService`); frontend: `paginas/ventas/VentaDetallePage`, `componentes/dominio/ModalDevolucion` |
 
 ## Descripción
@@ -56,5 +56,5 @@ prenda es apta para venta. Una devolución apta reingresa las unidades al stock;
 
 ## Observaciones
 
-- Stakeholder, NEC, CU y prioridad del Word: por asignar. NEC-010 del Word debería ser NEC-10.
+- Datos del Word: Vendedor, NEC-08, CU-09, prioridad Baja. NEC-010 del Word debería ser NEC-10.
 - `ModalDevolucion` no tiene archivo de prueba propio; se cubre desde `accionesVenta.test.tsx`.

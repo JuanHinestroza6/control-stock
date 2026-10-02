@@ -1,17 +1,17 @@
-# REQ-02 — Registrar operaciones de stock (FO-ERS)
+# REQ-02 — Registrar Automáticamente Operaciones de Stock (FO-ERS)
 
 > Estado a la fecha: implementado en la Fase 2 (backend y frontend), rama `fase-2-operacion`.
 
 | Campo | Contenido |
 |---|---|
 | **Código** | REQ-02 |
-| **Nombre** | Registrar operaciones de stock |
+| **Nombre** | Registrar Automáticamente Operaciones de Stock |
 | **Tipo** | Funcional |
-| **Stakeholder** | Por asignar (contrastar con el Word) |
-| **Necesidad** | Por asignar (contrastar con el Word) |
-| **Caso de uso** | Por asignar (contrastar con el Word) |
+| **Stakeholder** | Vendedor |
+| **Necesidad** | NEC-02 |
+| **Caso de uso** | CU-03 |
 | **Relacionados** | REQ-01 (consulta de stock y kardex); REQ-08 (devoluciones); REQ-06 (permisos por rol) |
-| **Prioridad** | Por asignar (contrastar con el Word) |
+| **Prioridad** | Alta |
 | **Módulos** | `inventario` (`MovimientoService`, `OperacionInventarioService`), `venta` (`VentaService`); frontend: `paginas/inventario`, `paginas/ventas`, `componentes/dominio/ModalAjuste` |
 
 ## Descripción
@@ -85,7 +85,7 @@ ADR-006 y las reglas en `docs/dominio.md`.
 
 ## Observaciones
 
-- Stakeholder, necesidad y caso de uso del Word: por asignar. No se infieren desde el código.
+- Datos del Word: Vendedor, NEC-02, CU-03, prioridad Alta.
 - Inconsistencias del Word: REQ-08 y REQ-09 con nombre y descripción cruzados; NEC-010 debería ser NEC-10.
 - Pendiente aceptado (ADR-006): dos entradas simultáneas del mismo producto, gana la última en confirmar (`Producto` sin `@Version`).
 - Diagramas: `diagramas/clases-fase2-operacion.puml`, `diagramas/secuencia-registrar-venta.puml`.

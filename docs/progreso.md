@@ -5,8 +5,7 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
 ## Estado actual
 
 - Semana: 2
-- Fase en curso: 2 — Operación (rama `fase-2-operacion`, sin push): código, revisión y PPI terminados; falta la prueba
-  manual T3 del usuario
+- Fase en curso: 2 — Operación terminada (rama `fase-2-operacion` publicada); siguiente: Fase 3 (apartados)
 - Última actualización: 2026-10-02
 
 ## Hecho
@@ -21,17 +20,19 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
 - [x] Fase 2 — frontend: inventario, entrada por matriz, ajuste, kardex, nueva venta, listado/detalle, devolución,
       anulación, rutas por rol. 304/304 pruebas, lint y build OK
 - [x] Fase 2 — revisión final: sin críticos; 1 importante (ArchUnit) y 7 menores corregidos (6705c7c, 898bb19)
-- [x] Fase 2 — PPI: fichas REQ-01, REQ-02, REQ-08; diagramas de clases de operación y secuencia de registrar venta
+- [x] Fase 2 — PPI: fichas REQ-01 (CU-04), REQ-02 (CU-03) y REQ-08 (CU-09) con datos del Word; diagramas de
+      clases de operación y secuencia de registrar venta
+- [x] Fase 2 — T3: prueba manual con el backend real completa, sin errores (2026-10-02)
 
 ## En curso
 
-- [ ] T3 de la fase 2: prueba manual con el backend real (la hace el usuario; ver "Prueba manual T3 — fase 2")
+- [ ] PR de `fase-2-operacion` hacia main (lo abre el usuario cuando lo decida)
 
 ## Próximos pasos
 
-1. Ejecutar la prueba manual T3 de la fase 2 y reportar lo que falle.
-2. Push de `fase-2-operacion` y PR solo cuando el usuario lo pida.
-3. Asignar stakeholder, NEC, CU y prioridad de REQ-01, REQ-02 y REQ-08 contra el Word; revisar diagramas con Alt+D.
+1. PR y merge de `fase-2-operacion`; luego `git switch main && git pull`.
+2. Revisar los diagramas con Alt+D (PlantUML no instalado).
+3. Iniciar `/fase 3`: apartados (reservas), alertas y tareas programadas.
 
 ## Bloqueos y decisiones pendientes (aceptados, sin acción)
 
@@ -41,24 +42,24 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
 - Reglas para fases futuras: las ventas ANULADAS se excluyen de demanda, ABC y rentabilidad (fases 5–7); anular una venta
   que vino de una reserva solo devuelve físico y la reserva queda CONVERTIDA (fase 3).
 
-## Prueba manual T3 — fase 2 (PowerShell 5, desde la raíz del repo)
+## Prueba manual T3 — fase 2 (PowerShell 5, desde la raíz del repo) — completada 2026-10-02
 
 1. Arranque igual que en la fase 1: `.env` completo, `docker compose up -d mysql` (esperar `healthy`), en `backend`
    `.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=dev"` (Flyway aplica V8–V10 solo) y en `frontend`
    `npm run dev`. Abre http://localhost:5173 y entra con `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
 2. Verificación (crea antes un usuario INVENTARIO, uno VENDEDOR y uno CONTABILIDAD si no existen):
-   - [ ] Inventario: el producto con variantes de la fase 1 aparece en 0 y AGOTADO; filtros y búsqueda funcionan.
-   - [ ] Como INVENTARIO, "Nueva entrada" con cantidades en la matriz y costo 25000 → el stock sube y el detalle del
+   - [x] Inventario: el producto con variantes de la fase 1 aparece en 0 y AGOTADO; filtros y búsqueda funcionan.
+   - [x] Como INVENTARIO, "Nueva entrada" con cantidades en la matriz y costo 25000 → el stock sube y el detalle del
          producto muestra precioCompra 25000. Otra entrada con costo 0 → stock sube y precioCompra no cambia.
-   - [ ] Ajuste negativo con observación → el stock baja; el kardex de esa variante muestra ENTRADA y AJUSTE con los
+   - [x] Ajuste negativo con observación → el stock baja; el kardex de esa variante muestra ENTRADA y AJUSTE con los
          saldos antes → después encadenados.
-   - [ ] Como VENDEDOR, nueva venta con 2 variantes, una con precio menor que la lista → el detalle muestra el
+   - [x] Como VENDEDOR, nueva venta con 2 variantes, una con precio menor que la lista → el detalle muestra el
          descuento y no muestra el costo; el stock baja. Pedir más que el disponible no se permite.
-   - [ ] Devolver 1 unidad apta → stock +1; devolver 1 no apta → stock igual; ambas aparecen en el detalle.
-   - [ ] Como ADMIN, anular esa venta → 422 (tiene devoluciones). Anular otra venta sin devoluciones con motivo →
+   - [x] Devolver 1 unidad apta → stock +1; devolver 1 no apta → stock igual; ambas aparecen en el detalle.
+   - [x] Como ADMIN, anular esa venta → 422 (tiene devoluciones). Anular otra venta sin devoluciones con motivo →
          stock repuesto y el kardex muestra ANULACION_VENTA.
-   - [ ] Como CONTABILIDAD: ve inventario, kardex y ventas con costo, sin botones para registrar ni anular.
-   - [ ] Como INVENTARIO no ve Ventas; como VENDEDOR no ve Kardex ni entradas.
+   - [x] Como CONTABILIDAD: ve inventario, kardex y ventas con costo, sin botones para registrar ni anular.
+   - [x] Como INVENTARIO no ve Ventas; como VENDEDOR no ve Kardex ni entradas.
 
 ## Notas para la próxima sesión
 
