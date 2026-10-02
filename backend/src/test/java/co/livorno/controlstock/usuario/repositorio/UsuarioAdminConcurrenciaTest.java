@@ -44,12 +44,12 @@ class UsuarioAdminConcurrenciaTest {
     @Autowired JdbcTemplate jdbc;
 
     @Test
-    void desactivarseMutuamente_losDosUnicosAdmin_unoRecibe422YQuedaUnoActivo() throws Exception {
+    void desactivarseMutuamente_losDosUnicosAdmin_unoFallaYQuedaUnoActivo() throws Exception {
         ejecutarCarrera(Accion.DESACTIVAR);
     }
 
     @Test
-    void degradarseMutuamente_losDosUnicosAdmin_unoRecibe422YQuedaUnoActivo() throws Exception {
+    void degradarseMutuamente_losDosUnicosAdmin_unoFallaYQuedaUnoActivo() throws Exception {
         ejecutarCarrera(Accion.DEGRADAR);
     }
 
@@ -77,7 +77,10 @@ class UsuarioAdminConcurrenciaTest {
             List<Throwable> resultados = java.util.Arrays.asList(deA.get(60, TimeUnit.SECONDS), deB.get(60, TimeUnit.SECONDS));
 
             assertThat(resultados.stream().filter(r -> r == null)).hasSize(1);
-            assertThat(resultados.stream().filter(r -> r instanceof ExcepcionNegocio)).hasSize(1);
+            // El perdedor recibe 422 (regla de negocio) o, si InnoDB lo elige víctima de un deadlock, un fallo de
+            // concurrencia (409 en la API); en ambos casos el invariante se conserva.
+            assertThat(resultados.stream().filter(r -> r instanceof ExcepcionNegocio
+                    || r instanceof org.springframework.dao.ConcurrencyFailureException)).hasSize(1);
             Integer activos = jdbc.queryForObject(
                     "SELECT COUNT(*) FROM usuario WHERE rol = 'ADMIN' AND activo = 1 AND id IN (?, ?)",
                     Integer.class, a.getId(), b.getId());
