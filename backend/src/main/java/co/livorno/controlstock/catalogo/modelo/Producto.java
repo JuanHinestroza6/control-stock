@@ -76,6 +76,14 @@ public class Producto extends EntidadAuditable {
         this.loteMinimo = loteMinimo;
     }
 
+    /** Último costo de compra conocido; lo actualiza el registro de entradas de inventario. */
+    public void actualizarPrecioCompra(BigDecimal precioCompra) {
+        if (precioCompra.signum() < 0) {
+            throw new IllegalArgumentException("El precio de compra no puede ser negativo");
+        }
+        this.precioCompra = precioCompra.setScale(2, RoundingMode.HALF_UP);
+    }
+
     public void activar() {
         this.activo = true;
     }
