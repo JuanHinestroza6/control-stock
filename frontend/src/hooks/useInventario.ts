@@ -18,11 +18,12 @@ export function invalidarStock(qc: QueryClient, extra: string[] = []) {
   return Promise.all([...CLAVES_STOCK, ...extra].map((k) => qc.invalidateQueries({ queryKey: [k] })))
 }
 
-export function useInventario(filtros: FiltrosInventario) {
+export function useInventario(filtros: FiltrosInventario, habilitado = true) {
   return useQuery<PaginaInventario>({
     queryKey: ['inventario', filtros],
     queryFn: () => listarInventario(filtros),
     placeholderData: keepPreviousData,
+    enabled: habilitado,
   })
 }
 
