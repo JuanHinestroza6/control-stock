@@ -33,7 +33,8 @@ public class ConvertidorUsuarioJwt implements Converter<Jwt, AbstractAuthenticat
         }
         Usuario u = usuarios.findById(id).filter(Usuario::isActivo)
                 .orElseThrow(() -> new BadCredentialsException("Usuario inexistente o inactivo"));
-        UsuarioAutenticado principal = new UsuarioAutenticado(u.getId(), u.getEmail(), u.getNombre(), u.getRol().name());
+        UsuarioAutenticado principal = new UsuarioAutenticado(u.getId(), u.getEmail(), u.getNombre(), u.getRol().name(),
+                u.isDebeCambiarPassword());
         return UsernamePasswordAuthenticationToken.authenticated(principal, jwt,
                 List.of(new SimpleGrantedAuthority("ROLE_" + u.getRol().name())));
     }

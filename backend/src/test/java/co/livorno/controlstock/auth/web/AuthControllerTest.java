@@ -47,7 +47,7 @@ class AuthControllerTest {
     @Test
     void login_credencialesValidas_responde200ConContrato() throws Exception {
         when(authService.login(any(LoginRequest.class), anyString())).thenReturn(LoginResponse.de("tok", Instant.parse("2026-10-02T00:00:00Z"),
-                new UsuarioSesionResponse(1L, "Ana", "ana@livorno.test", "VENDEDOR")));
+                new UsuarioSesionResponse(1L, "Ana", "ana@livorno.test", "VENDEDOR", true)));
 
         mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(CUERPO))
                 .andExpect(status().isOk())
@@ -55,7 +55,8 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.tipo").value("Bearer"))
                 .andExpect(jsonPath("$.expiraEn").value("2026-10-02T00:00:00Z"))
                 .andExpect(jsonPath("$.usuario.id").value(1))
-                .andExpect(jsonPath("$.usuario.rol").value("VENDEDOR"));
+                .andExpect(jsonPath("$.usuario.rol").value("VENDEDOR"))
+                .andExpect(jsonPath("$.usuario.debeCambiarPassword").value(true));
     }
 
     @Test

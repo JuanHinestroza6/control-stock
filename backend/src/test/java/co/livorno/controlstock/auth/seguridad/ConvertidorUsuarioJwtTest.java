@@ -65,6 +65,17 @@ class ConvertidorUsuarioJwtTest {
     }
 
     @Test
+    void convert_usuarioConPasswordTemporal_principalLlevaDebeCambiarPassword() {
+        Usuario u = usuario(Rol.VENDEDOR);
+        u.asignarPasswordTemporal("hash", java.time.LocalDateTime.parse("2026-10-01T10:00:00"));
+        when(repo.findById(3L)).thenReturn(Optional.of(u));
+
+        Authentication auth = convertidor.convert(jwt("3", "VENDEDOR"));
+
+        assertThat(((UsuarioAutenticado) auth.getPrincipal()).debeCambiarPassword()).isTrue();
+    }
+
+    @Test
     void convert_rolDelTokenDistintoAlDeBd_aplicaElRolDeBd() {
         when(repo.findById(3L)).thenReturn(Optional.of(usuario(Rol.VENDEDOR)));
 

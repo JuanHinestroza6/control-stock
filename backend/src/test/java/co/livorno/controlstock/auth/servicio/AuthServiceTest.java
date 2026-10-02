@@ -73,6 +73,18 @@ class AuthServiceTest {
     }
 
     @Test
+    void login_conPasswordTemporal_informaDebeCambiarPassword() {
+        Usuario u = new Usuario("Ana", "ana@livorno.test", "hash-real", Rol.VENDEDOR);
+        u.asignarPasswordTemporal("hash-real", java.time.LocalDateTime.parse("2026-10-01T10:00:00"));
+        when(repo.findByEmail("ana@livorno.test")).thenReturn(Optional.of(u));
+        when(encoder.matches("clave", "hash-real")).thenReturn(true);
+        when(tokens.emitir(u)).thenReturn(new TokenService.TokenEmitido("tok", Instant.now()));
+
+        assertThat(service.login(new LoginRequest("ana@livorno.test", "clave"), "1.2.3.4")
+                .usuario().debeCambiarPassword()).isTrue();
+    }
+
+    @Test
     void login_usuarioInactivo_fallaAunqueLaClaveCoincida() {
         Usuario u = new Usuario("Ana", "ana@livorno.test", "hash-real", Rol.VENDEDOR);
         u.desactivar();
