@@ -4,9 +4,13 @@ import co.livorno.controlstock.catalogo.dto.CategoriaRequest;
 import co.livorno.controlstock.catalogo.dto.CategoriaResponse;
 import co.livorno.controlstock.catalogo.modelo.Categoria;
 import co.livorno.controlstock.catalogo.repositorio.CategoriaRepository;
+import co.livorno.controlstock.catalogo.repositorio.ConteoPorCategoria;
+import co.livorno.controlstock.catalogo.repositorio.ProductoRepository;
 import co.livorno.controlstock.comun.excepcion.ConflictoException;
 import co.livorno.controlstock.comun.excepcion.RecursoNoEncontradoException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -21,11 +25,15 @@ public class CategoriaService {
     private static final String CON_PRODUCTOS = "La categoría tiene productos asociados";
 
     private final CategoriaRepository repositorio;
+    private final ProductoRepository productoRepositorio;
 
     public List<CategoriaResponse> listar() {
-        // totalProductos queda en 0 hasta que exista Producto (B3), que lo calculará con una consulta agregada.
+        Map<Long, Long> totales = new HashMap<>();
+        for (ConteoPorCategoria c : productoRepositorio.contarPorCategoria()) {
+            totales.put(c.categoriaId(), c.total());
+        }
         return repositorio.findAllByOrderByNombreAsc().stream()
-                .map(c -> CategoriaResponse.de(c, 0))
+                .map(c -> CategoriaResponse.de(c, totales.getOrDefault(c.getId(), 0L)))
                 .toList();
     }
 
@@ -46,17 +54,20 @@ public class CategoriaService {
             throw new ConflictoException(DUPLICADA);
         }
         categoria.renombrar(nombre);
-        return CategoriaResponse.de(guardar(categoria), 0);
+        return CategoriaResponse.de(guardar(categoria), productoRepositorio.countByCategoriaId(id));
     }
 
     @Transactional
     public void eliminar(Long id) {
         Categoria categoria = buscar(id);
+        if (productoRepositorio.existsByCategoriaId(id)) {
+            throw new ConflictoException(CON_PRODUCTOS);
+        }
         try {
             repositorio.delete(categoria);
             repositorio.flush();
         } catch (DataIntegrityViolationException e) {
-            // FK producto.categoria_id ON DELETE RESTRICT
+            // Carrera: un producto se creó entre la verificación y el borrado (FK ON DELETE RESTRICT).
             throw new ConflictoException(CON_PRODUCTOS);
         }
     }

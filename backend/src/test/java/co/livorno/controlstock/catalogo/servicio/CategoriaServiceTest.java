@@ -25,7 +25,34 @@ import org.springframework.dao.DataIntegrityViolationException;
 class CategoriaServiceTest {
 
     @Mock CategoriaRepository repositorio;
+    @Mock co.livorno.controlstock.catalogo.repositorio.ProductoRepository productoRepositorio;
     @InjectMocks CategoriaService servicio;
+
+    @Test
+    void eliminar_existenProductos_lanzaConflictoSinBorrar() {
+        Categoria c = new Categoria("Jeans");
+        when(repositorio.findById(1L)).thenReturn(Optional.of(c));
+        when(productoRepositorio.existsByCategoriaId(1L)).thenReturn(true);
+
+        assertThatThrownBy(() -> servicio.eliminar(1L)).isInstanceOf(ConflictoException.class);
+        verify(repositorio, never()).delete(any());
+    }
+
+    @Test
+    void listar_combinaTotalesPorCategoria() {
+        Categoria jeans = new Categoria("Jeans");
+        org.springframework.test.util.ReflectionTestUtils.setField(jeans, "id", 3L);
+        Categoria gorras = new Categoria("Gorras");
+        org.springframework.test.util.ReflectionTestUtils.setField(gorras, "id", 4L);
+        when(repositorio.findAllByOrderByNombreAsc()).thenReturn(java.util.List.of(gorras, jeans));
+        when(productoRepositorio.contarPorCategoria()).thenReturn(java.util.List.of(
+                new co.livorno.controlstock.catalogo.repositorio.ConteoPorCategoria(3L, 5)));
+
+        var lista = servicio.listar();
+
+        assertThat(lista).extracting("nombre", "totalProductos").containsExactly(
+                org.assertj.core.groups.Tuple.tuple("Gorras", 0L), org.assertj.core.groups.Tuple.tuple("Jeans", 5L));
+    }
 
     @Test
     void crear_nombreNuevo_guardaConNombreSinEspacios() {
