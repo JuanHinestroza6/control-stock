@@ -11,6 +11,7 @@ import { CategoriasPage } from './paginas/productos/CategoriasPage'
 import { ProductoDetallePage } from './paginas/productos/ProductoDetallePage'
 import { ProductoFormPage } from './paginas/productos/ProductoFormPage'
 import { ProductosPage } from './paginas/productos/ProductosPage'
+import { UsuariosPage } from './paginas/usuarios/UsuariosPage'
 
 export default function App() {
   return (
@@ -27,7 +28,10 @@ export default function App() {
             <Route path="/productos/nuevo" element={<ProductoFormPage />} />
             <Route path="/productos/:id/editar" element={<ProductoFormPage />} />
           </Route>
-          {MODULOS.filter((m) => m.ruta !== '/' && m.clave !== 'productos').map((m) => (
+          <Route element={<RutaProtegida roles={['ADMIN']} />}>
+            <Route path="/usuarios" element={<UsuariosPage />} />
+          </Route>
+          {MODULOS.filter((m) => m.ruta !== '/' && m.clave !== 'productos' && m.clave !== 'usuarios').map((m) => (
             <Route key={m.clave} element={<RutaProtegida roles={m.roles} />}>
               <Route path={m.ruta} element={<ProximamentePage titulo={m.etiqueta} descripcion={m.descripcion} />} />
             </Route>
