@@ -249,4 +249,31 @@ class ProductoServiceTest {
         assertThat(a.isActivo()).isFalse();
         verify(variantes, never()).findByProductoId(any());
     }
+
+    @Test
+    void actualizar_violacionDeIntegridad_noDiceCodigoDuplicado() {
+        Producto p = producto();
+        when(productos.buscarConCategoria(10L)).thenReturn(Optional.of(p));
+        when(categorias.findById(2L)).thenReturn(Optional.of(categoria()));
+        when(productos.saveAndFlush(any())).thenThrow(
+                new org.springframework.dao.DataIntegrityViolationException("fk"));
+
+        assertThatThrownBy(() -> servicio.actualizar(10L, new ActualizarProductoRequest("Camiseta", 2L,
+                new BigDecimal("20000"), new BigDecimal("59900"), 15, 1)))
+                .isInstanceOf(ConflictoException.class)
+                .hasMessageContaining("categoría")
+                .hasMessageNotContaining("código");
+    }
+
+    @Test
+    void crear_violacionDeIntegridadPorCarrera_dicePorCodigoDuplicado() {
+        Categoria c = categoria();
+        when(categorias.findById(2L)).thenReturn(Optional.of(c));
+        when(productos.existsByCodigo("LIV001")).thenReturn(false);
+        when(productos.saveAndFlush(any())).thenThrow(
+                new org.springframework.dao.DataIntegrityViolationException("uk"));
+
+        assertThatThrownBy(() -> servicio.crear(crearReq("LIV001")))
+                .isInstanceOf(ConflictoException.class).hasMessage("Ya existe un producto con ese código.");
+    }
 }

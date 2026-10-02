@@ -36,6 +36,8 @@ public class ProductoService {
     public static final Set<String> ORDEN_PERMITIDO = Set.of("codigo", "nombre", "precioVenta", "creadoEn");
     private static final Set<String> ROLES_CON_COSTO = Set.of("ADMIN", "INVENTARIO", "CONTABILIDAD");
     private static final String CODIGO_DUPLICADO = "Ya existe un producto con ese código.";
+    private static final String CONFLICTO_ACTUALIZAR =
+            "No se pudo guardar el producto: la categoría ya no existe o el producto fue modificado en paralelo.";
 
     private final ProductoRepository productos;
     private final VarianteRepository variantes;
@@ -69,7 +71,7 @@ public class ProductoService {
         }
         Producto producto = new Producto(codigo, req.nombre(), categoria, req.precioCompra(), req.precioVenta(),
                 req.leadTimeDias(), req.loteMinimo());
-        return detalle(guardar(producto));
+        return detalle(guardar(producto, CODIGO_DUPLICADO));
     }
 
     @Transactional
@@ -78,7 +80,7 @@ public class ProductoService {
         Categoria categoria = categoria(req.categoriaId());
         producto.actualizarDatos(req.nombre(), categoria, req.precioCompra(), req.precioVenta(),
                 req.leadTimeDias(), req.loteMinimo());
-        return detalle(guardar(producto));
+        return detalle(guardar(producto, CONFLICTO_ACTUALIZAR));
     }
 
     /**
@@ -101,7 +103,7 @@ public class ProductoService {
                 deLaFamilia.forEach(Variante::desactivar);
                 producto.desactivar();
             }
-            guardar(producto);
+            guardar(producto, CONFLICTO_ACTUALIZAR);
         }
         return detalle(producto);
     }
@@ -119,11 +121,11 @@ public class ProductoService {
         return categorias.findById(id).orElseThrow(() -> new RecursoNoEncontradoException("Categoría", id));
     }
 
-    private Producto guardar(Producto producto) {
+    private Producto guardar(Producto producto, String mensajeConflicto) {
         try {
             return productos.saveAndFlush(producto);
         } catch (DataIntegrityViolationException e) {
-            throw new ConflictoException(CODIGO_DUPLICADO);
+            throw new ConflictoException(mensajeConflicto);
         }
     }
 }

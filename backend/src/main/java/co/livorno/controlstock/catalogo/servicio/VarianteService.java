@@ -16,6 +16,7 @@ import co.livorno.controlstock.comun.excepcion.ConflictoException;
 import co.livorno.controlstock.comun.excepcion.ExcepcionNegocio;
 import co.livorno.controlstock.comun.excepcion.RecursoNoEncontradoException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -23,7 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
+import java.util.TreeMap;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -59,8 +60,13 @@ public class VarianteService {
                     + " está inactivo; actívalo antes de generar variantes.");
         }
         Set<Talla> tallas = EnumSet.copyOf(req.tallas());
-        Set<String> colores = new TreeSet<>();
-        req.colores().forEach(c -> colores.add(GeneradorSku.normalizarColor(c)));
+        // Colores que solo difieren en tildes son el mismo color (la BD los trata como iguales): se conserva el primero.
+        Map<String, String> porClave = new TreeMap<>();
+        req.colores().forEach(c -> {
+            String color = GeneradorSku.normalizarColor(c);
+            porClave.putIfAbsent(GeneradorSku.claveColor(color), color);
+        });
+        Collection<String> colores = porClave.values();
 
         Map<String, Variante> existentes = new HashMap<>();
         Set<Talla> tallasDelProducto = EnumSet.noneOf(Talla.class);
@@ -144,6 +150,6 @@ public class VarianteService {
     }
 
     private static String clave(Talla talla, String color) {
-        return talla.name() + "|" + color;
+        return talla.name() + "|" + GeneradorSku.claveColor(color);
     }
 }

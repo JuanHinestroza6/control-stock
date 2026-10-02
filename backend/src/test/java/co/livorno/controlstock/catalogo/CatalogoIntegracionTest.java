@@ -443,4 +443,47 @@ class CatalogoIntegracionTest {
         assertThat(jdbc.queryForObject("SELECT stock_fisico FROM variante WHERE id = ?", Integer.class, varianteId))
                 .isZero();
     }
+
+    @Test
+    void generarVariantes_colorConTildeSobreExistenteSinTilde_loOmiteYNoDa409() throws Exception {
+        String admin = tokenAdmin();
+        long productoId = crearProducto(admin, crearCategoria(admin));
+        String ruta = "/api/productos/" + productoId + "/variantes/generar";
+        enviar("POST", ruta, admin, generarJson("[\"M\"]", "[\"Azul\",\"Anil\"]"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.creadas.length()").value(2));
+
+        // la collation de la BD ignora tildes: AZÚL = AZUL y AÑIL = ANIL
+        enviar("POST", ruta, admin, generarJson("[\"M\"]", "[\"Azúl\",\"Añil\"]"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.creadas.length()").value(0))
+                .andExpect(jsonPath("$.omitidas.length()").value(2))
+                .andExpect(jsonPath("$.omitidas[*].motivo").value(org.hamcrest.Matchers.everyItem(
+                        org.hamcrest.Matchers.is("EXISTE"))));
+
+        // desactivar: el mismo color con tilde se reporta como EXISTE_INACTIVA
+        enviar("PATCH", "/api/productos/" + productoId + "/estado", admin, "{\"activo\":false}").andExpect(status().isOk());
+        enviar("PATCH", "/api/productos/" + productoId + "/estado", admin, "{\"activo\":true}").andExpect(status().isOk());
+        enviar("POST", ruta, admin, generarJson("[\"M\"]", "[\"AZÚL\"]"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.creadas.length()").value(0))
+                .andExpect(jsonPath("$.omitidas[0].motivo").value("EXISTE_INACTIVA"));
+    }
+
+    @Test
+    void generarVariantes_dosColoresQueSoloDifierenEnTildeEnLaMismaSolicitud_creaUno() throws Exception {
+        String admin = tokenAdmin();
+        long productoId = crearProducto(admin, crearCategoria(admin));
+
+        enviar("POST", "/api/productos/" + productoId + "/variantes/generar", admin,
+                generarJson("[\"M\"]", "[\"Azul\",\"Azúl\"]"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.creadas.length()").value(1));
+    }
+
+    @Test
+    void generarVariantes_colorConLetrasNoLatinas_responde422() throws Exception {
+        String admin = tokenAdmin();
+        long productoId = crearProducto(admin, crearCategoria(admin));
+
+        enviar("POST", "/api/productos/" + productoId + "/variantes/generar", admin,
+                generarJson("[\"M\"]", "[\"ΑΒΓ\"]")).andExpect(status().is(422));
+    }
 }

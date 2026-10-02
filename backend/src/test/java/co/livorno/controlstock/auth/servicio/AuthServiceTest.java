@@ -179,4 +179,49 @@ class AuthServiceTest {
 
         verify(tokens, never()).emitir(org.mockito.ArgumentMatchers.any());
     }
+
+    @Test
+    void cambiarPassword_actualIncorrecta_registraFalloEnElLimitadorPorUsuario() {
+        Usuario u = conPasswordTemporal();
+        when(repo.findById(1L)).thenReturn(Optional.of(u));
+        when(encoder.matches("mala", "hash-actual")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.cambiarPassword(1L,
+                new co.livorno.controlstock.auth.dto.CambiarPasswordRequest("mala", "Nueva-1234567")))
+                .isInstanceOf(co.livorno.controlstock.comun.excepcion.ExcepcionNegocio.class);
+
+        verify(limitador).verificarNoBloqueado("cambio-password:1", "-");
+        verify(limitador).registrarFallo("cambio-password:1", "-");
+        verify(limitador, never()).registrarExito(anyString(), anyString());
+    }
+
+    @Test
+    void cambiarPassword_exitosa_limpiaElContadorDeIntentos() {
+        Usuario u = conPasswordTemporal();
+        when(repo.findById(1L)).thenReturn(Optional.of(u));
+        when(encoder.matches("Actual-123456", "hash-actual")).thenReturn(true);
+        when(encoder.matches("Nueva-1234567", "hash-actual")).thenReturn(false);
+        when(encoder.encode("Nueva-1234567")).thenReturn("hash-nuevo");
+        when(tokens.emitir(u)).thenReturn(new TokenService.TokenEmitido("tok", Instant.now()));
+
+        service.cambiarPassword(1L,
+                new co.livorno.controlstock.auth.dto.CambiarPasswordRequest("Actual-123456", "Nueva-1234567"));
+
+        verify(limitador).registrarExito("cambio-password:1", "-");
+        verify(limitador, never()).registrarFallo(anyString(), anyString());
+    }
+
+    @Test
+    void cambiarPassword_bloqueado_lanzaDemasiadosIntentosSinVerificarLaContrasena() {
+        org.mockito.Mockito.doThrow(new co.livorno.controlstock.comun.excepcion.DemasiadosIntentosException(120))
+                .when(limitador).verificarNoBloqueado("cambio-password:1", "-");
+
+        assertThatThrownBy(() -> service.cambiarPassword(1L,
+                new co.livorno.controlstock.auth.dto.CambiarPasswordRequest("x", "Nueva-1234567")))
+                .isInstanceOfSatisfying(co.livorno.controlstock.comun.excepcion.DemasiadosIntentosException.class,
+                        e -> assertThat(e.getSegundosRestantes()).isEqualTo(120));
+
+        verify(repo, never()).findById(org.mockito.ArgumentMatchers.anyLong());
+        verify(encoder, never()).matches(anyString(), anyString());
+    }
 }

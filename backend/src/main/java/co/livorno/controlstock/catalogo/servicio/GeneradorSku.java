@@ -1,5 +1,6 @@
 package co.livorno.controlstock.catalogo.servicio;
 
+import co.livorno.controlstock.comun.excepcion.ExcepcionNegocio;
 import java.text.Normalizer;
 import java.util.Locale;
 import java.util.function.Predicate;
@@ -26,13 +27,22 @@ public final class GeneradorSku {
         return normalizado;
     }
 
+    /**
+     * Clave de unicidad del color: sin diacríticos (AZÚL = AZUL, AÑIL = ANIL), igual que la collation
+     * utf8mb4_0900_ai_ci de uk_variante_producto_talla_color.
+     */
+    public static String claveColor(String colorNormalizado) {
+        return Normalizer.normalize(colorNormalizado, Normalizer.Form.NFD).replaceAll("\\p{M}", "");
+    }
+
     /** Primeras 3 letras/dígitos del color, sin tildes, espacios ni la ñ (MARRÓN -> MAR, AZUL CIELO -> AZU). */
     public static String abreviarColor(String color) {
         String sinTildes = Normalizer.normalize(normalizarColor(color), Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "")
                 .replaceAll("[^A-Z0-9]", "");
         if (sinTildes.isEmpty()) {
-            throw new IllegalArgumentException("El color debe contener letras o números");
+            throw new ExcepcionNegocio("El color \"" + color.strip()
+                    + "\" debe contener al menos una letra latina o un número para generar el SKU.");
         }
         return sinTildes.substring(0, Math.min(LETRAS_COLOR, sinTildes.length()));
     }

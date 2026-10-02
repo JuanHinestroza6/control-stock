@@ -36,7 +36,10 @@ public class ConvertidorUsuarioJwt implements Converter<Jwt, AbstractAuthenticat
                 .orElseThrow(() -> new BadCredentialsException("Usuario inexistente o inactivo"));
         // Revocación (ADR-005): un token emitido antes del último cambio de contraseña ya no vale.
         // Ambos instantes en segundos; emitido en el mismo segundo del cambio sigue siendo válido.
-        if (u.getPasswordCambiadoEn() != null && jwt.getIssuedAt() != null) {
+        if (u.getPasswordCambiadoEn() != null) {
+            if (jwt.getIssuedAt() == null) {
+                throw new BadCredentialsException("Token sin fecha de emisión (iat)");
+            }
             long cambio = u.getPasswordCambiadoEn().atZone(ConfiguracionTiempo.ZONA).toInstant().getEpochSecond();
             if (jwt.getIssuedAt().getEpochSecond() < cambio) {
                 throw new BadCredentialsException("Token emitido antes del último cambio de contraseña");

@@ -26,7 +26,6 @@ public interface ProductoRepository extends JpaRepository<Producto, Long> {
     /**
      * Listado filtrado y paginado, sin N+1 (la categoría viaja en el mismo SELECT). Los filtros nulos se ignoran.
      * {@code patron} debe construirse con {@link #patronContiene(String)}.
-     * Los totales de variantes se agregan cuando exista la tabla variante (B6).
      */
     @Query(value = """
             select p from Producto p join fetch p.categoria c

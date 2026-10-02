@@ -76,4 +76,13 @@ class ConvertidorUsuarioJwtRevocacionTest {
         assertThat(convertidor.convert(jwtEmitidoEn(Instant.parse("2020-01-01T00:00:00Z"))).isAuthenticated())
                 .isTrue();
     }
+
+    @Test
+    void convert_sinIat_conCambio_lanza401() {
+        usuarioConCambio(CAMBIO);
+        Jwt sinIat = Jwt.withTokenValue("t").header("alg", "HS256").subject("3").claim("rol", "VENDEDOR")
+                .expiresAt(CAMBIO_INSTANTE.plusSeconds(3600)).build();
+
+        assertThatThrownBy(() -> convertidor.convert(sinIat)).isInstanceOf(BadCredentialsException.class);
+    }
 }

@@ -61,7 +61,7 @@ class GeneradorSkuTest {
         assertThatThrownBy(() -> GeneradorSku.generar("LIV001", "M", "   ", s -> false))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> GeneradorSku.generar("LIV001", "M", "---", s -> false))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(co.livorno.controlstock.comun.excepcion.ExcepcionNegocio.class);
         assertThatThrownBy(() -> GeneradorSku.generar("LIV001", "M", null, s -> false))
                 .isInstanceOf(IllegalArgumentException.class);
     }
@@ -77,5 +77,18 @@ class GeneradorSkuTest {
         String sku = GeneradorSku.generar("A".repeat(20), "UNICA", "Negro", s -> s.length() < 45 && !s.endsWith("99"));
 
         assertThat(sku.length()).isLessThanOrEqualTo(40);
+    }
+
+    @Test
+    void generar_colorSoloConLetrasNoLatinas_lanzaExcepcionDeNegocio() {
+        assertThatThrownBy(() -> GeneradorSku.generar("LIV001", "M", "ΑΒΓ", s -> false))
+                .isInstanceOf(co.livorno.controlstock.comun.excepcion.ExcepcionNegocio.class)
+                .hasMessageContaining("ΑΒΓ");
+    }
+
+    @Test
+    void claveColor_ignoraTildesYEnie() {
+        assertThat(GeneradorSku.claveColor("AZÚL")).isEqualTo("AZUL");
+        assertThat(GeneradorSku.claveColor("AÑIL")).isEqualTo("ANIL");
     }
 }

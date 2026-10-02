@@ -21,6 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class AuthService {
 
+    private static final String CLAVE_CAMBIO_PASSWORD = "cambio-password:";
+    private static final String IP_NO_APLICA = "-";
+
     private final UsuarioRepository usuarios;
     private final PasswordEncoder encoder;
     private final TokenService tokens;
@@ -68,14 +71,18 @@ public class AuthService {
      */
     @Transactional
     public LoginResponse cambiarPassword(Long usuarioId, CambiarPasswordRequest solicitud) {
+        String claveLimite = CLAVE_CAMBIO_PASSWORD + usuarioId;
+        limitador.verificarNoBloqueado(claveLimite, IP_NO_APLICA);
         Usuario usuario = usuarios.findById(usuarioId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Usuario", usuarioId));
         if (!encoder.matches(solicitud.actual(), usuario.getPasswordHash())) {
+            limitador.registrarFallo(claveLimite, IP_NO_APLICA);
             throw new ExcepcionNegocio("La contraseña actual no es correcta.");
         }
         if (encoder.matches(solicitud.nueva(), usuario.getPasswordHash())) {
             throw new ExcepcionNegocio("La nueva contraseña debe ser distinta de la actual.");
         }
+        limitador.registrarExito(claveLimite, IP_NO_APLICA);
         usuario.cambiarPassword(encoder.encode(solicitud.nueva()), LocalDateTime.now(clock));
         usuarios.saveAndFlush(usuario);
         TokenService.TokenEmitido t = tokens.emitir(usuario);
