@@ -1,0 +1,192 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+title Diagrama de clases - Fase 1 (módulo catalogo)
+
+package "comun" {
+  abstract class EntidadAuditable <<MappedSuperclass>> {
+    - creadoEn : LocalDateTime
+    - actualizadoEn : LocalDateTime
+  }
+  class UsuarioActual
+}
+
+package "catalogo.modelo" {
+  class Categoria <<Entity>> {
+    - id : Long
+    - nombre : String {unique}
+    + renombrar(nuevoNombre : String)
+  }
+  class Producto <<Entity>> {
+    - id : Long
+    - codigo : String {unique, inmutable}
+    - nombre : String
+    - precioCompra : BigDecimal
+    - precioVenta : BigDecimal
+    - leadTimeDias : int
+    - loteMinimo : int
+    - activo : boolean
+    + actualizarDatos(...)
+    + activar()
+    + desactivar()
+  }
+  class Variante <<Entity>> {
+    - id : Long
+    - sku : String {unique, inmutable}
+    - talla : Talla {inmutable}
+    - color : String {inmutable}
+    - stockFisico : int
+    - stockReservado : int
+    - stockMinimo : int
+    - puntoReorden : Integer
+    - claseAbc : Character
+    - activo : boolean
+    - version : long <<@Version>>
+    + getStockDisponible() : int
+    + estadoStock() : EstadoStock
+    + actualizarStockMinimo(stockMinimo : int)
+    + activar()
+    + desactivar()
+  }
+  enum Talla {
+    XS
+    S
+    M
+    L
+    XL
+    XXL
+    UNICA
+  }
+  enum EstadoStock {
+    OK
+    BAJO
+    AGOTADO
+  }
+}
+
+package "catalogo.repositorio" {
+  interface CategoriaRepository
+  interface ProductoRepository
+  interface VarianteRepository
+}
+
+package "catalogo.servicio" {
+  class GeneradorSku <<utilidad>> {
+    + {static} normalizarColor(color : String) : String
+    + {static} claveColor(color : String) : String
+    + {static} abreviarColor(color : String) : String
+    + {static} generar(codigo, talla, color, existe : Predicate<String>) : String
+  }
+  class CategoriaService {
+    + listar() : List<CategoriaResponse>
+    + crear(req) : CategoriaResponse
+    + actualizar(id, req) : CategoriaResponse
+    + eliminar(id)
+  }
+  class ProductoService {
+    + listar(q, categoriaId, activo, pageable) : Page<ProductoResumenResponse>
+    + obtener(id) : ProductoDetalleResponse
+    + crear(req) : ProductoDetalleResponse
+    + actualizar(id, req) : ProductoDetalleResponse
+    + cambiarEstado(id, activo) : ProductoDetalleResponse
+  }
+  class VarianteService {
+    + listar(productoId, incluirInactivas) : List<VarianteResponse>
+    + generar(productoId, req) : GenerarVariantesResponse
+    + actualizar(id, req) : VarianteResponse
+    + cambiarEstado(id, activo) : VarianteResponse
+    + matriz(productoId, incluirInactivas) : MatrizResponse
+  }
+}
+
+package "catalogo.web" {
+  class CategoriaController <<RestController>> {
+    /api/categorias
+  }
+  class ProductoController <<RestController>> {
+    /api/productos
+  }
+  class VarianteController <<RestController>> {
+    /api/productos/{id}/variantes
+    /api/productos/{id}/matriz
+    /api/variantes/{id}
+  }
+}
+
+package "catalogo.dto" {
+  class CategoriaRequest <<record>>
+  class CategoriaResponse <<record>> {
+    id, nombre, totalProductos
+  }
+  class CategoriaRef <<record>> {
+    id, nombre
+  }
+  class CrearProductoRequest <<record>>
+  class ActualizarProductoRequest <<record>>
+  class ProductoResumenResponse <<record>> {
+    id, codigo, nombre, categoria, precioVenta,
+    activo, totalVariantes, stockDisponibleTotal
+  }
+  class ProductoDetalleResponse <<record>> {
+    precioCompra (null para VENDEDOR), precioVenta,
+    leadTimeDias, loteMinimo, activo, totalVariantes
+  }
+  class GenerarVariantesRequest <<record>> {
+    tallas, colores, stockMinimo
+  }
+  class GenerarVariantesResponse <<record>> {
+    creadas, omitidas
+  }
+  class ActualizarVarianteRequest <<record>> {
+    stockMinimo
+  }
+  class VarianteResponse <<record>> {
+    sku, talla, color, stockFisico, stockReservado,
+    stockDisponible, stockMinimo, puntoReorden,
+    claseAbc, estadoStock, activo
+  }
+  class MatrizResponse <<record>> {
+    productoId, tallas, colores, celdas
+  }
+}
+
+EntidadAuditable <|-- Categoria
+EntidadAuditable <|-- Producto
+EntidadAuditable <|-- Variante
+
+Categoria "1" <-- "0..*" Producto : categoria
+Producto "1" <-- "0..*" Variante : producto
+Variante --> Talla
+Variante ..> EstadoStock : calcula
+
+CategoriaService --> CategoriaRepository
+CategoriaService --> ProductoRepository
+ProductoService --> ProductoRepository
+ProductoService --> VarianteRepository
+ProductoService --> CategoriaRepository
+ProductoService --> UsuarioActual
+VarianteService --> ProductoRepository
+VarianteService --> VarianteRepository
+VarianteService ..> GeneradorSku
+
+CategoriaController --> CategoriaService
+ProductoController --> ProductoService
+VarianteController --> VarianteService
+
+CategoriaService ..> CategoriaResponse
+ProductoService ..> ProductoResumenResponse
+ProductoService ..> ProductoDetalleResponse
+VarianteService ..> VarianteResponse
+VarianteService ..> GenerarVariantesResponse
+VarianteService ..> MatrizResponse
+ProductoResumenResponse *-- CategoriaRef
+ProductoDetalleResponse *-- CategoriaRef
+
+note bottom of Variante
+  Regla de oro 1: sin setters de stock.
+  Nace con stockFisico = stockReservado = 0;
+  solo MovimientoService (Fase 2) lo modificará.
+end note
+@enduml

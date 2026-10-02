@@ -1,7 +1,8 @@
 # REQ-06 — Controlar el Acceso y Roles de Usuario (FO-ERS)
 
-> Estado a la fecha: control de acceso por rol implementado en la Fase 0 (backend y frontend); asignación de roles desde la
-> interfaz **pendiente — Fase 1** (ver REQ-12).
+> Estado a la fecha: control de acceso por rol implementado en la Fase 0; en la Fase 1 se añadieron la asignación de roles
+> desde la interfaz (CU-02, REQ-12), la revocación de tokens por cambio de contraseña y el cambio obligatorio de la contraseña
+> temporal (ADR-005).
 
 | Campo | Contenido |
 |---|---|
@@ -44,11 +45,18 @@ de acuerdo con la matriz de permisos de `docs/dominio.md`, y aplicar siempre el 
 - Limitador de intentos en memoria por correo + IP: tras 5 fallos en 15 minutos responde 429 con `Retry-After`.
 - Frontend: página de login con validación; sesión en `localStorage` con verificación de expiración, limpieza ante 401 y entre pestañas.
 
-## Pendiente — Fase 1
+## Alcance implementado (Fase 1)
 
-- Pendiente — Fase 1: aplicar `@PreAuthorize` por rol a los endpoints de cada módulo conforme se creen (hoy solo existen los
-  de `auth`; la prueba de 403 usa un endpoint de prueba).
-- Pendiente — Fase 1: asignación y cambio de rol desde la interfaz por el ADMIN (CU-02; la administración de cuentas es REQ-12).
+- Asignación y cambio de rol por el ADMIN desde la pantalla "Usuarios" (`PUT /api/usuarios/{id}`, solo ADMIN, CU-02). Reglas:
+  nadie cambia su propio rol (422) y siempre debe quedar al menos un ADMIN activo (422, con bloqueo pesimista sobre los ADMIN activos).
+- `@PreAuthorize` aplicado en los endpoints de `catalogo` (lectura autenticada; escritura ADMIN/INVENTARIO) y `usuario` (solo ADMIN).
+- Revocación de tokens (ADR-005): `usuario.password_cambiado_en` (migración `V6`); el convertidor JWT rechaza con 401 un token
+  con `iat` anterior a ese instante (comparación en segundos; ventana aceptada de 1 s).
+- Cambio obligatorio: la contraseña que asigna el ADMIN es temporal (`debeCambiarPassword`). Mientras esté pendiente, solo se permiten
+  `GET /api/auth/yo` y `PUT /api/auth/yo/password`; el resto responde 403 con `codigo: "CAMBIO_PASSWORD_REQUERIDO"`. El frontend
+  redirige a `/cuenta` (`RutaProtegida` e interceptor de Axios).
+- `PUT /api/auth/yo/password` (autenticado): cambia la contraseña propia y devuelve un token nuevo; el anterior queda revocado.
+  Contraseña actual incorrecta o nueva igual a la actual produce 422 (no 401, para no cerrar la sesión).
 
 ## Criterios de aceptación
 
@@ -61,7 +69,11 @@ de acuerdo con la matriz de permisos de `docs/dominio.md`, y aplicar siempre el 
 | CA-5 | CORS acepta solo orígenes configurados | Cumplido | `ConfiguracionSeguridadTest` |
 | CA-6 | Sin sesión se redirige a `/login` conservando el destino; con rol no permitido se muestra acceso denegado | Cumplido | `RutaProtegida.test.tsx`, `flujoSesion.test.tsx`, `modulos.test.ts` |
 | CA-7 | El menú muestra solo los módulos permitidos para cada rol | Cumplido | `Sidebar.test.tsx`, `modulos.test.ts`, `Topbar.test.tsx` |
-| CA-8 | El ADMIN asigna y cambia roles desde la interfaz | Pendiente — Fase 1 | Por definir |
+| CA-8 | El ADMIN asigna y cambia roles desde la interfaz; no puede cambiar su propio rol ni dejar el sistema sin ADMIN activo | Cumplido | `UsuarioServiceTest`, `UsuarioControllerTest`, `UsuarioSeguridadIntegracionTest`, `UsuarioAdminConcurrenciaTest`, `UsuariosPage.test.tsx` |
+| CA-9 | Los endpoints de `usuarios` responden 403 a todo rol distinto de ADMIN y los de catálogo respetan la matriz por rol | Cumplido | `UsuarioSeguridadIntegracionTest`, `CatalogoIntegracionTest`, `UsuarioControllerTest`, `ProductoControllerTest` |
+| CA-10 | Un token anterior al cambio o restablecimiento de contraseña recibe 401; uno del mismo segundo o posterior es válido; sin `passwordCambiadoEn` es válido | Cumplido | `ConvertidorUsuarioJwtRevocacionTest`, `UsuarioSeguridadIntegracionTest` |
+| CA-11 | Con `debeCambiarPassword` todo endpoint responde 403 con `codigo` `CAMBIO_PASSWORD_REQUERIDO`, salvo `/api/auth/yo` y `/api/auth/yo/password`; el frontend redirige a `/cuenta` | Cumplido | `CambioPasswordObligatorioTest`, `RutaProtegida.test.tsx`, `cliente.test.ts`, `CuentaPage.test.tsx` |
+| CA-12 | `PUT /api/auth/yo/password` devuelve token nuevo y el anterior queda revocado; contraseña actual incorrecta → 422 | Cumplido | `AuthControllerTest`, `AuthServiceTest`, `UsuarioSeguridadIntegracionTest`, `CuentaPage.test.tsx` |
 
 ### Criterios de CU-13 "Iniciar sesión" (RNF-02)
 
