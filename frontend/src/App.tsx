@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router'
 import { LayoutPrincipal } from './componentes/layout/LayoutPrincipal'
 import { MODULOS } from './componentes/layout/modulos'
+import { CuentaPage } from './paginas/cuenta/CuentaPage'
 import { RutaProtegida } from './componentes/layout/RutaProtegida'
 import { LoginPage } from './paginas/auth/LoginPage'
 import { NoEncontradaPage } from './paginas/comun/NoEncontradaPage'
@@ -18,6 +19,7 @@ export default function App() {
       <Route element={<RutaProtegida />}>
         <Route element={<LayoutPrincipal />}>
           <Route index element={<InicioPage />} />
+          <Route path="/cuenta" element={<CuentaPage />} />
           <Route path="/productos" element={<ProductosPage />} />
           <Route path="/productos/:id" element={<ProductoDetallePage />} />
           <Route path="/productos/categorias" element={<CategoriasPage />} />

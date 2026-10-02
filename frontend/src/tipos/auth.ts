@@ -14,6 +14,11 @@ export interface UsuarioSesion {
   debeCambiarPassword: boolean
 }
 
+export interface CambiarPasswordRequest {
+  actual: string
+  nueva: string
+}
+
 export interface LoginResponse {
   token: string
   tipo: 'Bearer'
