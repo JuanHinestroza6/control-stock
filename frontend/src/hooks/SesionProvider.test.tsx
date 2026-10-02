@@ -7,7 +7,7 @@ import { renderizarApp } from '../pruebas/render'
 
 describe('SesionProvider', () => {
   it('ante el evento de sesión expirada vuelve a /login', () => {
-    renderizarApp(<App />, { ruta: '/ventas', rol: 'ADMIN' })
+    renderizarApp(<App />, { ruta: '/reservas', rol: 'ADMIN' })
     expect(screen.getByRole('heading', { name: 'Próximamente' })).toBeInTheDocument()
     act(() => {
       window.dispatchEvent(new Event(EVENTO_SESION_EXPIRADA))
@@ -24,7 +24,7 @@ describe('SesionProvider', () => {
   })
 
   it('cerrar sesión en otra pestaña (evento storage) cierra esta sesión', () => {
-    renderizarApp(<App />, { ruta: '/ventas', rol: 'ADMIN' })
+    renderizarApp(<App />, { ruta: '/reservas', rol: 'ADMIN' })
     expect(screen.getByRole('heading', { name: 'Próximamente' })).toBeInTheDocument()
     act(() => {
       localStorage.removeItem(CLAVE_SESION)
@@ -34,7 +34,7 @@ describe('SesionProvider', () => {
   })
 
   it('ignora eventos storage de otras claves', () => {
-    renderizarApp(<App />, { ruta: '/ventas', rol: 'ADMIN' })
+    renderizarApp(<App />, { ruta: '/reservas', rol: 'ADMIN' })
     act(() => {
       window.dispatchEvent(new StorageEvent('storage', { key: 'otra-clave', newValue: null }))
     })

@@ -6,12 +6,20 @@ import { RutaProtegida } from './componentes/layout/RutaProtegida'
 import { LoginPage } from './paginas/auth/LoginPage'
 import { NoEncontradaPage } from './paginas/comun/NoEncontradaPage'
 import { ProximamentePage } from './paginas/comun/ProximamentePage'
+import { EntradaNuevaPage } from './paginas/inventario/EntradaNuevaPage'
 import { InicioPage } from './paginas/inicio/InicioPage'
+import { InventarioPage } from './paginas/inventario/InventarioPage'
+import { KardexPage } from './paginas/inventario/KardexPage'
 import { CategoriasPage } from './paginas/productos/CategoriasPage'
 import { ProductoDetallePage } from './paginas/productos/ProductoDetallePage'
 import { ProductoFormPage } from './paginas/productos/ProductoFormPage'
 import { ProductosPage } from './paginas/productos/ProductosPage'
 import { UsuariosPage } from './paginas/usuarios/UsuariosPage'
+import { VentaDetallePage } from './paginas/ventas/VentaDetallePage'
+import { VentaNuevaPage } from './paginas/ventas/VentaNuevaPage'
+import { VentasPage } from './paginas/ventas/VentasPage'
+
+const CON_PAGINA = ['productos', 'inventario', 'ventas', 'usuarios']
 
 export default function App() {
   return (
@@ -28,10 +36,24 @@ export default function App() {
             <Route path="/productos/nuevo" element={<ProductoFormPage />} />
             <Route path="/productos/:id/editar" element={<ProductoFormPage />} />
           </Route>
+          <Route element={<RutaProtegida roles={['ADMIN', 'INVENTARIO', 'CONTABILIDAD']} />}>
+            <Route path="/inventario" element={<InventarioPage />} />
+            <Route path="/inventario/kardex" element={<KardexPage />} />
+          </Route>
+          <Route element={<RutaProtegida roles={['ADMIN', 'INVENTARIO']} />}>
+            <Route path="/inventario/entradas/nueva" element={<EntradaNuevaPage />} />
+          </Route>
+          <Route element={<RutaProtegida roles={['ADMIN', 'VENDEDOR', 'CONTABILIDAD']} />}>
+            <Route path="/ventas" element={<VentasPage />} />
+            <Route path="/ventas/:id" element={<VentaDetallePage />} />
+          </Route>
+          <Route element={<RutaProtegida roles={['ADMIN', 'VENDEDOR']} />}>
+            <Route path="/ventas/nueva" element={<VentaNuevaPage />} />
+          </Route>
           <Route element={<RutaProtegida roles={['ADMIN']} />}>
             <Route path="/usuarios" element={<UsuariosPage />} />
           </Route>
-          {MODULOS.filter((m) => m.ruta !== '/' && m.clave !== 'productos' && m.clave !== 'usuarios').map((m) => (
+          {MODULOS.filter((m) => m.ruta !== '/' && !CON_PAGINA.includes(m.clave)).map((m) => (
             <Route key={m.clave} element={<RutaProtegida roles={m.roles} />}>
               <Route path={m.ruta} element={<ProximamentePage titulo={m.etiqueta} descripcion={m.descripcion} />} />
             </Route>
