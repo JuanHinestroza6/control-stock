@@ -1,5 +1,6 @@
 package co.livorno.controlstock.auth.seguridad;
 
+import co.livorno.controlstock.comun.config.ConfiguracionTiempo;
 import co.livorno.controlstock.comun.seguridad.UsuarioAutenticado;
 import co.livorno.controlstock.usuario.modelo.Usuario;
 import co.livorno.controlstock.usuario.repositorio.UsuarioRepository;
@@ -33,6 +34,14 @@ public class ConvertidorUsuarioJwt implements Converter<Jwt, AbstractAuthenticat
         }
         Usuario u = usuarios.findById(id).filter(Usuario::isActivo)
                 .orElseThrow(() -> new BadCredentialsException("Usuario inexistente o inactivo"));
+        // Revocación (ADR-005): un token emitido antes del último cambio de contraseña ya no vale.
+        // Ambos instantes en segundos; emitido en el mismo segundo del cambio sigue siendo válido.
+        if (u.getPasswordCambiadoEn() != null && jwt.getIssuedAt() != null) {
+            long cambio = u.getPasswordCambiadoEn().atZone(ConfiguracionTiempo.ZONA).toInstant().getEpochSecond();
+            if (jwt.getIssuedAt().getEpochSecond() < cambio) {
+                throw new BadCredentialsException("Token emitido antes del último cambio de contraseña");
+            }
+        }
         UsuarioAutenticado principal = new UsuarioAutenticado(u.getId(), u.getEmail(), u.getNombre(), u.getRol().name(),
                 u.isDebeCambiarPassword());
         return UsernamePasswordAuthenticationToken.authenticated(principal, jwt,
