@@ -5,8 +5,8 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
 ## Estado actual
 
 - Semana: 1
-- Fase en curso: 1 — Núcleo (rama `fase-1-nucleo`, sin push): B1–B13, F1–F12, T1 y T2 hechos; falta T3 manual,
-  revisión final, documentación PPI y cierre
+- Fase en curso: 1 — Núcleo (rama `fase-1-nucleo`, sin push): código, revisión y PPI terminados; falta solo la
+  prueba manual T3 del usuario
 - Última actualización: 2026-10-01
 
 ## Hecho
@@ -14,20 +14,26 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
 - [x] Fase 0 — Setup: monorepo, infra, CI, auth JWT, frontend base; PPI REQ-06/REQ-12, convención RNF (PR #1–#3)
 - [x] Fase 1 — plan (docs/fases/fase-1-plan.md), ADR-004 (catálogo) y ADR-005 (revocación y cambio de contraseña)
 - [x] Fase 1 — backend: categorías (V3, 6 base), productos (V4), variantes (V5, SKU, matriz, cascada), usuarios (V6,
-      reglas de último ADMIN, revocación por iat, cambio obligatorio). 294/294 pruebas
+      reglas de último ADMIN, revocación por iat, cambio obligatorio, límite de intentos, V7 índice). 307/307 pruebas
 - [x] Fase 1 — frontend: tabla/paginación/modal, categorías, productos, detalle con matriz y generador, usuarios, /cuenta.
       215/215 pruebas, lint y build OK
+- [x] Fase 1 — revisión final: sin críticos; 2 importantes y 6 menores corregidos (commit 41a9424)
+- [x] Fase 1 — PPI: ficha REQ-11, CA de REQ-06/REQ-12 cumplidos, diagrama de clases del catálogo
 
 ## En curso
 
 - [ ] T3: prueba manual con el backend real (la hace el usuario; ver "Prueba manual T3")
-- [ ] Revisión final de la fase 1 (agente revisor)
 
 ## Próximos pasos
 
 1. Ejecutar la prueba manual T3 y reportar lo que falle.
-2. Corregir hallazgos del revisor; documentación PPI (REQ-11, CA de REQ-06/REQ-12, diagrama de clases).
-3. Push de `fase-1-nucleo` y PR solo cuando el usuario lo pida.
+2. Push de `fase-1-nucleo` y PR solo cuando el usuario lo pida.
+3. Asignar stakeholder, NEC y CU de REQ-11 contra el Word; revisar los diagramas con Alt+D.
+
+## Bloqueos y decisiones pendientes (aceptados, sin acción)
+
+- Validación del body antes de `@PreAuthorize`: un rol sin permiso con body inválido recibe 400 en vez de 403.
+- Revocación por `iat` con precisión de segundos: un token emitido en el mismo segundo del cambio sigue válido (ADR-005).
 
 ## Prueba manual T3 (PowerShell 5, desde la raíz del repo)
 
@@ -54,9 +60,6 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
    - [ ] Como ADMIN, restablecer la contraseña del VENDEDOR → su sesión abierta cae al login.
    - [ ] En la tabla de usuarios, tu propia fila no ofrece desactivar ni cambiar el rol.
 
-## Bloqueos y decisiones pendientes
-
-- (ninguno)
 
 ## Notas para la próxima sesión
 

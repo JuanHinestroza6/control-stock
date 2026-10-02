@@ -1,1 +1,2 @@
-- [Pendientes revisión Fase 0](project_fase0_pendientes.md) — abiertos tras cierre backend F0: secreto de .env.example válido, sin rate-limit login, Locale.ROOT, permitAll explícito
+- [Pendientes revisión Fase 0](project_fase0_pendientes.md) — casi todo cerrado en F1; solo falta prueba de actuator; V2 es migración Java
+- [Patrones recurrentes](project_patrones_recurrentes.md) — collation ai_ci vs Java, IllegalArgumentException=500, catch DIVE genérico, ADR≠código, sin pruebas concurrentes
