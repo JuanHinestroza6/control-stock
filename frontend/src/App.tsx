@@ -7,6 +7,7 @@ import { NoEncontradaPage } from './paginas/comun/NoEncontradaPage'
 import { ProximamentePage } from './paginas/comun/ProximamentePage'
 import { InicioPage } from './paginas/inicio/InicioPage'
 import { CategoriasPage } from './paginas/productos/CategoriasPage'
+import { ProductoFormPage } from './paginas/productos/ProductoFormPage'
 import { ProductosPage } from './paginas/productos/ProductosPage'
 
 export default function App() {
@@ -18,7 +19,11 @@ export default function App() {
           <Route index element={<InicioPage />} />
           <Route path="/productos" element={<ProductosPage />} />
           <Route path="/productos/categorias" element={<CategoriasPage />} />
-          {MODULOS.filter((m) => m.ruta !== '/').map((m) => (
+          <Route element={<RutaProtegida roles={['ADMIN', 'INVENTARIO']} />}>
+            <Route path="/productos/nuevo" element={<ProductoFormPage />} />
+            <Route path="/productos/:id/editar" element={<ProductoFormPage />} />
+          </Route>
+          {MODULOS.filter((m) => m.ruta !== '/' && m.clave !== 'productos').map((m) => (
             <Route key={m.clave} element={<RutaProtegida roles={m.roles} />}>
               <Route path={m.ruta} element={<ProximamentePage titulo={m.etiqueta} descripcion={m.descripcion} />} />
             </Route>

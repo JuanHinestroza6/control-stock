@@ -1,4 +1,10 @@
-import type { FiltrosProductos, PaginaProductos } from '../tipos/catalogo'
+import type {
+  ActualizarProductoRequest,
+  CrearProductoRequest,
+  FiltrosProductos,
+  PaginaProductos,
+  ProductoDetalleResponse,
+} from '../tipos/catalogo'
 import { cliente } from './cliente'
 
 /** Construye los query params del listado; omite los filtros vacíos o indefinidos. */
@@ -16,5 +22,20 @@ export function parametrosProductos(filtros: FiltrosProductos): Record<string, s
 
 export async function listarProductos(filtros: FiltrosProductos): Promise<PaginaProductos> {
   const { data } = await cliente.get<PaginaProductos>('/productos', { params: parametrosProductos(filtros) })
+  return data
+}
+
+export async function obtenerProducto(id: number): Promise<ProductoDetalleResponse> {
+  const { data } = await cliente.get<ProductoDetalleResponse>(`/productos/${id}`)
+  return data
+}
+
+export async function crearProducto(datos: CrearProductoRequest): Promise<ProductoDetalleResponse> {
+  const { data } = await cliente.post<ProductoDetalleResponse>('/productos', datos)
+  return data
+}
+
+export async function actualizarProducto(id: number, datos: ActualizarProductoRequest): Promise<ProductoDetalleResponse> {
+  const { data } = await cliente.put<ProductoDetalleResponse>(`/productos/${id}`, datos)
   return data
 }
