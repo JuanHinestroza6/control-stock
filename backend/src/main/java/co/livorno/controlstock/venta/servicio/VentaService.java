@@ -13,12 +13,14 @@ import co.livorno.controlstock.inventario.servicio.MovimientoService;
 import co.livorno.controlstock.usuario.modelo.Usuario;
 import co.livorno.controlstock.usuario.repositorio.UsuarioRepository;
 import co.livorno.controlstock.venta.dto.AnularVentaRequest;
+import co.livorno.controlstock.venta.dto.DevolucionResponse;
 import co.livorno.controlstock.venta.dto.LineaVentaRequest;
 import co.livorno.controlstock.venta.dto.RegistrarVentaRequest;
 import co.livorno.controlstock.venta.dto.VentaDetalleResponse;
 import co.livorno.controlstock.venta.dto.VentaResumenResponse;
 import co.livorno.controlstock.venta.modelo.EstadoVenta;
 import co.livorno.controlstock.venta.modelo.Venta;
+import co.livorno.controlstock.venta.repositorio.DevolucionRepository;
 import co.livorno.controlstock.venta.repositorio.VentaRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -28,6 +30,8 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -44,6 +48,7 @@ public class VentaService {
     public static final Set<String> ORDEN_PERMITIDO = Set.of("fecha", "total");
 
     private final VentaRepository ventas;
+    private final DevolucionRepository devoluciones;
     private final VarianteRepository variantes;
     private final UsuarioRepository usuarios;
     private final MovimientoService movimientos;
@@ -105,7 +110,7 @@ public class VentaService {
                 .orElseThrow(() -> new RecursoNoEncontradoException("Usuario", usuarioId));
 
         venta.anular(admin, LocalDateTime.now(clock), request.motivo()); // 409 si ya está anulada
-        if (tieneDevoluciones(venta)) {
+        if (devoluciones.existsByDetalleVentaVentaId(venta.getId())) {
             throw new ExcepcionNegocio("La venta " + venta.numero()
                     + " tiene devoluciones; corrige el stock con ajustes.");
         }
@@ -114,11 +119,6 @@ public class VentaService {
                         d.getCantidad(), null, usuarioId, "VENTA", venta.getId(), venta.getMotivoAnulacion())));
         ventas.saveAndFlush(venta);
         return VentaDetalleResponse.de(venta, true);
-    }
-
-    /** Punto de conexión con B10: aquí se consultará DevolucionRepository (hoy no existe la tabla). */
-    boolean tieneDevoluciones(Venta venta) {
-        return false;
     }
 
     public Page<VentaResumenResponse> listar(LocalDate desde, LocalDate hasta, EstadoVenta estado,
@@ -142,7 +142,10 @@ public class VentaService {
 
     public VentaDetalleResponse obtener(Long id) {
         Venta v = ventas.conDetalle(id).orElseThrow(() -> new RecursoNoEncontradoException("Venta", id));
-        return VentaDetalleResponse.de(v, puedeVerCosto());
+        Map<Long, List<DevolucionResponse>> porLinea = devoluciones.porVenta(id).stream()
+                .collect(Collectors.groupingBy(d -> d.getDetalleVenta().getId(),
+                        Collectors.mapping(DevolucionResponse::de, Collectors.toList())));
+        return VentaDetalleResponse.de(v, puedeVerCosto(), porLinea);
     }
 
     /** El costo no se expone al rol VENDEDOR. */

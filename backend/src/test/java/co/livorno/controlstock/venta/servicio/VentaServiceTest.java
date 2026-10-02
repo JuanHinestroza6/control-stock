@@ -52,6 +52,7 @@ class VentaServiceTest {
     static final Clock RELOJ = Clock.fixed(Instant.parse("2026-10-02T15:00:00Z"), ZoneId.of("America/Bogota"));
 
     @Mock VentaRepository ventas;
+    @Mock co.livorno.controlstock.venta.repositorio.DevolucionRepository devoluciones;
     @Mock VarianteRepository variantes;
     @Mock UsuarioRepository usuarios;
     @Mock MovimientoService movimientos;
@@ -64,7 +65,7 @@ class VentaServiceTest {
 
     @BeforeEach
     void preparar() {
-        servicio = new VentaService(ventas, variantes, usuarios, movimientos, usuarioActual, RELOJ);
+        servicio = new VentaService(ventas, devoluciones, variantes, usuarios, movimientos, usuarioActual, RELOJ);
         producto = new Producto("LIV001", "Camiseta", new Categoria("Camisetas"), new BigDecimal("20000"),
                 new BigDecimal("59900"), null, null);
         v5 = variante(5L, "LIV001-M-NEG", Talla.M);
@@ -246,15 +247,9 @@ class VentaServiceTest {
         comoUsuario("ADMIN");
         Venta venta = ventaConDosLineas();
         when(ventas.bloquear(42L)).thenReturn(Optional.of(venta));
-        VentaService conDevoluciones = new VentaService(ventas, variantes, usuarios, movimientos, usuarioActual,
-                RELOJ) {
-            @Override
-            boolean tieneDevoluciones(Venta v) {
-                return true;
-            }
-        };
+        when(devoluciones.existsByDetalleVentaVentaId(42L)).thenReturn(true);
 
-        assertThatThrownBy(() -> conDevoluciones.anular(42L,
+        assertThatThrownBy(() -> servicio.anular(42L,
                 new co.livorno.controlstock.venta.dto.AnularVentaRequest("con devolución")))
                 .isInstanceOf(ExcepcionNegocio.class)
                 .hasMessage("La venta V-000042 tiene devoluciones; corrige el stock con ajustes.");

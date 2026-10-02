@@ -1,10 +1,13 @@
 package co.livorno.controlstock.venta.web;
 
 import co.livorno.controlstock.venta.dto.AnularVentaRequest;
+import co.livorno.controlstock.venta.dto.DevolucionRequest;
+import co.livorno.controlstock.venta.dto.DevolucionResponse;
 import co.livorno.controlstock.venta.dto.RegistrarVentaRequest;
 import co.livorno.controlstock.venta.dto.VentaDetalleResponse;
 import co.livorno.controlstock.venta.dto.VentaResumenResponse;
 import co.livorno.controlstock.venta.modelo.EstadoVenta;
+import co.livorno.controlstock.venta.servicio.DevolucionService;
 import co.livorno.controlstock.venta.servicio.VentaService;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
@@ -31,6 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class VentaController {
 
     private final VentaService servicio;
+    private final DevolucionService devolucionService;
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN','VENDEDOR')")
@@ -43,6 +47,13 @@ public class VentaController {
     @PreAuthorize("hasRole('ADMIN')")
     public VentaDetalleResponse anular(@PathVariable Long id, @Valid @RequestBody AnularVentaRequest request) {
         return servicio.anular(id, request);
+    }
+
+    @PostMapping("/{id}/devoluciones")
+    @PreAuthorize("hasAnyRole('ADMIN','VENDEDOR')")
+    @ResponseStatus(HttpStatus.CREATED)
+    public DevolucionResponse devolver(@PathVariable Long id, @Valid @RequestBody DevolucionRequest request) {
+        return devolucionService.registrar(id, request);
     }
 
     @GetMapping

@@ -53,6 +53,7 @@ class VentaControllerTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean VentaService servicio;
+    @MockitoBean co.livorno.controlstock.venta.servicio.DevolucionService devolucionService;
     @MockitoBean co.livorno.controlstock.usuario.repositorio.UsuarioRepository usuarioRepository;
 
     private static Authentication como(String rol) {
@@ -202,6 +203,42 @@ class VentaControllerTest {
         mvc.perform(post("/api/ventas/43/anular").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"motivo\":\"error de captura\"}").with(authentication(como("ADMIN"))))
                 .andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
+    void devolver_vendedor_devuelve201() throws Exception {
+        when(devolucionService.registrar(eq(42L), any())).thenReturn(new co.livorno.controlstock.venta.dto.DevolucionResponse(
+                9L, 1L, 1, "talla equivocada", true, LocalDateTime.of(2026, 10, 2, 11, 0), "Ana"));
+
+        mvc.perform(post("/api/ventas/42/devoluciones").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"detalleVentaId\":1,\"cantidad\":1,\"motivo\":\"talla equivocada\",\"aptaParaVenta\":true}")
+                        .with(authentication(como("VENDEDOR"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(9))
+                .andExpect(jsonPath("$.usuarioNombre").value("Ana"));
+    }
+
+    @Test
+    void devolver_rolSinPermiso_devuelve403() throws Exception {
+        for (String rol : List.of("INVENTARIO", "CONTABILIDAD")) {
+            mvc.perform(post("/api/ventas/42/devoluciones").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"detalleVentaId\":1,\"cantidad\":1,\"motivo\":\"talla equivocada\",\"aptaParaVenta\":true}")
+                            .with(authentication(como(rol))))
+                    .andExpect(status().isForbidden());
+        }
+        verifyNoInteractions(devolucionService);
+    }
+
+    @Test
+    void devolver_cuerpoInvalido_devuelve400() throws Exception {
+        for (String cuerpo : List.of("{}",
+                "{\"detalleVentaId\":1,\"cantidad\":0,\"motivo\":\"talla equivocada\",\"aptaParaVenta\":true}",
+                "{\"detalleVentaId\":1,\"cantidad\":1,\"motivo\":\"abc\",\"aptaParaVenta\":true}",
+                "{\"detalleVentaId\":1,\"cantidad\":1,\"motivo\":\"talla equivocada\"}")) {
+            mvc.perform(post("/api/ventas/42/devoluciones").contentType(MediaType.APPLICATION_JSON).content(cuerpo)
+                            .with(authentication(como("ADMIN"))))
+                    .andExpect(status().isBadRequest());
+        }
     }
 
     @Test
