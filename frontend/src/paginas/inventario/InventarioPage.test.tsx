@@ -105,10 +105,10 @@ describe('InventarioPage', () => {
     await waitFor(() => expect(ultimosFiltros()).toMatchObject({ page: 1 }))
   })
 
-  it('el botón Ajuste abre el modal solo para quien mueve stock y no en variantes inactivas', async () => {
+  it('el botón Ajuste abre el modal solo para quien mueve stock, también en variantes inactivas', async () => {
     const inv = renderizarApp(<InventarioPage />, { rol: 'INVENTARIO' })
     await screen.findByText('LIV001-M-NEG1')
-    expect(screen.queryByRole('button', { name: 'Ajuste de LIV001-M-NEG2' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ajuste de LIV001-M-NEG2' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Ajuste de LIV001-M-NEG1' }))
     expect(screen.getByRole('dialog', { name: 'Ajuste de LIV001-M-NEG1' })).toBeInTheDocument()
     inv.unmount()

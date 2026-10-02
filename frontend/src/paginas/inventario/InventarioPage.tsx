@@ -100,7 +100,7 @@ export function InventarioPage() {
       encabezado: 'Acciones',
       celda: (v) => (
         <div className="flex flex-wrap gap-3">
-          {puedeMover && v.activo && (
+          {puedeMover && (
             <button type="button" onClick={() => setAjustando(v)} className={clasesLink} aria-label={`Ajuste de ${v.sku}`}>
               Ajuste
             </button>
