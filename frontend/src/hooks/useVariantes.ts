@@ -1,7 +1,13 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { cambiarEstadoProducto } from '../api/productos'
-import { actualizarVariante, cambiarEstadoVariante, listarVariantes, obtenerMatriz } from '../api/variantes'
-import type { MatrizResponse, ProductoDetalleResponse, VarianteResponse } from '../tipos/catalogo'
+import { actualizarVariante, cambiarEstadoVariante, generarVariantes, listarVariantes, obtenerMatriz } from '../api/variantes'
+import type {
+  GenerarVariantesRequest,
+  GenerarVariantesResponse,
+  MatrizResponse,
+  ProductoDetalleResponse,
+  VarianteResponse,
+} from '../tipos/catalogo'
 
 export function useVariantes(productoId: number, incluirInactivas: boolean) {
   return useQuery<VarianteResponse[]>({
@@ -48,5 +54,13 @@ export function useMatriz(productoId: number, incluirInactivas: boolean) {
   return useQuery<MatrizResponse>({
     queryKey: ['matriz', productoId, incluirInactivas],
     queryFn: () => obtenerMatriz(productoId, incluirInactivas),
+  })
+}
+
+export function useGenerarVariantes(productoId: number) {
+  const qc = useQueryClient()
+  return useMutation<GenerarVariantesResponse, unknown, GenerarVariantesRequest>({
+    mutationFn: (datos) => generarVariantes(productoId, datos),
+    onSuccess: () => invalidarCatalogo(qc, productoId),
   })
 }

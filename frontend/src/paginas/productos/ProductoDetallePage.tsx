@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { BadgeStock } from '../../componentes/dominio/BadgeStock'
+import { GeneradorVariantes } from '../../componentes/dominio/GeneradorVariantes'
 import { MatrizTallaColor } from '../../componentes/dominio/MatrizTallaColor'
 import { Badge } from '../../componentes/ui/Badge'
 import { Boton } from '../../componentes/ui/Boton'
@@ -191,7 +192,7 @@ function Detalle({ producto }: { producto: ProductoDetalleResponse }) {
         {tablaVariantes}
       </div>
 
-      {/* F8: aquí va el GeneradorVariantes (solo roles que editan el catálogo). */}
+      {puedeEditar && <GeneradorVariantes productoId={producto.id} productoActivo={producto.activo} />}
 
       {editando && (
         <ModalStockMinimo
