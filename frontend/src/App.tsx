@@ -7,6 +7,7 @@ import { NoEncontradaPage } from './paginas/comun/NoEncontradaPage'
 import { ProximamentePage } from './paginas/comun/ProximamentePage'
 import { InicioPage } from './paginas/inicio/InicioPage'
 import { CategoriasPage } from './paginas/productos/CategoriasPage'
+import { ProductoDetallePage } from './paginas/productos/ProductoDetallePage'
 import { ProductoFormPage } from './paginas/productos/ProductoFormPage'
 import { ProductosPage } from './paginas/productos/ProductosPage'
 
@@ -18,6 +19,7 @@ export default function App() {
         <Route element={<LayoutPrincipal />}>
           <Route index element={<InicioPage />} />
           <Route path="/productos" element={<ProductosPage />} />
+          <Route path="/productos/:id" element={<ProductoDetallePage />} />
           <Route path="/productos/categorias" element={<CategoriasPage />} />
           <Route element={<RutaProtegida roles={['ADMIN', 'INVENTARIO']} />}>
             <Route path="/productos/nuevo" element={<ProductoFormPage />} />

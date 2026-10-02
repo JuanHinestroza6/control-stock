@@ -39,3 +39,8 @@ export async function actualizarProducto(id: number, datos: ActualizarProductoRe
   const { data } = await cliente.put<ProductoDetalleResponse>(`/productos/${id}`, datos)
   return data
 }
+
+export async function cambiarEstadoProducto(id: number, activo: boolean): Promise<ProductoDetalleResponse> {
+  const { data } = await cliente.patch<ProductoDetalleResponse>(`/productos/${id}/estado`, { activo })
+  return data
+}
