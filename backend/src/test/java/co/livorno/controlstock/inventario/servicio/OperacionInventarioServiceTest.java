@@ -167,4 +167,30 @@ class OperacionInventarioServiceTest {
                 .isInstanceOf(SolicitudInvalidaException.class);
         verify(movimientos, never()).registrar(any());
     }
+
+    @Test
+    void registrarEntrada_lineasDesordenadas_registraOrdenadasPorVarianteId() {
+        variante(10, producto, "LIV001-M-NEG");
+        variante(11, producto, "LIV001-L-NEG");
+        variante(20, otro, "LIV002-M-NEG");
+
+        servicio.registrarEntrada(new EntradaRequest(null,
+                List.of(linea(20, 1, "31000"), linea(10, 1, "21000"), linea(11, 1, "21000"))));
+
+        ArgumentCaptor<SolicitudMovimiento> c = ArgumentCaptor.forClass(SolicitudMovimiento.class);
+        verify(movimientos, org.mockito.Mockito.times(3)).registrar(c.capture());
+        assertThat(c.getAllValues()).extracting(SolicitudMovimiento::varianteId).containsExactly(10L, 11L, 20L);
+    }
+
+    @Test
+    void registrarEntrada_observacionEnBlancoOConEspacios_seGuardaNullORecortada() {
+        variante(10, producto, "LIV001-M-NEG");
+        ArgumentCaptor<SolicitudMovimiento> c = ArgumentCaptor.forClass(SolicitudMovimiento.class);
+
+        servicio.registrarEntrada(new EntradaRequest("   ", List.of(linea(10, 1, "0"))));
+        servicio.registrarEntrada(new EntradaRequest("  Pedido 7  ", List.of(linea(10, 1, "0"))));
+
+        verify(movimientos, org.mockito.Mockito.times(2)).registrar(c.capture());
+        assertThat(c.getAllValues()).extracting(SolicitudMovimiento::observacion).containsExactly(null, "Pedido 7");
+    }
 }

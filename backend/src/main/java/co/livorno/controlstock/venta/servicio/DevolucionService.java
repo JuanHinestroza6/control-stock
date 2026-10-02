@@ -58,7 +58,7 @@ public class DevolucionService {
         Usuario usuario = usuarios.findById(usuarioId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Usuario", usuarioId));
         Devolucion devolucion = devoluciones.saveAndFlush(new Devolucion(linea, request.cantidad(),
-                request.motivo(), request.aptaParaVenta(), LocalDateTime.now(clock), usuario));
+                request.motivo().strip(), request.aptaParaVenta(), LocalDateTime.now(clock), usuario));
 
         if (devolucion.isAptaParaVenta()) {
             movimientos.registrar(new SolicitudMovimiento(linea.getVariante().getId(), TipoMovimiento.DEVOLUCION,

@@ -18,13 +18,12 @@ public interface MovimientoRepository extends Repository<Movimiento, Long> {
     Optional<Movimiento> findById(Long id);
 
     /**
-     * Kardex filtrado, orden fijo {@code fecha desc, id desc} (el Pageable debe venir sin orden). Una sola consulta con
-     * variante y producto. Rango semiabierto {@code [desde, hasta)}; filtros nulos se ignoran.
+     * Kardex sin filtro de tipo, orden fijo {@code fecha desc, id desc} (el Pageable debe venir sin orden). Una sola
+     * consulta con variante y producto. Rango semiabierto {@code [desde, hasta)}; filtros nulos se ignoran.
      */
     @Query(value = """
             select m from Movimiento m join fetch m.variante v join fetch v.producto p
             where (:varianteId is null or v.id = :varianteId)
-              and (:tipo is null or cast(m.tipo as string) = :tipo)
               and (:desde is null or m.fecha >= :desde)
               and (:hasta is null or m.fecha < :hasta)
             order by m.fecha desc, m.id desc
@@ -32,16 +31,34 @@ public interface MovimientoRepository extends Repository<Movimiento, Long> {
             countQuery = """
             select count(m) from Movimiento m
             where (:varianteId is null or m.variante.id = :varianteId)
-              and (:tipo is null or cast(m.tipo as string) = :tipo)
               and (:desde is null or m.fecha >= :desde)
               and (:hasta is null or m.fecha < :hasta)
             """)
-    Page<Movimiento> consultar(@Param("varianteId") Long varianteId, @Param("tipo") String tipo,
+    Page<Movimiento> consultarTodos(@Param("varianteId") Long varianteId, @Param("desde") LocalDateTime desde,
+            @Param("hasta") LocalDateTime hasta, Pageable pageable);
+
+    /** Igual que {@link #consultarTodos} pero con {@code m.tipo = :tipo} tipado, para usar idx_movimiento_tipo_fecha. */
+    @Query(value = """
+            select m from Movimiento m join fetch m.variante v join fetch v.producto p
+            where m.tipo = :tipo
+              and (:varianteId is null or v.id = :varianteId)
+              and (:desde is null or m.fecha >= :desde)
+              and (:hasta is null or m.fecha < :hasta)
+            order by m.fecha desc, m.id desc
+            """,
+            countQuery = """
+            select count(m) from Movimiento m
+            where m.tipo = :tipo
+              and (:varianteId is null or m.variante.id = :varianteId)
+              and (:desde is null or m.fecha >= :desde)
+              and (:hasta is null or m.fecha < :hasta)
+            """)
+    Page<Movimiento> consultarPorTipo(@Param("tipo") TipoMovimiento tipo, @Param("varianteId") Long varianteId,
             @Param("desde") LocalDateTime desde, @Param("hasta") LocalDateTime hasta, Pageable pageable);
 
-    /** Versión tipada (Hibernate no infiere el tipo de un enum nulo en {@code :tipo is null}). */
     default Page<Movimiento> buscar(Long varianteId, TipoMovimiento tipo, LocalDateTime desde, LocalDateTime hasta,
             Pageable pageable) {
-        return consultar(varianteId, tipo != null ? tipo.name() : null, desde, hasta, pageable);
+        return tipo == null ? consultarTodos(varianteId, desde, hasta, pageable)
+                : consultarPorTipo(tipo, varianteId, desde, hasta, pageable);
     }
 }

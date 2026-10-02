@@ -360,4 +360,69 @@ class OperacionIntegracionTest {
         assertThat(devuelto).isEqualTo(3).isLessThanOrEqualTo(5);
         assertThat(fisico(variante)).isZero();
     }
+
+    @Test
+    void anularYDevolver_enParaleloLaMismaVenta_unaSolaGanaYNuncaQuedaAnuladaConDevoluciones() throws Exception {
+        // dado: venta de 2 unidades; ADMIN anula y VENDEDOR devuelve una (apta) a la vez
+        String admin = tokenAdmin();
+        String vendedor = tokenDe(Rol.VENDEDOR);
+        long variante = productoConVariante(admin)[1];
+        entrada(admin, variante, 2, "20000.00");
+        String ventaJson = venta(vendedor, variante, 2, null);
+        long ventaId = id(ventaJson, "$.id");
+        long detalle = id(ventaJson, "$.lineas[0].detalleId");
+
+        // cuando: se disparan a la vez
+        CountDownLatch salida = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        Future<Integer> anulacion = pool.submit(() -> {
+            salida.await();
+            return enviar("POST", "/api/ventas/" + ventaId + "/anular", admin, "{\"motivo\":\"error de captura\"}")
+                    .andReturn().getResponse().getStatus();
+        });
+        Future<Integer> devolucion = pool.submit(() -> {
+            salida.await();
+            return enviar("POST", "/api/ventas/" + ventaId + "/devoluciones", vendedor,
+                    devolucionJson(detalle, 1, true)).andReturn().getResponse().getStatus();
+        });
+        salida.countDown();
+        int estadoAnular = anulacion.get();
+        int estadoDevolver = devolucion.get();
+        pool.shutdown();
+
+        // entonces: exactamente una operación tiene éxito (anular 200 o devolver 201), la otra 422/409
+        boolean anuloGano = estadoAnular == 200;
+        boolean devolvioGano = estadoDevolver == 201;
+        assertThat(anuloGano ^ devolvioGano).as("anular=%d, devolver=%d", estadoAnular, estadoDevolver).isTrue();
+        assertThat(anuloGano ? estadoDevolver : estadoAnular).isIn(422, 409);
+
+        String estado = jdbc.queryForObject("SELECT estado FROM venta WHERE id = ?", String.class, ventaId);
+        Integer devoluciones = jdbc.queryForObject("SELECT COUNT(*) FROM devolucion WHERE detalle_venta_id = ?",
+                Integer.class, detalle);
+        assertThat("ANULADA".equals(estado) && devoluciones > 0).as("venta ANULADA con devoluciones").isFalse();
+        assertThat(estado).isEqualTo(anuloGano ? "ANULADA" : "REGISTRADA");
+        assertThat(devoluciones).isEqualTo(anuloGano ? 0 : 1);
+        assertThat(fisico(variante)).isEqualTo(anuloGano ? 2 : 1); // anulada repone 2; devuelta 1 queda 0+1
+    }
+
+    @Test
+    void validacionTextos_observacionOMotivoCortoTrasRecortar_responde400() throws Exception {
+        String admin = tokenAdmin();
+        long variante = productoConVariante(admin)[1];
+        entrada(admin, variante, 3, "20000.00");
+        long ventaId = id(venta(admin, variante, 1, null), "$.id");
+        long detalle = jdbc.queryForObject("SELECT id FROM detalle_venta WHERE venta_id = ?", Long.class, ventaId);
+
+        enviar("POST", "/api/inventario/ajustes", admin, "{\"varianteId\":" + variante
+                + ",\"tipo\":\"AJUSTE_POSITIVO\",\"cantidad\":1,\"observacion\":\"  ab   \"}")
+                .andExpect(status().isBadRequest());
+        enviar("POST", "/api/ventas/" + ventaId + "/anular", admin, "{\"motivo\":\"  abc  \"}")
+                .andExpect(status().isBadRequest());
+        enviar("POST", "/api/ventas/" + ventaId + "/devoluciones", admin, "{\"detalleVentaId\":" + detalle
+                + ",\"cantidad\":1,\"motivo\":\"  abcd \",\"aptaParaVenta\":true}")
+                .andExpect(status().isBadRequest());
+        // justo en el límite (5 caracteres recortados) sí pasa
+        enviar("POST", "/api/ventas/" + ventaId + "/anular", admin, "{\"motivo\":\"  abcde  \"}")
+                .andExpect(status().isOk());
+    }
 }

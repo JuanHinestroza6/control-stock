@@ -18,6 +18,9 @@ spring:
           time_zone: America/Bogota
         # Actualiza filas en orden de PK: evita deadlocks entre ventas de varias líneas (ADR-006)
         order_updates: true
+        query:
+          # El kardex es inmutable: un UPDATE/DELETE masivo sobre una entidad @Immutable falla en vez de ignorarse
+          immutable_entity_update_query_handling_mode: exception
   flyway:
     enabled: true
     locations: classpath:db/migration

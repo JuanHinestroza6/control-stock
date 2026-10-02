@@ -17,6 +17,7 @@ import co.livorno.controlstock.inventario.modelo.Movimiento;
 import co.livorno.controlstock.inventario.modelo.TipoMovimiento;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -68,9 +69,13 @@ public class OperacionInventarioService {
 
         UsuarioAutenticado usuario = usuarioActual.obtener();
         List<MovimientoResponse> respuesta = new ArrayList<>();
-        for (LineaEntradaRequest linea : req.lineas()) {
+        String observacion = req.observacion() == null || req.observacion().isBlank() ? null : req.observacion().strip();
+        // Orden por varianteId (como la venta): mismo orden de bloqueo entre transacciones concurrentes
+        List<LineaEntradaRequest> ordenadas = req.lineas().stream()
+                .sorted(Comparator.comparing(LineaEntradaRequest::varianteId)).toList();
+        for (LineaEntradaRequest linea : ordenadas) {
             Movimiento m = movimientos.registrar(new SolicitudMovimiento(linea.varianteId(), TipoMovimiento.ENTRADA,
-                    linea.cantidad(), linea.costoUnitario(), usuario.id(), null, null, req.observacion()));
+                    linea.cantidad(), linea.costoUnitario(), usuario.id(), null, null, observacion));
             respuesta.add(MovimientoResponse.de(m, usuario.nombre()));
         }
         productos.forEach((id, producto) -> {
