@@ -1,5 +1,10 @@
 package co.livorno.controlstock.catalogo.web;
 
+import co.livorno.controlstock.catalogo.dto.ActualizarVarianteRequest;
+import co.livorno.controlstock.catalogo.dto.MatrizResponse;
+import co.livorno.controlstock.comun.dto.EstadoRequest;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import co.livorno.controlstock.catalogo.dto.GenerarVariantesRequest;
 import co.livorno.controlstock.catalogo.dto.GenerarVariantesResponse;
 import co.livorno.controlstock.catalogo.dto.VarianteResponse;
@@ -19,20 +24,39 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/productos/{productoId}/variantes")
+@RequestMapping("/api")
 @RequiredArgsConstructor
 public class VarianteController {
 
     private final VarianteService servicio;
 
-    @GetMapping
+    @GetMapping("/productos/{productoId}/matriz")
+    @PreAuthorize("isAuthenticated()")
+    public MatrizResponse matriz(@PathVariable Long productoId,
+            @RequestParam(defaultValue = "false") boolean incluirInactivas) {
+        return servicio.matriz(productoId, incluirInactivas);
+    }
+
+    @PutMapping("/variantes/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','INVENTARIO')")
+    public VarianteResponse actualizar(@PathVariable Long id, @Valid @RequestBody ActualizarVarianteRequest req) {
+        return servicio.actualizar(id, req);
+    }
+
+    @PatchMapping("/variantes/{id}/estado")
+    @PreAuthorize("hasAnyRole('ADMIN','INVENTARIO')")
+    public VarianteResponse cambiarEstado(@PathVariable Long id, @Valid @RequestBody EstadoRequest req) {
+        return servicio.cambiarEstado(id, req.activo());
+    }
+
+    @GetMapping("/productos/{productoId}/variantes")
     @PreAuthorize("isAuthenticated()")
     public List<VarianteResponse> listar(@PathVariable Long productoId,
             @RequestParam(defaultValue = "false") boolean incluirInactivas) {
         return servicio.listar(productoId, incluirInactivas);
     }
 
-    @PostMapping("/generar")
+    @PostMapping("/productos/{productoId}/variantes/generar")
     @PreAuthorize("hasAnyRole('ADMIN','INVENTARIO')")
     @ResponseStatus(HttpStatus.CREATED)
     public GenerarVariantesResponse generar(@PathVariable Long productoId,

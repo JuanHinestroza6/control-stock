@@ -193,4 +193,60 @@ class ProductoServiceTest {
         assertThat(servicio.cambiarEstado(10L, true).activo()).isTrue();
         verify(productos, never()).saveAndFlush(any());
     }
+
+    private co.livorno.controlstock.catalogo.modelo.Variante variante(Producto p, String sku, int reservado) {
+        var v = new co.livorno.controlstock.catalogo.modelo.Variante(p, sku,
+                co.livorno.controlstock.catalogo.modelo.Talla.M, "NEGRO", 1);
+        ReflectionTestUtils.setField(v, "stockFisico", reservado + 5);
+        ReflectionTestUtils.setField(v, "stockReservado", reservado);
+        return v;
+    }
+
+    @Test
+    void cambiarEstado_desactivar_cascadaDesactivaTodasLasVariantes() {
+        comoRol("ADMIN");
+        Producto p = producto();
+        var a = variante(p, "LIV001-M-NEG", 0);
+        var b = variante(p, "LIV001-M-ROJ", 0);
+        when(productos.buscarConCategoria(10L)).thenReturn(Optional.of(p));
+        when(variantes.findByProductoId(10L)).thenReturn(List.of(a, b));
+        when(productos.saveAndFlush(p)).thenReturn(p);
+
+        servicio.cambiarEstado(10L, false);
+
+        assertThat(a.isActivo()).isFalse();
+        assertThat(b.isActivo()).isFalse();
+    }
+
+    @Test
+    void cambiarEstado_desactivarConReservado_lanza409YNoCambiaNada() {
+        Producto p = producto();
+        var a = variante(p, "LIV001-M-NEG", 0);
+        var b = variante(p, "LIV001-M-ROJ", 4);
+        when(productos.buscarConCategoria(10L)).thenReturn(Optional.of(p));
+        when(variantes.findByProductoId(10L)).thenReturn(List.of(a, b));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> servicio.cambiarEstado(10L, false))
+                .isInstanceOf(ConflictoException.class)
+                .hasMessage("No se puede desactivar el producto: la variante LIV001-M-ROJ tiene 4 unidades "
+                        + "en apartados activos.");
+        assertThat(p.isActivo()).isTrue();
+        assertThat(a.isActivo()).isTrue();
+        verify(productos, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void cambiarEstado_reactivar_noReactivaLasVariantes() {
+        comoRol("ADMIN");
+        Producto p = producto();
+        p.desactivar();
+        var a = variante(p, "LIV001-M-NEG", 0);
+        a.desactivar();
+        when(productos.buscarConCategoria(10L)).thenReturn(Optional.of(p));
+        when(productos.saveAndFlush(p)).thenReturn(p);
+
+        assertThat(servicio.cambiarEstado(10L, true).activo()).isTrue();
+        assertThat(a.isActivo()).isFalse();
+        verify(variantes, never()).findByProductoId(any());
+    }
 }

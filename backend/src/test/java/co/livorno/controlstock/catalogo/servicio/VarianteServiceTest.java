@@ -194,6 +194,108 @@ class VarianteServiceTest {
         assertThat(servicio.listar(10L, true)).isEmpty();
     }
 
+    private Variante conStock(Variante v, int fisico, int reservado) {
+        ReflectionTestUtils.setField(v, "stockFisico", fisico);
+        ReflectionTestUtils.setField(v, "stockReservado", reservado);
+        return v;
+    }
+
+    @Test
+    void actualizar_cambiaSoloElStockMinimo() {
+        Variante v = existente(producto(true), "A", Talla.M, "NEGRO", true);
+        when(variantes.findById(5L)).thenReturn(Optional.of(v));
+        when(variantes.saveAndFlush(v)).thenReturn(v);
+
+        var r = servicio.actualizar(5L, new co.livorno.controlstock.catalogo.dto.ActualizarVarianteRequest(9));
+
+        assertThat(r.stockMinimo()).isEqualTo(9);
+        assertThat(r.sku()).isEqualTo("A");
+    }
+
+    @Test
+    void actualizar_inexistente_lanza404() {
+        when(variantes.findById(5L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.actualizar(5L,
+                new co.livorno.controlstock.catalogo.dto.ActualizarVarianteRequest(1)))
+                .isInstanceOf(RecursoNoEncontradoException.class);
+    }
+
+    @Test
+    void cambiarEstado_desactivarConReservado_lanza409() {
+        Variante v = conStock(existente(producto(true), "LIV001-M-NEG", Talla.M, "NEGRO", true), 10, 3);
+        when(variantes.findById(5L)).thenReturn(Optional.of(v));
+
+        assertThatThrownBy(() -> servicio.cambiarEstado(5L, false))
+                .isInstanceOf(co.livorno.controlstock.comun.excepcion.ConflictoException.class)
+                .hasMessage("La variante LIV001-M-NEG tiene 3 unidades en apartados activos.");
+        assertThat(v.isActivo()).isTrue();
+    }
+
+    @Test
+    void cambiarEstado_desactivarSinReservado_desactiva() {
+        Variante v = existente(producto(true), "A", Talla.M, "NEGRO", true);
+        when(variantes.findById(5L)).thenReturn(Optional.of(v));
+
+        assertThat(servicio.cambiarEstado(5L, false).activo()).isFalse();
+    }
+
+    @Test
+    void cambiarEstado_activarConProductoInactivo_lanza422() {
+        Variante v = existente(producto(false), "A", Talla.M, "NEGRO", false);
+        when(variantes.findById(5L)).thenReturn(Optional.of(v));
+
+        assertThatThrownBy(() -> servicio.cambiarEstado(5L, true))
+                .isInstanceOf(ExcepcionNegocio.class).hasMessage("Activa primero el producto LIV001.");
+        assertThat(v.isActivo()).isFalse();
+    }
+
+    @Test
+    void cambiarEstado_activarConProductoActivo_activa() {
+        Variante v = existente(producto(true), "A", Talla.M, "NEGRO", false);
+        when(variantes.findById(5L)).thenReturn(Optional.of(v));
+
+        assertThat(servicio.cambiarEstado(5L, true).activo()).isTrue();
+    }
+
+    @Test
+    void cambiarEstado_igualAlActual_esNoOpAunqueHayaReservado() {
+        Variante v = conStock(existente(producto(true), "A", Talla.M, "NEGRO", true), 10, 3);
+        when(variantes.findById(5L)).thenReturn(Optional.of(v));
+
+        assertThat(servicio.cambiarEstado(5L, true).activo()).isTrue();
+        verify(variantes, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void matriz_ordenaTallasPorEnumColoresAlfabeticosYDejaCeldasAusentes() {
+        Producto p = producto(true);
+        when(productos.existsById(10L)).thenReturn(true);
+        when(variantes.findByProductoIdAndActivoTrue(10L)).thenReturn(List.of(
+                conStock(existente(p, "L-AZU", Talla.L, "AZUL", true), 2, 1),
+                existente(p, "S-ROJ", Talla.S, "ROJO", true)));
+
+        var m = servicio.matriz(10L, false);
+
+        assertThat(m.tallas()).containsExactly(Talla.S, Talla.L);
+        assertThat(m.colores()).containsExactly("AZUL", "ROJO");
+        assertThat(m.celdas()).hasSize(2); // S-AZUL y L-ROJO no existen: celda ausente
+        assertThat(m.celdas()).extracting("sku").containsExactly("S-ROJ", "L-AZU");
+        assertThat(m.celdas().get(1).stockDisponible()).isEqualTo(1);
+        assertThat(m.celdas().get(1).estadoStock()).isEqualTo(EstadoStock.BAJO);
+    }
+
+    @Test
+    void matriz_productoSinVariantes_devuelveListasVacias() {
+        when(productos.existsById(10L)).thenReturn(true);
+        when(variantes.findByProductoIdAndActivoTrue(10L)).thenReturn(List.of());
+
+        var m = servicio.matriz(10L, false);
+
+        assertThat(m.tallas()).isEmpty();
+        assertThat(m.celdas()).isEmpty();
+    }
+
     @Test
     void listar_productoInexistente_lanza404() {
         when(productos.existsById(99L)).thenReturn(false);

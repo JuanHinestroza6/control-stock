@@ -14,6 +14,8 @@ import co.livorno.controlstock.comun.excepcion.ConflictoException;
 import co.livorno.controlstock.comun.excepcion.RecursoNoEncontradoException;
 import co.livorno.controlstock.comun.seguridad.UsuarioActual;
 import co.livorno.controlstock.comun.web.Ordenamiento;
+import co.livorno.controlstock.catalogo.modelo.Variante;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -81,7 +83,8 @@ public class ProductoService {
 
     /**
      * Cambia el estado del producto; igual al actual es un no-op.
-     * Pendiente B8: al desactivar, cascada a las variantes y 409 si alguna tiene stockReservado mayor a 0.
+     * Al desactivar: 409 si alguna variante tiene stockReservado mayor a 0; si no, se desactivan todas sus variantes.
+     * Reactivar el producto NO reactiva sus variantes.
      */
     @Transactional
     public ProductoDetalleResponse cambiarEstado(Long id, boolean activo) {
@@ -90,6 +93,12 @@ public class ProductoService {
             if (activo) {
                 producto.activar();
             } else {
+                List<Variante> deLaFamilia = variantes.findByProductoId(id);
+                deLaFamilia.stream().filter(v -> v.getStockReservado() > 0).findFirst().ifPresent(v -> {
+                    throw new ConflictoException("No se puede desactivar el producto: la variante " + v.getSku()
+                            + " tiene " + v.getStockReservado() + " unidades en apartados activos.");
+                });
+                deLaFamilia.forEach(Variante::desactivar);
                 producto.desactivar();
             }
             guardar(producto);

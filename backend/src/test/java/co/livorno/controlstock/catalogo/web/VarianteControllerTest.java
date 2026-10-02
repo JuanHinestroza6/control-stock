@@ -115,6 +115,63 @@ class VarianteControllerTest {
     }
 
     @Test
+    void matriz_cualquierAutenticado_responde200() throws Exception {
+        when(servicio.matriz(10L, false)).thenReturn(new co.livorno.controlstock.catalogo.dto.MatrizResponse(10L,
+                List.of(Talla.M), List.of("NEGRO"), List.of(new co.livorno.controlstock.catalogo.dto.MatrizResponse
+                        .Celda(Talla.M, "NEGRO", 1L, "LIV001-M-NEG", 0, 0, 0, EstadoStock.AGOTADO, true))));
+
+        mvc.perform(get("/api/productos/10/matriz").with(authentication(como("VENDEDOR"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tallas[0]").value("M"))
+                .andExpect(jsonPath("$.celdas[0].varianteId").value(1));
+        mvc.perform(get("/api/productos/10/matriz")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void actualizarYCambiarEstado_adminOk_vendedorYContabilidad403() throws Exception {
+        when(servicio.actualizar(eq(1L), any())).thenReturn(variante());
+        when(servicio.cambiarEstado(1L, false)).thenReturn(variante());
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/variantes/1")
+                .with(authentication(como("INVENTARIO"))).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"stockMinimo\":5}")).andExpect(status().isOk());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch("/api/variantes/1/estado")
+                .with(authentication(como("ADMIN"))).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"activo\":false}")).andExpect(status().isOk());
+        for (String rol : List.of("VENDEDOR", "CONTABILIDAD")) {
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/variantes/1")
+                    .with(authentication(como(rol))).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"stockMinimo\":5}")).andExpect(status().isForbidden());
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                    .patch("/api/variantes/1/estado").with(authentication(como(rol)))
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"activo\":false}"))
+                    .andExpect(status().isForbidden());
+        }
+    }
+
+    @Test
+    void actualizar_stockMinimoInvalido_responde400() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/variantes/1")
+                .with(authentication(como("ADMIN"))).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"stockMinimo\":-1}")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errores[0].campo").value("stockMinimo"));
+    }
+
+    @Test
+    void cambiarEstado_conflictoYReglaDeNegocio_responden409Y422() throws Exception {
+        when(servicio.cambiarEstado(1L, false)).thenThrow(
+                new co.livorno.controlstock.comun.excepcion.ConflictoException("reservas"));
+        when(servicio.cambiarEstado(2L, true)).thenThrow(new ExcepcionNegocio("Activa primero el producto X."));
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch("/api/variantes/1/estado")
+                .with(authentication(como("ADMIN"))).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"activo\":false}")).andExpect(status().isConflict());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch("/api/variantes/2/estado")
+                .with(authentication(como("ADMIN"))).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"activo\":true}")).andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
     void generar_reglaDeNegocio_responde422() throws Exception {
         when(servicio.generar(eq(10L), any())).thenThrow(new ExcepcionNegocio("producto inactivo"));
 

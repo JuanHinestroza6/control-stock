@@ -1,5 +1,7 @@
 package co.livorno.controlstock.catalogo.servicio;
 
+import co.livorno.controlstock.catalogo.dto.ActualizarVarianteRequest;
+import co.livorno.controlstock.catalogo.dto.MatrizResponse;
 import co.livorno.controlstock.catalogo.dto.GenerarVariantesRequest;
 import co.livorno.controlstock.catalogo.dto.GenerarVariantesResponse;
 import co.livorno.controlstock.catalogo.dto.GenerarVariantesResponse.Motivo;
@@ -95,6 +97,50 @@ public class VarianteService {
         }
         return new GenerarVariantesResponse(nuevas.stream().sorted(ORDEN).map(VarianteResponse::de).toList(),
                 omitidas);
+    }
+
+    @Transactional
+    public VarianteResponse actualizar(Long id, ActualizarVarianteRequest req) {
+        Variante v = buscar(id);
+        v.actualizarStockMinimo(req.stockMinimo());
+        return VarianteResponse.de(variantes.saveAndFlush(v));
+    }
+
+    /** Igual al estado actual es no-op. Desactivar con reservado mayor a 0 da 409; activar con producto inactivo, 422. */
+    @Transactional
+    public VarianteResponse cambiarEstado(Long id, boolean activo) {
+        Variante v = buscar(id);
+        if (v.isActivo() != activo) {
+            if (activo) {
+                if (!v.getProducto().isActivo()) {
+                    throw new ExcepcionNegocio("Activa primero el producto " + v.getProducto().getCodigo() + ".");
+                }
+                v.activar();
+            } else {
+                if (v.getStockReservado() > 0) {
+                    throw new ConflictoException("La variante " + v.getSku() + " tiene " + v.getStockReservado()
+                            + " unidades en apartados activos.");
+                }
+                v.desactivar();
+            }
+            variantes.saveAndFlush(v);
+        }
+        return VarianteResponse.de(v);
+    }
+
+    public MatrizResponse matriz(Long productoId, boolean incluirInactivas) {
+        List<VarianteResponse> lista = listar(productoId, incluirInactivas);
+        List<Talla> tallas = lista.stream().map(VarianteResponse::talla).distinct().sorted().toList();
+        List<String> colores = lista.stream().map(VarianteResponse::color).distinct().sorted().toList();
+        List<MatrizResponse.Celda> celdas = lista.stream()
+                .map(v -> new MatrizResponse.Celda(v.talla(), v.color(), v.id(), v.sku(), v.stockFisico(),
+                        v.stockReservado(), v.stockDisponible(), v.estadoStock(), v.activo()))
+                .toList();
+        return new MatrizResponse(productoId, tallas, colores, celdas);
+    }
+
+    private Variante buscar(Long id) {
+        return variantes.findById(id).orElseThrow(() -> new RecursoNoEncontradoException("Variante", id));
     }
 
     private static String clave(Talla talla, String color) {
