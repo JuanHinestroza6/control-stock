@@ -1,0 +1,53 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+title Secuencia: registrar venta (POST /api/ventas)
+
+actor Vendedor
+participant "Frontend\n(VentaNuevaPage)" as Front
+participant VentaController
+participant VentaService
+participant "VarianteRepository" as VarRepo
+participant MovimientoService
+participant "Variante" as Variante
+participant "MovimientoRepository" as MovRepo
+database BD
+
+Vendedor -> Front : confirma líneas (variante, cantidad, precio)
+Front -> VentaController : POST /api/ventas
+note right of VentaController : @PreAuthorize ADMIN o VENDEDOR
+VentaController -> VentaService : registrar(request)
+activate VentaService
+note over VentaService, BD : Una sola transacción (@Transactional)
+VentaService -> VentaService : rechaza variantes repetidas,\nordena líneas por varianteId
+loop por cada línea
+  VentaService -> VarRepo : findById(varianteId)
+  VentaService -> VentaService : valida activa y precio <= lista
+end
+VentaService -> BD : saveAndFlush(Venta + DetalleVenta)
+loop por cada detalle
+  VentaService -> MovimientoService : registrar(VENTA, cantidad, ref VENTA/id)
+  MovimientoService -> VarRepo : findById(varianteId)
+  MovimientoService -> MovimientoService : validar(cantidad <= disponible)
+  MovimientoService -> Variante : aplicarMovimiento(-cantidad, 0)
+  MovimientoService -> MovRepo : save(Movimiento.de(...))
+  MovimientoService --> MovimientoService : publica StockCambiado
+end
+VentaService --> VentaController : VentaDetalleResponse
+deactivate VentaService
+
+alt commit correcto
+  BD --> VentaService : COMMIT (UPDATE variante con @Version)
+  VentaController --> Front : 200 venta registrada
+  note over MovimientoService : AFTER_COMMIT: se evalúan alertas (Fase 4)
+else stock insuficiente / variante inactiva / precio > lista
+  MovimientoService --> VentaController : ExcepcionNegocio
+  VentaController --> Front : 422 (ROLLBACK, no se guarda nada)
+else concurrencia (@Version distinto al leer)
+  BD --> VentaService : OptimisticLockingFailureException
+  VentaController --> Front : 409 "Los datos cambiaron...\nRevisa y vuelve a confirmar"
+  note right of Front : Sin reintento en el servidor;\nel formulario conserva los datos
+end
+@enduml

@@ -1,0 +1,131 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+title Clases de la operación de inventario y ventas (Fase 2)
+
+enum TipoMovimiento {
+  ENTRADA
+  VENTA
+  VENTA_RESERVA
+  DEVOLUCION
+  AJUSTE_POSITIVO
+  AJUSTE_NEGATIVO
+  RESERVA
+  LIBERACION
+  ANULACION_VENTA
+}
+
+enum EstadoVenta {
+  REGISTRADA
+  ANULADA
+}
+
+class Variante <<catalogo>> {
+  id: Long
+  sku: String
+  stockFisico: int
+  stockReservado: int
+  stockMinimo: int
+  puntoReorden: Integer
+  activo: boolean
+  version: long
+  aplicarMovimiento(deltaFisico: int, deltaReservado: int)
+}
+
+class Producto <<catalogo>> {
+  id: Long
+  codigo: String
+  precioCompra: BigDecimal
+  precioVenta: BigDecimal
+}
+
+class Usuario <<usuario>> {
+  id: Long
+  nombre: String
+  rol: Rol
+}
+
+class Movimiento <<inmutable>> {
+  id: Long
+  tipo: TipoMovimiento
+  cantidad: int
+  fisicoAntes: int
+  fisicoDespues: int
+  reservadoAntes: int
+  reservadoDespues: int
+  costoUnitario: BigDecimal
+  usuarioId: Long
+  fecha: LocalDateTime
+  referenciaTipo: String
+  referenciaId: Long
+  observacion: String
+  {static} de(...): Movimiento
+}
+
+class Venta {
+  id: Long
+  fecha: LocalDateTime
+  total: BigDecimal
+  estado: EstadoVenta
+  anuladaEn: LocalDateTime
+  motivoAnulacion: String
+  agregarLinea(...): DetalleVenta
+  anular(por, cuando, motivo)
+}
+
+class DetalleVenta {
+  id: Long
+  cantidad: int
+  precioLista: BigDecimal
+  precioUnitario: BigDecimal
+  costoUnitario: BigDecimal
+  subtotal(): BigDecimal
+}
+
+class Devolucion <<inmutable>> {
+  id: Long
+  cantidad: int
+  motivo: String
+  aptaParaVenta: boolean
+  fecha: LocalDateTime
+}
+
+class MovimientoService <<servicio>> {
+  registrar(SolicitudMovimiento): Movimiento
+}
+class OperacionInventarioService <<servicio>> {
+  registrarEntrada(EntradaRequest)
+  registrarAjuste(AjusteRequest)
+}
+class VentaService <<servicio>> {
+  registrar(RegistrarVentaRequest)
+  anular(id, AnularVentaRequest)
+}
+class DevolucionService <<servicio>> {
+  registrar(ventaId, DevolucionRequest)
+}
+
+Producto "1" -- "0..*" Variante
+Variante "1" <-- "0..*" Movimiento
+Movimiento ..> TipoMovimiento
+Usuario "1" <-- "0..*" Venta : vendedor
+Venta "1" *-- "1..*" DetalleVenta
+DetalleVenta "0..*" --> "1" Variante
+DetalleVenta "1" <-- "0..*" Devolucion
+Usuario "1" <-- "0..*" Devolucion
+Venta ..> EstadoVenta
+
+OperacionInventarioService ..> MovimientoService
+VentaService ..> MovimientoService
+DevolucionService ..> MovimientoService
+MovimientoService ..> Variante : único que invoca\naplicarMovimiento
+MovimientoService ..> Movimiento : crea
+
+note right of Movimiento
+  Kardex inmutable: sin setters,
+  @Immutable, repositorio sin
+  UPDATE ni DELETE.
+end note
+@enduml
