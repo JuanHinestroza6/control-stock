@@ -12,6 +12,7 @@ import co.livorno.controlstock.inventario.modelo.TipoMovimiento;
 import co.livorno.controlstock.inventario.servicio.MovimientoService;
 import co.livorno.controlstock.usuario.modelo.Usuario;
 import co.livorno.controlstock.usuario.repositorio.UsuarioRepository;
+import co.livorno.controlstock.venta.dto.AnularVentaRequest;
 import co.livorno.controlstock.venta.dto.LineaVentaRequest;
 import co.livorno.controlstock.venta.dto.RegistrarVentaRequest;
 import co.livorno.controlstock.venta.dto.VentaDetalleResponse;
@@ -90,6 +91,34 @@ public class VentaService {
                     d.getCantidad(), null, usuarioId, "VENTA", venta.getId(), null));
         }
         return VentaDetalleResponse.de(venta, puedeVerCosto());
+    }
+
+    /**
+     * Anula la venta (solo ADMIN, lo exige el controller): bloquea la fila, y por cada línea registra un movimiento
+     * ANULACION_VENTA (+físico) con referencia VENTA/{id}. Ya anulada: 409; con devoluciones: 422.
+     */
+    @Transactional
+    public VentaDetalleResponse anular(Long id, AnularVentaRequest request) {
+        Venta venta = ventas.bloquear(id).orElseThrow(() -> new RecursoNoEncontradoException("Venta", id));
+        Long usuarioId = usuarioActual.id();
+        Usuario admin = usuarios.findById(usuarioId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Usuario", usuarioId));
+
+        venta.anular(admin, LocalDateTime.now(clock), request.motivo()); // 409 si ya está anulada
+        if (tieneDevoluciones(venta)) {
+            throw new ExcepcionNegocio("La venta " + venta.numero()
+                    + " tiene devoluciones; corrige el stock con ajustes.");
+        }
+        venta.getDetalles().stream().sorted(Comparator.comparing(d -> d.getVariante().getId())).forEach(d ->
+                movimientos.registrar(new SolicitudMovimiento(d.getVariante().getId(), TipoMovimiento.ANULACION_VENTA,
+                        d.getCantidad(), null, usuarioId, "VENTA", venta.getId(), venta.getMotivoAnulacion())));
+        ventas.saveAndFlush(venta);
+        return VentaDetalleResponse.de(venta, true);
+    }
+
+    /** Punto de conexión con B10: aquí se consultará DevolucionRepository (hoy no existe la tabla). */
+    boolean tieneDevoluciones(Venta venta) {
+        return false;
     }
 
     public Page<VentaResumenResponse> listar(LocalDate desde, LocalDate hasta, EstadoVenta estado,

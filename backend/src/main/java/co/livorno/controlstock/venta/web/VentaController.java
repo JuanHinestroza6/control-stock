@@ -1,5 +1,6 @@
 package co.livorno.controlstock.venta.web;
 
+import co.livorno.controlstock.venta.dto.AnularVentaRequest;
 import co.livorno.controlstock.venta.dto.RegistrarVentaRequest;
 import co.livorno.controlstock.venta.dto.VentaDetalleResponse;
 import co.livorno.controlstock.venta.dto.VentaResumenResponse;
@@ -36,6 +37,12 @@ public class VentaController {
     @ResponseStatus(HttpStatus.CREATED)
     public VentaDetalleResponse registrar(@Valid @RequestBody RegistrarVentaRequest request) {
         return servicio.registrar(request);
+    }
+
+    @PostMapping("/{id}/anular")
+    @PreAuthorize("hasRole('ADMIN')")
+    public VentaDetalleResponse anular(@PathVariable Long id, @Valid @RequestBody AnularVentaRequest request) {
+        return servicio.anular(id, request);
     }
 
     @GetMapping

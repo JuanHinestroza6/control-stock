@@ -190,6 +190,86 @@ class VentaServiceTest {
                 new LineaVentaRequest(9L, 1, null)))).isInstanceOf(ExcepcionNegocio.class);
     }
 
+    private Venta ventaConDosLineas() {
+        Venta v = new Venta(new Usuario("Ana", "ana@livorno.co", "h", Rol.VENDEDOR),
+                java.time.LocalDateTime.of(2026, 10, 2, 9, 0));
+        v.agregarLinea(v9, 1, new BigDecimal("59900"), new BigDecimal("59900"), new BigDecimal("20000"));
+        v.agregarLinea(v5, 2, new BigDecimal("59900"), new BigDecimal("59900"), new BigDecimal("20000"));
+        ReflectionTestUtils.setField(v, "id", 42L);
+        return v;
+    }
+
+    @Test
+    void anular_ventaRegistrada_registraAnulacionPorLineaYGuardaDatos() {
+        // dado
+        comoUsuario("ADMIN");
+        Venta venta = ventaConDosLineas();
+        when(ventas.bloquear(42L)).thenReturn(Optional.of(venta));
+
+        // cuando
+        VentaDetalleResponse r = servicio.anular(42L,
+                new co.livorno.controlstock.venta.dto.AnularVentaRequest("  error de captura "));
+
+        // entonces
+        assertThat(r.estado()).isEqualTo(co.livorno.controlstock.venta.modelo.EstadoVenta.ANULADA);
+        assertThat(r.anuladaPor()).isEqualTo("Ana");
+        assertThat(r.motivoAnulacion()).isEqualTo("error de captura");
+        assertThat(r.anuladaEn()).isEqualTo(java.time.LocalDateTime.of(2026, 10, 2, 10, 0));
+        ArgumentCaptor<SolicitudMovimiento> c = ArgumentCaptor.forClass(SolicitudMovimiento.class);
+        verify(movimientos, org.mockito.Mockito.times(2)).registrar(c.capture());
+        assertThat(c.getAllValues()).extracting(SolicitudMovimiento::varianteId).containsExactly(5L, 9L);
+        assertThat(c.getAllValues()).extracting(SolicitudMovimiento::cantidad).containsExactly(2, 1);
+        assertThat(c.getAllValues()).allSatisfy(s -> {
+            assertThat(s.tipo()).isEqualTo(TipoMovimiento.ANULACION_VENTA);
+            assertThat(s.referenciaTipo()).isEqualTo("VENTA");
+            assertThat(s.referenciaId()).isEqualTo(42L);
+            assertThat(s.observacion()).isEqualTo("error de captura");
+        });
+    }
+
+    @Test
+    void anular_ventaYaAnulada_lanza409SinMovimientos() {
+        comoUsuario("ADMIN");
+        Venta venta = ventaConDosLineas();
+        venta.anular(new Usuario("Root", "r@livorno.co", "h", Rol.ADMIN), java.time.LocalDateTime.now(RELOJ), "primera");
+        when(ventas.bloquear(42L)).thenReturn(Optional.of(venta));
+
+        assertThatThrownBy(() -> servicio.anular(42L,
+                new co.livorno.controlstock.venta.dto.AnularVentaRequest("segunda vez")))
+                .isInstanceOf(co.livorno.controlstock.comun.excepcion.ConflictoException.class)
+                .hasMessage("La venta V-000042 ya está anulada.");
+        verify(movimientos, never()).registrar(any());
+    }
+
+    @Test
+    void anular_ventaConDevoluciones_lanza422SinMovimientos() {
+        comoUsuario("ADMIN");
+        Venta venta = ventaConDosLineas();
+        when(ventas.bloquear(42L)).thenReturn(Optional.of(venta));
+        VentaService conDevoluciones = new VentaService(ventas, variantes, usuarios, movimientos, usuarioActual,
+                RELOJ) {
+            @Override
+            boolean tieneDevoluciones(Venta v) {
+                return true;
+            }
+        };
+
+        assertThatThrownBy(() -> conDevoluciones.anular(42L,
+                new co.livorno.controlstock.venta.dto.AnularVentaRequest("con devolución")))
+                .isInstanceOf(ExcepcionNegocio.class)
+                .hasMessage("La venta V-000042 tiene devoluciones; corrige el stock con ajustes.");
+        verify(movimientos, never()).registrar(any());
+    }
+
+    @Test
+    void anular_ventaInexistente_lanza404() {
+        when(ventas.bloquear(7L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.anular(7L,
+                new co.livorno.controlstock.venta.dto.AnularVentaRequest("no existe")))
+                .isInstanceOf(RecursoNoEncontradoException.class);
+    }
+
     @Test
     void listar_ordenNoPermitido_lanzaSolicitudInvalida() {
         var pageable = PageRequest.of(0, 20, Sort.by("vendedor"));

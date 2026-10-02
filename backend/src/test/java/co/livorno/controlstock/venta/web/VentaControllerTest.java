@@ -161,6 +161,50 @@ class VentaControllerTest {
     }
 
     @Test
+    void anular_admin_devuelve200() throws Exception {
+        when(servicio.anular(eq(42L), any())).thenReturn(detalle());
+
+        mvc.perform(post("/api/ventas/42/anular").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"motivo\":\"error de captura\"}").with(authentication(como("ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.numero").value("V-000042"));
+        verify(servicio).anular(eq(42L), eq(new co.livorno.controlstock.venta.dto.AnularVentaRequest("error de captura")));
+    }
+
+    @Test
+    void anular_rolesNoAdmin_devuelve403() throws Exception {
+        for (String rol : List.of("VENDEDOR", "INVENTARIO", "CONTABILIDAD")) {
+            mvc.perform(post("/api/ventas/42/anular").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"motivo\":\"error de captura\"}").with(authentication(como(rol))))
+                    .andExpect(status().isForbidden());
+        }
+        verifyNoInteractions(servicio);
+    }
+
+    @Test
+    void anular_motivoInvalido_devuelve400() throws Exception {
+        for (String cuerpo : List.of("{}", "{\"motivo\":\"  \"}", "{\"motivo\":\"abc\"}")) {
+            mvc.perform(post("/api/ventas/42/anular").contentType(MediaType.APPLICATION_JSON).content(cuerpo)
+                            .with(authentication(como("ADMIN"))))
+                    .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Test
+    void anular_ventaYaAnuladaOConDevoluciones_devuelve409Y422() throws Exception {
+        org.mockito.Mockito.doThrow(new co.livorno.controlstock.comun.excepcion.ConflictoException("ya anulada"))
+                .when(servicio).anular(eq(42L), any());
+        mvc.perform(post("/api/ventas/42/anular").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"motivo\":\"error de captura\"}").with(authentication(como("ADMIN"))))
+                .andExpect(status().isConflict());
+
+        org.mockito.Mockito.doThrow(new ExcepcionNegocio("tiene devoluciones")).when(servicio).anular(eq(43L), any());
+        mvc.perform(post("/api/ventas/43/anular").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"motivo\":\"error de captura\"}").with(authentication(como("ADMIN"))))
+                .andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
     void obtener_vendedor_devuelve200() throws Exception {
         when(servicio.obtener(42L)).thenReturn(detalle());
 
