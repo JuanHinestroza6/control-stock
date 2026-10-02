@@ -11,7 +11,7 @@
 | **Stakeholder** | Gerente |
 | **Necesidad** | NEC-06 |
 | **Caso de uso** | CU-12 "Registrar y gestionar usuarios" |
-| **Relacionados** | REQ-06 (roles y control de acceso, CU-02); CU-13 "Iniciar sesión" (REQ-02) |
+| **Relacionados** | REQ-06 (roles y control de acceso, CU-02); CU-13 "Iniciar sesión" (RNF-02) |
 | **Prioridad** | Alta |
 | **Módulos** | `usuario`, `auth` |
 

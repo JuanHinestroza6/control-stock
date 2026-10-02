@@ -109,13 +109,29 @@ Después de cada movimiento se publica un evento (`@TransactionalEventListener(A
 | REQ-03 Reportes de rentabilidad | reporte |
 | REQ-04 Alertas de stock mínimo | inventario (alertas) + analitica (ROP) |
 | REQ-05 Productos más vendidos | analitica |
-| REQ-06 / REQ-12 Usuarios y roles | usuario, auth |
+| REQ-06 Controlar el acceso y roles de usuario (CU-02) | auth, usuario |
 | REQ-07 Reportes contables | reporte |
 | REQ-08 Devoluciones | venta |
 | REQ-09 Tendencias históricas | analitica |
 | REQ-10 Planeación de compras | compra + analitica (pronóstico) |
 | REQ-11 Gestión de productos | catalogo |
+| REQ-12 Registrar y gestionar usuarios (CU-12) | usuario |
 | Nuevo: Apartados | inventario (reservas) |
 | Nuevo: Clasificación ABC | analitica |
 
 Nota: en el documento PPI, REQ-08 y REQ-09 tienen nombre y descripción cruzados; corregir en la próxima versión.
+
+### Convención de códigos
+
+- `REQ-xx`: requisitos funcionales (tabla anterior). `RNF-xx`: requisitos no funcionales del documento Word, que allí
+  aparecen numerados como REQ-01..REQ-05; aquí se renombran a RNF-01..RNF-05 para no chocar con los funcionales.
+- `CU-xx`: casos de uso. CU-13 "Iniciar sesión" no existe en el Word; se creó en la fase 0 y se liga a RNF-02.
+- `NEC-xx`: necesidades del Word, con dos dígitos (NEC-010 del Word es NEC-10).
+
+| Requisito no funcional | Stakeholder | Necesidades | Prioridad | Área principal |
+|---|---|---|---|---|
+| RNF-01 Disponibilidad en el sistema | Gerencia | — | Alta | infraestructura (Docker Compose, `/actuator/health`) |
+| RNF-02 Seguridad y control | Gerencia | NEC-06 | Alta | auth, usuario, comun (CU-13 Iniciar sesión) |
+| RNF-03 Rendimiento de consultas | Contabilidad | NEC-01, NEC-03 | Media | reporte, analitica, inventario (consultas e índices) |
+| RNF-04 Usabilidad de la interfaz | Vendedores | NEC-02, NEC-05 | Media | frontend |
+| RNF-05 Escalabilidad del sistema | Junta directiva | NEC-09, NEC-10 | Alta | transversal |

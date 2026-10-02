@@ -17,7 +17,7 @@ Usuario <|-- Inventario
 Usuario <|-- Vendedor
 Usuario <|-- Contabilidad
 
-rectangle "Control Stock - Seguridad y control (REQ-02, no funcional)" {
+rectangle "Control Stock - Seguridad y control (RNF-02, no funcional)" {
   usecase "CU-13 Iniciar sesión" as UC_Login
   usecase "Verificar bloqueo por\nintentos fallidos (429)" as UC_Bloqueo
   usecase "Consultar mi sesión\n(GET /api/auth/yo)" as UC_Yo
@@ -55,7 +55,7 @@ note bottom of UC_Menu
 end note
 note right of UC_Login
   CU-13 no existe en el documento Word:
-  se crea en la fase 0 (REQ-02, NEC-06).
+  se crea en la fase 0 (RNF-02, NEC-06).
 end note
 note right of UC_Usuarios
   Pendiente: solo existe la entrada de menú "Usuarios".
