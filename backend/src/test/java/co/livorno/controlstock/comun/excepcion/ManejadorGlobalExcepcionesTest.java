@@ -62,6 +62,15 @@ class ManejadorGlobalExcepcionesTest {
         @GetMapping("/integridad")
         String integridad() { throw new DataIntegrityViolationException("Duplicate entry xyz for key"); }
 
+        @GetMapping("/400")
+        String solicitud() { throw new SolicitudInvalidaException("Parámetro inválido"); }
+
+        @GetMapping("/orden")
+        String orden() {
+            throw new org.springframework.data.core.PropertyReferenceException("x",
+                    org.springframework.data.core.TypeInformation.of(String.class), java.util.List.of());
+        }
+
         @GetMapping("/500")
         String error() { throw new IllegalStateException("detalle interno sensible"); }
     }
@@ -113,6 +122,20 @@ class ManejadorGlobalExcepcionesTest {
         mvc.perform(post("/prueba/validar").contentType(MediaType.TEXT_PLAIN).content("hola"))
                 .andExpect(status().isUnsupportedMediaType())
                 .andExpect(jsonPath("$.title").value("Tipo de contenido no soportado"));
+    }
+
+    @Test
+    void solicitudInvalida_responde400() throws Exception {
+        mvc.perform(get("/prueba/400"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("Parámetro inválido"));
+    }
+
+    @Test
+    void campoDeOrdenInexistente_responde400() throws Exception {
+        mvc.perform(get("/prueba/orden"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("Campo de orden no permitido"));
     }
 
     @Test

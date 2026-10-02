@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -93,6 +94,16 @@ public class ManejadorGlobalExcepciones extends ResponseEntityExceptionHandler {
     @ExceptionHandler(RecursoNoEncontradoException.class)
     public ProblemDetail noEncontrado(RecursoNoEncontradoException ex) {
         return problema(HttpStatus.NOT_FOUND, "Recurso no encontrado", ex.getMessage());
+    }
+
+    @ExceptionHandler(SolicitudInvalidaException.class)
+    public ProblemDetail solicitudInvalida(SolicitudInvalidaException ex) {
+        return problema(HttpStatus.BAD_REQUEST, "Solicitud inválida", ex.getMessage());
+    }
+
+    @ExceptionHandler(PropertyReferenceException.class)
+    public ProblemDetail ordenInvalido(PropertyReferenceException ex) {
+        return problema(HttpStatus.BAD_REQUEST, "Solicitud inválida", "Campo de orden no permitido");
     }
 
     @ExceptionHandler(ExcepcionNegocio.class)
