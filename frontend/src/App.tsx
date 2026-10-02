@@ -7,6 +7,7 @@ import { NoEncontradaPage } from './paginas/comun/NoEncontradaPage'
 import { ProximamentePage } from './paginas/comun/ProximamentePage'
 import { InicioPage } from './paginas/inicio/InicioPage'
 import { CategoriasPage } from './paginas/productos/CategoriasPage'
+import { ProductosPage } from './paginas/productos/ProductosPage'
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
       <Route element={<RutaProtegida />}>
         <Route element={<LayoutPrincipal />}>
           <Route index element={<InicioPage />} />
+          <Route path="/productos" element={<ProductosPage />} />
           <Route path="/productos/categorias" element={<CategoriasPage />} />
           {MODULOS.filter((m) => m.ruta !== '/').map((m) => (
             <Route key={m.clave} element={<RutaProtegida roles={m.roles} />}>
