@@ -17,7 +17,8 @@ Para fechar en el pasado, los servicios aceptan un `Clock` inyectable; el genera
 
 ## Catálogo
 
-- 6 categorías: Camisetas, Hoodies, Jeans, Joggers, Chaquetas, Accesorios.
+- 6 categorías: Camisetas, Hoodies, Jeans, Joggers, Chaquetas, Accesorios. Ya las crea la migración
+  `V3__crear_tabla_categoria.sql` (Fase 1): el generador las busca por nombre y las reutiliza, NO las crea.
 - ~30 productos, cada uno con 2–4 colores y tallas S–XL (accesorios: UNICA) → ~300 variantes.
 - Precios realistas en COP (camiseta 59.900–89.900, hoodie 129.900–179.900, jean 119.900–169.900). Costo = 40–55% del precio.
 - Lead time 10–30 días.

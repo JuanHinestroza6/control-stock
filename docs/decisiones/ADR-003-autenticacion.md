@@ -1,7 +1,9 @@
 # ADR-003: Autenticación y sesión
 
-- Estado: aceptada
+- Estado: aceptada (modificada por ADR-005)
 - Fecha: 2026-10-01
+- Modificada por: ADR-005 — al cambiar o restablecer la contraseña se revocan los tokens anteriores, y la contraseña
+  temporal asignada por el ADMIN obliga a cambiarla antes de usar el sistema.
 
 ## Contexto
 ADR-001 definió Spring Security con JWT stateless. Faltaba decidir librería, duración de la sesión, almacenamiento del token
