@@ -24,7 +24,7 @@ inmutable y bloqueo optimista. Había cinco cuestiones abiertas:
    de una reserva (Fase 3), solo se devuelve el físico; la reserva sigue CONVERTIDA. Las ventas ANULADAS se excluyen de la
    demanda, los más vendidos, ABC, el pronóstico y los reportes (Fases 5–7).
 3. **Concurrencia**: `@Version` en `Variante`. `OptimisticLockingFailureException` y `PessimisticLockingFailureException`
-   → 409 "El stock cambió mientras registrabas la operación. Revisa y vuelve a confirmar." **Sin reintento en el
+   → 409 "Los datos cambiaron mientras registrabas la operación. Revisa y vuelve a confirmar." **Sin reintento en el
    servidor**: el cliente conserva el formulario. Las operaciones de varias líneas procesan las variantes ordenadas por id
    y Hibernate ordena los UPDATE (`hibernate.order_updates=true`) para evitar interbloqueos. Anular y devolver bloquean la
    fila de la venta (`PESSIMISTIC_WRITE`), porque una devolución no apta no toca `Variante` y su `@Version` no la protege.

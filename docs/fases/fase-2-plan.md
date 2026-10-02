@@ -66,7 +66,7 @@ Convenciones de la Fase 1 (página VIA_DTO, dinero con 2 decimales, fechas ISO-8
 - `TipoMovimiento` (string): los 9 tipos. `EstadoVenta = "REGISTRADA" | "ANULADA"`.
 - Fechas de filtro `desde`/`hasta`: `LocalDate` ISO (`2026-10-02`), ambas inclusivas → `[desde 00:00, hasta+1 00:00)`.
   `desde > hasta` → 400 "La fecha inicial no puede ser posterior a la final."
-- 409 de concurrencia: título "Conflicto de concurrencia", detail "El stock cambió mientras registrabas la operación.
+- 409 de concurrencia: título "Conflicto de concurrencia", detail "Los datos cambiaron mientras registrabas la operación.
   Revisa y vuelve a confirmar."
 - 422 de stock: "Stock insuficiente para {sku}: disponible {d}, solicitado {q}."
 
