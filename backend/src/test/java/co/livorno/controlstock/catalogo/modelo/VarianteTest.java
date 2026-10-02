@@ -34,7 +34,7 @@ class VarianteTest {
 
     @Test
     void reglaDeOro1_ningunMetodoPublicoCambiaElStock() {
-        // Ningún setter ni mutador público toca stockFisico/stockReservado (solo MovimientoService en Fase 2).
+        // Ningún setter toca el stock; el único mutador es aplicarMovimiento (solo MovimientoService, vía ArchUnit).
         Method[] publicos = Variante.class.getDeclaredMethods();
         assertThat(Arrays.stream(publicos).filter(m -> Modifier.isPublic(m.getModifiers())))
                 .extracting(Method::getName)
@@ -42,6 +42,49 @@ class VarianteTest {
                 .noneMatch(n -> n.toLowerCase().contains("stockfisico") && !n.equals("getStockFisico"))
                 .noneMatch(n -> n.toLowerCase().contains("stockreservado") && !n.equals("getStockReservado"))
                 .doesNotContain("aplicar");
+    }
+
+    @Test
+    void aplicarMovimiento_deltasValidos_actualizaFisicoYReservado() {
+        // dado
+        Variante v = variante(1);
+        // cuando
+        v.aplicarMovimiento(10, 0);
+        v.aplicarMovimiento(0, 4);
+        v.aplicarMovimiento(-4, -4);
+        // entonces
+        assertThat(v.getStockFisico()).isEqualTo(6);
+        assertThat(v.getStockReservado()).isZero();
+        assertThat(v.getStockDisponible()).isEqualTo(6);
+    }
+
+    @Test
+    void aplicarMovimiento_dejaFisicoNegativo_lanzaYNoCambiaNada() {
+        Variante v = variante(1);
+        v.aplicarMovimiento(2, 0);
+
+        assertThatThrownBy(() -> v.aplicarMovimiento(-3, 0)).isInstanceOf(IllegalStateException.class);
+        assertThat(v.getStockFisico()).isEqualTo(2);
+    }
+
+    @Test
+    void aplicarMovimiento_dejaReservadoNegativo_lanza() {
+        Variante v = variante(1);
+        v.aplicarMovimiento(5, 1);
+
+        assertThatThrownBy(() -> v.aplicarMovimiento(0, -2)).isInstanceOf(IllegalStateException.class);
+        assertThat(v.getStockReservado()).isEqualTo(1);
+    }
+
+    @Test
+    void aplicarMovimiento_reservadoSuperaFisico_lanza() {
+        Variante v = variante(1);
+        v.aplicarMovimiento(5, 3);
+
+        assertThatThrownBy(() -> v.aplicarMovimiento(0, 3)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> v.aplicarMovimiento(-3, 0)).isInstanceOf(IllegalStateException.class);
+        assertThat(v.getStockFisico()).isEqualTo(5);
+        assertThat(v.getStockReservado()).isEqualTo(3);
     }
 
     @Test

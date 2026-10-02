@@ -9,7 +9,7 @@ Plan de Fase 1 aprobado 2026-10-01 (fuente: docs/fases/fase-1-plan.md, ADR-004, 
 - Migraciones V3 categoria (+6 categorías base del skill datos-semilla), V4 producto, V5 variante, V6 columnas usuario (password_cambiado_en, debe_cambiar_password).
 - El usuario CAMBIÓ mi propuesta: desactivar producto desactiva en cascada sus variantes; reactivar NO las reactiva. Reservas activas bloquean desactivar (409), en Fase 1 vía stockReservado > 0; reforzar con tabla reserva en Fase 3.
 - El usuario AGREGÓ: revocación de tokens (iat < passwordCambiadoEn → 401, truncado a segundos) y contraseña temporal obligatoria (debeCambiarPassword → solo GET /auth/yo y PUT /auth/yo/password; resto 403 con codigo CAMBIO_PASSWORD_REQUERIDO). Prefiere más seguridad aunque sume tareas.
-- Hallazgos: sort inválido → PropertyReferenceException → 500 (hay que mapear a 400); Page con VIA_DTO; cambio de propia contraseña 422 (no 401, dispararía logout del frontend); `Variante.aplicar()` no puede ser paquete-privado (decidir en Fase 2).
+- Hallazgos: sort inválido → PropertyReferenceException → 500 (hay que mapear a 400); Page con VIA_DTO; cambio de propia contraseña 422 (no 401, dispararía logout del frontend); `Variante.aplicar()` no puede ser paquete-privado (propuesta en [[decisiones-fase2]]).
 - Mi rol (arquitecto) no escribe en el repo: los textos del Paso 0 quedaron en el scratchpad para que otro agente los copie.
 
 **Why:** Fase 2+ (MovimientoService, reservas, seed) dependen de este modelo; el usuario tiende a pedir el rigor de seguridad extra.

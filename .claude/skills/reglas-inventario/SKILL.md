@@ -28,8 +28,11 @@ public Movimiento registrar(SolicitudMovimiento solicitud) {
     EfectoMovimiento efecto = solicitud.tipo().efecto(solicitud.cantidad()); // deltas físico/reservado
     validar(v, solicitud, efecto);   // lanza ExcepcionNegocio si rompe un invariante o permiso
 
-    v.aplicar(efecto);               // único método de la entidad que modifica stock (paquete-privado)
-    Movimiento m = Movimiento.de(v, solicitud, fisicoAntes, reservadoAntes, usuarioActual());
+    // Único método de la entidad que modifica stock. Es público (Variante está en catalogo.modelo y este servicio en
+    // inventario.servicio); una regla ArchUnit garantiza que solo MovimientoService lo invoca (ADR-006).
+    v.aplicarMovimiento(efecto.deltaFisico(), efecto.deltaReservado());
+    // usuarioId llega en la solicitud (null = proceso del sistema); la fecha sale del Clock inyectado.
+    Movimiento m = Movimiento.de(v, solicitud, fisicoAntes, reservadoAntes, LocalDateTime.now(clock));
     movimientoRepository.save(m);
 
     eventos.publishEvent(new StockCambiado(v.getId()));  // alertas AFTER_COMMIT
@@ -37,7 +40,10 @@ public Movimiento registrar(SolicitudMovimiento solicitud) {
 }
 ```
 
-- `Variante` NO tiene setters públicos de stock. Solo `aplicar(EfectoMovimiento)`.
+- `Variante` NO tiene setters de stock. Solo `aplicarMovimiento(int deltaFisico, int deltaReservado)`, público, que
+  valida los invariantes (físico ≥ 0, reservado ≥ 0, reservado ≤ físico) y lanza `IllegalStateException` si se rompen.
+  La prueba ArchUnit `ReglasArquitecturaTest` falla si alguna clase distinta de `inventario.servicio.MovimientoService`
+  lo invoca (ADR-006).
 - `@Version` en `Variante`: si dos ventas concurrentes chocan, una falla con `OptimisticLockingFailureException`; el manejador global responde 409 y el cliente reintenta.
 - Ventas, devoluciones, reservas y recepción de compras llaman a `MovimientoService`; nunca tocan `Variante` directamente.
 
@@ -53,6 +59,7 @@ public Movimiento registrar(SolicitudMovimiento solicitud) {
 | AJUSTE_NEGATIVO | −q | 0 | observación, q ≤ disponible |
 | RESERVA | 0 | +q | q ≤ disponible |
 | LIBERACION | 0 | −q | reserva ACTIVA |
+| ANULACION_VENTA | +q | 0 | venta REGISTRADA sin devoluciones; solo ADMIN (ADR-006) |
 
 Implementa los efectos en el enum `TipoMovimiento` para que no haya `switch` repartidos por el código.
 

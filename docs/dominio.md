@@ -26,9 +26,11 @@ Variante       id, productoId, sku (único), talla, color,
                claseAbc (A|B|C, nullable), activo, version, creadoEn, actualizadoEn
 Movimiento     id, varianteId, tipo, cantidad (>0),
                fisicoAntes, fisicoDespues, reservadoAntes, reservadoDespues,
-               usuarioId, fecha, referenciaTipo, referenciaId, observacion
-Venta          id, fecha, usuarioId, canal (nullable, reservado para el futuro), total, estado
-DetalleVenta   id, ventaId, varianteId, cantidad, precioUnitario, costoUnitario
+               costoUnitario (obligatorio en ENTRADA, null en los demás tipos),
+               usuarioId (nullable: null = proceso del sistema), fecha, referenciaTipo, referenciaId, observacion
+Venta          id, fecha, usuarioId, canal (nullable, reservado para el futuro), total, estado,
+               anuladaEn (nullable), anuladaPor (nullable), motivoAnulacion (nullable)
+DetalleVenta   id, ventaId, varianteId, cantidad, precioLista, precioUnitario, costoUnitario
 Devolucion     id, detalleVentaId, cantidad, motivo, aptaParaVenta, fecha, usuarioId
 Reserva        id, varianteId, cantidad, clienteNombre, clienteContacto,
                creadaEn, venceEn, estado, ventaId (nullable)
@@ -98,26 +100,63 @@ SKU sugerido: `{codigoProducto}-{talla}-{COLOR3}` → `LIV001-M-NEG`.
 | AJUSTE_POSITIVO / AJUSTE_NEGATIVO | ±q | = | Conteo físico, merma, corrección |
 | RESERVA | = | +q | Cliente aparta |
 | LIBERACION | = | −q | Reserva vencida o cancelada |
+| ANULACION_VENTA | +q | = | Anulación de una venta (solo ADMIN, ADR-006) |
 
-Validaciones en `MovimientoService` (lanzan excepción de negocio, no se guarda nada):
+Único punto de escritura (ADR-006): `MovimientoService` es el único que invoca `Variante.aplicarMovimiento(deltaFisico,
+deltaReservado)`, método público que además valida los invariantes. Una prueba ArchUnit lo hace cumplir.
+
+Validaciones en `MovimientoService` (lanzan `ExcepcionNegocio` → 422, no se guarda nada):
 - Ningún movimiento puede dejar `físico < 0`, `reservado < 0` ni `disponible < 0`.
-- VENTA y RESERVA requieren `cantidad ≤ disponible`.
-- AJUSTE requiere `observacion` obligatoria y rol ADMIN o INVENTARIO.
+- VENTA, RESERVA y AJUSTE_NEGATIVO requieren `cantidad ≤ disponible`; LIBERACION y VENTA_RESERVA, `cantidad ≤ reservado`.
+- AJUSTE_POSITIVO y AJUSTE_NEGATIVO requieren `observacion` no vacía.
+- ENTRADA requiere `costoUnitario ≥ 0`; los demás tipos no llevan costo.
+- El rol lo controla el `@PreAuthorize` del endpoint que origina el movimiento (ajustes: ADMIN o INVENTARIO). El usuario
+  llega explícito en la solicitud (`usuarioId`, null en procesos del sistema) y la fecha sale del `Clock` inyectado.
+- Variante o producto inactivo: lo valida el servicio que llama. Entradas y ventas → 422. Ajustes, devoluciones y
+  anulaciones sí se permiten sobre variantes inactivas (reflejan unidades físicas reales).
 
-Después de cada movimiento se publica un evento (`@TransactionalEventListener(AFTER_COMMIT)`) que evalúa alertas.
+Concurrencia (ADR-006): `@Version` en `Variante`. Un choque (`OptimisticLockingFailureException`) o un bloqueo de la base
+(`PessimisticLockingFailureException`) responde 409 sin reintento en el servidor; el cliente conserva el formulario y el
+usuario vuelve a confirmar. Las operaciones de varias líneas procesan las variantes ordenadas por id.
+
+Kardex inmutable: entidad `@Immutable`, sin setters, repositorio sin métodos de actualización ni borrado. Sin triggers.
+
+Después de cada movimiento se publica `StockCambiado(varianteId)`. En la Fase 2 solo se publica; desde la Fase 3 un
+`@TransactionalEventListener(AFTER_COMMIT)` evalúa las alertas.
+
+## Entradas, ventas y costos (ADR-006)
+
+- **Entrada**: una o varias líneas (variante, cantidad, `costoUnitario`) en una transacción, con observación común
+  opcional. Cada línea genera un movimiento ENTRADA con su costo y **actualiza `precioCompra` del producto** con ese costo
+  (último costo de entrada; un costo 0 se guarda pero no actualiza `precioCompra`). Todas las líneas de un mismo producto en una entrada deben traer el mismo costo (422 si no).
+  Variante repetida en la misma entrada → 400.
+- **Ajuste**: una variante, AJUSTE_POSITIVO o AJUSTE_NEGATIVO, observación obligatoria; no lleva costo ni toca precios.
+- **Venta**: una o varias líneas; variante repetida → 400; variante o producto inactivo → 422. `precioLista` = `precioVenta`
+  del producto al vender; `precioUnitario` opcional en la solicitud (si falta, igual a `precioLista`; si viene,
+  `0 < precioUnitario ≤ precioLista`); `costoUnitario` = `precioCompra` del producto al vender. Descuento de la línea =
+  `(precioLista − precioUnitario) × cantidad`. `total = Σ cantidad × precioUnitario` (escala 2, HALF_UP). Número visible
+  `V-000123` derivado del id. El costo no se expone al rol VENDEDOR.
+- **Ventas anuladas**: se excluyen de la demanda, los más vendidos, la clasificación ABC, el pronóstico y los reportes de
+  rentabilidad y contables (Fases 5–7).
 
 ## Máquinas de estado
 
 - **Reserva**: `ACTIVA → CONVERTIDA` (al vender) | `ACTIVA → CANCELADA` (manual) | `ACTIVA → VENCIDA` (tarea programada cada 15 min).
   Vencimiento por defecto: 48 h. CANCELADA y VENCIDA generan movimiento LIBERACION.
-- **Venta**: `REGISTRADA → ANULADA` (anular genera movimientos inversos; solo ADMIN).
+- **Venta**: `REGISTRADA → ANULADA` (solo ADMIN, motivo obligatorio). Anular genera un movimiento ANULACION_VENTA (+físico)
+  por línea y guarda `anuladaEn`, `anuladaPor` y `motivoAnulacion`. Anular una venta ANULADA → 409. Una venta con
+  devoluciones no se anula (422: se corrige con ajustes). Anular y devolver bloquean la fila de la venta
+  (`PESSIMISTIC_WRITE`). Si la venta vino de una reserva (Fase 3), anular solo devuelve el físico: la reserva sigue
+  CONVERTIDA y no se reactiva.
 - **Alerta**: `ACTIVA → ATENDIDA`. Si ya hay una ACTIVA para la misma variante y tipo, no se crea otra: se actualiza `revisadaEn`.
 - **PlanCompra**: `BORRADOR → APROBADO → RECIBIDO` (al recibir genera ENTRADAS).
 
 ## Devoluciones
 
-- Solo sobre un `DetalleVenta` existente; la suma devuelta nunca supera la cantidad vendida.
+- Solo sobre un `DetalleVenta` existente de la venta indicada (si no, 404); la suma devuelta nunca supera la cantidad
+  vendida (422). No se devuelve sobre una venta ANULADA (422). Motivo obligatorio. Roles: ADMIN y VENDEDOR.
 - `aptaParaVenta = true` → movimiento DEVOLUCION (+físico). `false` → se registra la devolución sin sumar stock.
+- Como una devolución no apta no modifica `Variante`, la validación se protege bloqueando la fila de la venta.
 
 ## Alertas
 
@@ -143,18 +182,22 @@ Después de cada movimiento se publica un evento (`@TransactionalEventListener(A
 | Plan de compras | CRUD / aprobar | Crear borrador | — | Ver |
 | Reportes contables / rentabilidad | Sí | — | — | Sí |
 
+Notas de la matriz (Fase 2): la consulta de inventario actual (stock por variante, sin costos) está abierta a todo
+usuario autenticado porque el VENDEDOR la usa para buscar al vender. Anular ventas: solo ADMIN. Los costos (`precioCompra`,
+`costoUnitario` de ventas y entradas) no se exponen al VENDEDOR.
+
 ## Trazabilidad con el documento PPI
 
 | Requisito PPI | Módulo |
 |---|---|
-| REQ-01 Visualizar stock en tiempo real | catalogo, inventario |
-| REQ-02 Registrar operaciones de stock | inventario |
+| REQ-01 Visualizar stock y atributos en tiempo real (CU-04) | catalogo, inventario |
+| REQ-02 Registrar automáticamente operaciones de stock (CU-03) | inventario |
 | REQ-03 Reportes de rentabilidad | reporte |
 | REQ-04 Alertas de stock mínimo | inventario (alertas) + analitica (ROP) |
 | REQ-05 Productos más vendidos | analitica |
 | REQ-06 Controlar el acceso y roles de usuario (CU-02) | auth, usuario |
 | REQ-07 Reportes contables | reporte |
-| REQ-08 Devoluciones | venta |
+| REQ-08 Gestionar el registro de devoluciones (CU-09) | venta |
 | REQ-09 Tendencias históricas | analitica |
 | REQ-10 Planeación de compras | compra + analitica (pronóstico) |
 | REQ-11 Gestión de productos (CU-11) | catalogo |

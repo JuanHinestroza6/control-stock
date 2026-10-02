@@ -101,6 +101,22 @@ public class Variante extends EntidadAuditable {
         return disponible <= umbral ? EstadoStock.BAJO : EstadoStock.OK;
     }
 
+    /**
+     * Único método que modifica el stock (regla de oro 1). Es público porque Variante y MovimientoService viven en
+     * paquetes distintos; una regla ArchUnit garantiza que solo {@code MovimientoService} lo invoca (ADR-006).
+     * Valida los invariantes: físico >= 0, reservado >= 0 y reservado <= físico; si se rompen no cambia nada.
+     */
+    public void aplicarMovimiento(int deltaFisico, int deltaReservado) {
+        int fisico = Math.addExact(stockFisico, deltaFisico);
+        int reservado = Math.addExact(stockReservado, deltaReservado);
+        if (fisico < 0 || reservado < 0 || reservado > fisico) {
+            throw new IllegalStateException("Movimiento inválido para la variante " + sku + ": físico " + fisico
+                    + ", reservado " + reservado);
+        }
+        this.stockFisico = fisico;
+        this.stockReservado = reservado;
+    }
+
     public void actualizarStockMinimo(int stockMinimo) {
         if (stockMinimo < 0) {
             throw new IllegalArgumentException("El stock mínimo no puede ser negativo");

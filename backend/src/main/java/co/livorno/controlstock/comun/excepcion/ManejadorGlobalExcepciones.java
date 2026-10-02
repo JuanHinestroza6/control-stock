@@ -5,7 +5,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -137,10 +137,11 @@ public class ManejadorGlobalExcepciones extends ResponseEntityExceptionHandler {
         return problema(HttpStatus.FORBIDDEN, "Acceso denegado", "No tienes permisos para realizar esta acción.");
     }
 
-    @ExceptionHandler(OptimisticLockingFailureException.class)
-    public ProblemDetail bloqueoOptimista(OptimisticLockingFailureException ex) {
+    /** Bloqueo optimista (@Version) y pesimista (timeout, deadlock): el cliente revisa y reintenta. */
+    @ExceptionHandler(ConcurrencyFailureException.class)
+    public ProblemDetail concurrencia(ConcurrencyFailureException ex) {
         return problema(HttpStatus.CONFLICT, "Conflicto de concurrencia",
-                "El registro fue modificado por otra operación. Actualiza e intenta de nuevo.");
+                "Los datos cambiaron mientras registrabas la operación. Revisa y vuelve a confirmar.");
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
