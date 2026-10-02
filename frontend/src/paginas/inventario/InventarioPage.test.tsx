@@ -105,6 +105,19 @@ describe('InventarioPage', () => {
     await waitFor(() => expect(ultimosFiltros()).toMatchObject({ page: 1 }))
   })
 
+  it('el botón Ajuste abre el modal solo para quien mueve stock y no en variantes inactivas', async () => {
+    const inv = renderizarApp(<InventarioPage />, { rol: 'INVENTARIO' })
+    await screen.findByText('LIV001-M-NEG1')
+    expect(screen.queryByRole('button', { name: 'Ajuste de LIV001-M-NEG2' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Ajuste de LIV001-M-NEG1' }))
+    expect(screen.getByRole('dialog', { name: 'Ajuste de LIV001-M-NEG1' })).toBeInTheDocument()
+    inv.unmount()
+
+    renderizarApp(<InventarioPage />, { rol: 'CONTABILIDAD' })
+    await screen.findByText('LIV001-M-NEG1')
+    expect(screen.queryByRole('button', { name: /Ajuste de/ })).not.toBeInTheDocument()
+  })
+
   it('muestra las acciones según el rol', async () => {
     const admin = renderizarApp(<InventarioPage />, { rol: 'ADMIN' })
     await screen.findByText('LIV001-M-NEG1')

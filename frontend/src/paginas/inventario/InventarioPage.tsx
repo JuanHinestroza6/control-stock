@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { BadgeStock } from '../../componentes/dominio/BadgeStock'
+import { ModalAjuste } from '../../componentes/dominio/ModalAjuste'
 import { Campo } from '../../componentes/ui/Campo'
 import { EstadoCarga, EstadoError, EstadoVacio } from '../../componentes/ui/Estados'
 import { Paginacion } from '../../componentes/ui/Paginacion'
@@ -47,6 +48,7 @@ export function InventarioPage() {
   const [inactivas, setInactivas] = useState(false)
   const [sort, setSort] = useState('producto.nombre,asc')
   const [pagina, setPagina] = useState(0)
+  const [ajustando, setAjustando] = useState<InventarioItemResponse | null>(null)
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -98,6 +100,11 @@ export function InventarioPage() {
       encabezado: 'Acciones',
       celda: (v) => (
         <div className="flex flex-wrap gap-3">
+          {puedeMover && v.activo && (
+            <button type="button" onClick={() => setAjustando(v)} className={clasesLink} aria-label={`Ajuste de ${v.sku}`}>
+              Ajuste
+            </button>
+          )}
           {puedeMover && v.activo && (
             <Link to={`/inventario/entradas/nueva?productoId=${v.productoId}`} className={clasesLink} aria-label={`Entrada de ${v.sku}`}>
               Entrada
@@ -234,6 +241,7 @@ export function InventarioPage() {
       </form>
 
       {contenido}
+      {ajustando && <ModalAjuste variante={ajustando} onCerrar={() => setAjustando(null)} />}
     </section>
   )
 }
