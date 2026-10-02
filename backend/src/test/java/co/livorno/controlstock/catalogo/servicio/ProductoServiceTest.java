@@ -35,6 +35,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 class ProductoServiceTest {
 
     @Mock ProductoRepository productos;
+    @Mock co.livorno.controlstock.catalogo.repositorio.VarianteRepository variantes;
     @Mock CategoriaRepository categorias;
     @Mock UsuarioActual usuarioActual;
     @InjectMocks ProductoService servicio;
@@ -149,15 +150,29 @@ class ProductoServiceTest {
     }
 
     @Test
-    void listar_escapaElTextoYDevuelveTotalesEnCero() {
+    void listar_escapaElTextoYProductoSinVariantesTieneTotalesEnCero() {
         var pag = PageRequest.of(0, 20, Sort.by("nombre"));
         when(productos.buscar("%50!%%", null, true, pag)).thenReturn(new PageImpl<>(List.of(producto()), pag, 1));
+        when(variantes.totalesPorProducto(List.of(10L))).thenReturn(List.of());
 
         var r = servicio.listar("50%", null, true, pag);
 
         assertThat(r.getContent()).hasSize(1);
         assertThat(r.getContent().get(0).totalVariantes()).isZero();
         assertThat(r.getContent().get(0).stockDisponibleTotal()).isZero();
+    }
+
+    @Test
+    void listar_conVariantes_usaTotalesDeLaConsultaAgregada() {
+        var pag = PageRequest.of(0, 20, Sort.by("nombre"));
+        when(productos.buscar(null, null, null, pag)).thenReturn(new PageImpl<>(List.of(producto()), pag, 1));
+        when(variantes.totalesPorProducto(List.of(10L)))
+                .thenReturn(List.of(new co.livorno.controlstock.catalogo.repositorio.TotalesProducto(10L, 6L, 42L)));
+
+        var r = servicio.listar(null, null, null, pag);
+
+        assertThat(r.getContent().get(0).totalVariantes()).isEqualTo(6);
+        assertThat(r.getContent().get(0).stockDisponibleTotal()).isEqualTo(42);
     }
 
     @Test

@@ -8,12 +8,17 @@ import co.livorno.controlstock.catalogo.modelo.Categoria;
 import co.livorno.controlstock.catalogo.modelo.Producto;
 import co.livorno.controlstock.catalogo.repositorio.CategoriaRepository;
 import co.livorno.controlstock.catalogo.repositorio.ProductoRepository;
+import co.livorno.controlstock.catalogo.repositorio.TotalesProducto;
+import co.livorno.controlstock.catalogo.repositorio.VarianteRepository;
 import co.livorno.controlstock.comun.excepcion.ConflictoException;
 import co.livorno.controlstock.comun.excepcion.RecursoNoEncontradoException;
 import co.livorno.controlstock.comun.seguridad.UsuarioActual;
 import co.livorno.controlstock.comun.web.Ordenamiento;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -31,15 +36,22 @@ public class ProductoService {
     private static final String CODIGO_DUPLICADO = "Ya existe un producto con ese código.";
 
     private final ProductoRepository productos;
+    private final VarianteRepository variantes;
     private final CategoriaRepository categorias;
     private final UsuarioActual usuarioActual;
 
     public Page<ProductoResumenResponse> listar(String q, Long categoriaId, Boolean activo, Pageable pageable) {
         Ordenamiento.validar(pageable, ORDEN_PERMITIDO);
-        // Pendiente B6/B7: totalVariantes y stockDisponibleTotal van en 0 hasta que exista la tabla variante;
-        // entonces se llenan con una consulta agregada sobre variantes activas (sin N+1).
-        return productos.buscar(ProductoRepository.patronContiene(q), categoriaId, activo, pageable)
-                .map(p -> ProductoResumenResponse.de(p, 0, 0));
+        Page<Producto> pagina = productos.buscar(ProductoRepository.patronContiene(q), categoriaId, activo, pageable);
+        // Una sola consulta agregada (variantes activas) para toda la página.
+        Map<Long, TotalesProducto> totales = pagina.isEmpty() ? Map.of()
+                : variantes.totalesPorProducto(pagina.map(Producto::getId).getContent()).stream()
+                        .collect(Collectors.toMap(TotalesProducto::productoId, Function.identity()));
+        return pagina.map(p -> {
+            TotalesProducto t = totales.get(p.getId());
+            return ProductoResumenResponse.de(p, t != null ? t.totalVariantes() : 0,
+                    t != null ? t.stockDisponible() : 0);
+        });
     }
 
     public ProductoDetalleResponse obtener(Long id) {
@@ -87,7 +99,7 @@ public class ProductoService {
 
     private ProductoDetalleResponse detalle(Producto p) {
         boolean verCosto = ROLES_CON_COSTO.contains(usuarioActual.obtener().rol());
-        return ProductoDetalleResponse.de(p, verCosto, 0); // totalVariantes real: B6/B7
+        return ProductoDetalleResponse.de(p, verCosto, variantes.countByProductoIdAndActivoTrue(p.getId()));
     }
 
     private Producto buscar(Long id) {
