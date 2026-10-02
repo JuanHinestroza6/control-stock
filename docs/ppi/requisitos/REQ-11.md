@@ -8,11 +8,11 @@
 | **Código** | REQ-11 |
 | **Nombre** | Gestión de Productos |
 | **Tipo** | Funcional |
-| **Stakeholder** | Por asignar (completar con el Word) |
-| **Necesidad** | Por asignar (completar con el Word) |
-| **Caso de uso** | Por asignar (completar con el Word) |
+| **Stakeholder** | Administrador |
+| **Necesidad** | NEC-01 |
+| **Caso de uso** | CU-11 "Registrar y gestionar productos" |
 | **Relacionados** | REQ-01 "Visualizar stock en tiempo real" (matriz de variantes); REQ-06 (permisos por rol) |
-| **Prioridad** | Por asignar (completar con el Word) |
+| **Prioridad** | Alta |
 | **Módulos** | `catalogo` (`web`, `servicio`, `repositorio`, `modelo`, `dto`); frontend: `paginas/productos`, `componentes/dominio`, `api`, `lib/permisos` |
 
 ## Descripción
@@ -60,7 +60,6 @@ y su inventario por variantes (talla × color), organizados en categorías. El p
 
 - Reforzar la regla de apartados activos (hoy `stockReservado > 0`) con la tabla de reservas en la Fase 3.
 - La matriz muestra ceros hasta registrar movimientos (Fase 2) o cargar datos semilla (Fase 4).
-- Registro de la ficha en el Word: código de caso de uso, necesidad, stakeholder y prioridad.
 
 ## Criterios de aceptación
 
@@ -82,8 +81,8 @@ y su inventario por variantes (talla × color), organizados en categorías. El p
 
 ## Observaciones
 
-- La numeración de `docs/dominio.md` asigna REQ-11 a "Gestión de productos"; el código de caso de uso, la necesidad y el
-  stakeholder del Word no se conocen y se dejan por asignar. La vista de la matriz se registra bajo REQ-01.
+- Datos del Word: stakeholder Administrador, NEC-01, CU-11 "Registrar y gestionar productos", prioridad Alta.
+  La vista de la matriz se registra bajo REQ-01.
 - Inconsistencias previas del documento Word (pendientes de corregir): nombre y descripción cruzados entre REQ-08 y REQ-09;
   NEC-010 debería ser NEC-10.
 - Diagrama: `diagramas/clases-fase1-catalogo.puml`.

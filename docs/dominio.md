@@ -157,7 +157,7 @@ Después de cada movimiento se publica un evento (`@TransactionalEventListener(A
 | REQ-08 Devoluciones | venta |
 | REQ-09 Tendencias históricas | analitica |
 | REQ-10 Planeación de compras | compra + analitica (pronóstico) |
-| REQ-11 Gestión de productos | catalogo |
+| REQ-11 Gestión de productos (CU-11) | catalogo |
 | REQ-12 Registrar y gestionar usuarios (CU-12) | usuario |
 | Nuevo: Apartados | inventario (reservas) |
 | Nuevo: Clasificación ABC | analitica |

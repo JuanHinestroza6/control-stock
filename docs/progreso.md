@@ -5,9 +5,8 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
 ## Estado actual
 
 - Semana: 1
-- Fase en curso: 1 — Núcleo (rama `fase-1-nucleo`, sin push): código, revisión y PPI terminados; falta solo la
-  prueba manual T3 del usuario
-- Última actualización: 2026-10-01
+- Fase en curso: 1 — Núcleo terminada (rama `fase-1-nucleo` publicada); siguiente: Fase 2 (operación)
+- Última actualización: 2026-10-02
 
 ## Hecho
 
@@ -18,24 +17,26 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
 - [x] Fase 1 — frontend: tabla/paginación/modal, categorías, productos, detalle con matriz y generador, usuarios, /cuenta.
       215/215 pruebas, lint y build OK
 - [x] Fase 1 — revisión final: sin críticos; 2 importantes y 6 menores corregidos (commit 41a9424)
-- [x] Fase 1 — PPI: ficha REQ-11, CA de REQ-06/REQ-12 cumplidos, diagrama de clases del catálogo
+- [x] Fase 1 — PPI: ficha REQ-11 (Administrador, NEC-01, CU-11, prioridad Alta), CA de REQ-06/REQ-12 cumplidos,
+      diagrama de clases del catálogo
+- [x] Fase 1 — T3: prueba manual con el backend real completa, sin errores (2026-10-02)
 
 ## En curso
 
-- [ ] T3: prueba manual con el backend real (la hace el usuario; ver "Prueba manual T3")
+- [ ] PR de `fase-1-nucleo` hacia main (lo abre el usuario cuando lo decida)
 
 ## Próximos pasos
 
-1. Ejecutar la prueba manual T3 y reportar lo que falle.
-2. Push de `fase-1-nucleo` y PR solo cuando el usuario lo pida.
-3. Asignar stakeholder, NEC y CU de REQ-11 contra el Word; revisar los diagramas con Alt+D.
+1. PR y merge de `fase-1-nucleo`; luego `git switch main && git pull`.
+2. Revisar los diagramas con Alt+D (PlantUML no instalado).
+3. Iniciar `/fase 2`: operación (entradas, ajustes, ventas, devoluciones, kardex).
 
 ## Bloqueos y decisiones pendientes (aceptados, sin acción)
 
 - Validación del body antes de `@PreAuthorize`: un rol sin permiso con body inválido recibe 400 en vez de 403.
 - Revocación por `iat` con precisión de segundos: un token emitido en el mismo segundo del cambio sigue válido (ADR-005).
 
-## Prueba manual T3 (PowerShell 5, desde la raíz del repo)
+## Prueba manual T3 (PowerShell 5, desde la raíz del repo) — completada 2026-10-02
 
 1. `Copy-Item .env.example .env` (solo la primera vez) y completa `.env`:
    - `JWT_SECRET`: genera uno con
@@ -49,16 +50,16 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
    `Invoke-RestMethod http://localhost:8080/actuator/health` (debe decir `UP`).
 4. Frontend (otra terminal): `cd frontend`, `npm install` (primera vez) y `npm run dev`. Abre http://localhost:5173
 5. Verificación:
-   - [ ] Entrar con `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
-   - [ ] Categorías: aparecen las 6 base; crear, editar y eliminar una sin productos; eliminar una con productos → aviso 409.
-   - [ ] Crear producto (p. ej. LIV001), editarlo; un precio de venta menor que el costo muestra aviso pero guarda.
-   - [ ] Detalle: generar tallas S, M, L × colores NEGRO, AZUL → 6 variantes; matriz con 6 celdas en 0 (AGOTADO);
+   - [x] Entrar con `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
+   - [x] Categorías: aparecen las 6 base; crear, editar y eliminar una sin productos; eliminar una con productos → aviso 409.
+   - [x] Crear producto (p. ej. LIV001), editarlo; un precio de venta menor que el costo muestra aviso pero guarda.
+   - [x] Detalle: generar tallas S, M, L × colores NEGRO, AZUL → 6 variantes; matriz con 6 celdas en 0 (AGOTADO);
          generar de nuevo → todas omitidas.
-   - [ ] Desactivar el producto → sus variantes quedan inactivas; reactivarlo → las variantes siguen inactivas.
-   - [ ] Usuarios: crear un VENDEDOR con contraseña temporal; en otra ventana privada entrar como él → lo lleva a
+   - [x] Desactivar el producto → sus variantes quedan inactivas; reactivarlo → las variantes siguen inactivas.
+   - [x] Usuarios: crear un VENDEDOR con contraseña temporal; en otra ventana privada entrar como él → lo lleva a
          /cuenta; tras cambiarla entra, ve productos sin costo y sin botones de edición, y no ve "Usuarios".
-   - [ ] Como ADMIN, restablecer la contraseña del VENDEDOR → su sesión abierta cae al login.
-   - [ ] En la tabla de usuarios, tu propia fila no ofrece desactivar ni cambiar el rol.
+   - [x] Como ADMIN, restablecer la contraseña del VENDEDOR → su sesión abierta cae al login.
+   - [x] En la tabla de usuarios, tu propia fila no ofrece desactivar ni cambiar el rol.
 
 
 ## Notas para la próxima sesión
