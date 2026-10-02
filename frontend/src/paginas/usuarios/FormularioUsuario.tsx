@@ -8,12 +8,7 @@ import { erroresPorCampo, mensajeError } from '../../lib/errores'
 import { ETIQUETA_ROL } from '../../lib/roles'
 import type { Rol } from '../../tipos/auth'
 import type { UsuarioResponse } from '../../tipos/usuarios'
-import {
-  esquemaCrearUsuario,
-  esquemaEditarPropio,
-  esquemaEditarUsuario,
-  type DatosFormularioUsuario,
-} from './esquemaUsuario'
+import { esquemaUsuario, type DatosFormularioUsuario } from './esquemaUsuario'
 
 const OPCIONES_ROL = (Object.keys(ETIQUETA_ROL) as Rol[]).map((r) => ({ valor: r, etiqueta: ETIQUETA_ROL[r] }))
 
@@ -32,14 +27,12 @@ interface FormularioUsuarioProps {
 export function FormularioUsuario({ usuario, esPropio = false, guardando, error, onGuardar, onCancelar }: FormularioUsuarioProps) {
   const editando = usuario !== undefined
   const rolFijo = editando && esPropio
-  const esquema = !editando ? esquemaCrearUsuario : rolFijo ? esquemaEditarPropio : esquemaEditarUsuario
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<DatosFormularioUsuario>({
-    // El esquema varía según el modo; la forma de salida coincide con DatosFormularioUsuario en cada caso.
-    resolver: zodResolver(esquema) as never,
+    resolver: zodResolver(esquemaUsuario(editando ? 'editar' : 'crear')),
     defaultValues: {
       nombre: usuario?.nombre ?? '',
       email: usuario?.email ?? '',
@@ -52,11 +45,9 @@ export function FormularioUsuario({ usuario, esPropio = false, guardando, error,
   const hayErrorCampo = ['nombre', 'email', 'rol', 'passwordTemporal'].some((c) => campos[c])
   const banner = error && !hayErrorCampo ? mensajeError(error) : undefined
 
-  const enviar = (datos: DatosFormularioUsuario) => onGuardar(rolFijo ? { ...datos, rol: usuario.rol } : datos)
-
   return (
     <Modal abierto titulo={editando ? 'Editar usuario' : 'Nuevo usuario'} onCerrar={onCancelar} bloqueado={guardando}>
-      <form noValidate onSubmit={handleSubmit(enviar)} className="flex flex-col gap-4" aria-label="Formulario de usuario">
+      <form noValidate onSubmit={handleSubmit(onGuardar)} className="flex flex-col gap-4" aria-label="Formulario de usuario">
         {banner && (
           <p role="alert" className="rounded-lg bg-critico/10 px-3 py-2 text-sm font-medium text-critico">
             {banner}

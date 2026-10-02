@@ -14,14 +14,17 @@ export const esquemaPasswordTemporal = z
   .refine((v) => new TextEncoder().encode(v).length <= 72, 'Máximo 72 bytes')
   .refine((v) => !v.toLowerCase().startsWith('cambiar'), 'No puede empezar por "cambiar"')
 
-export const esquemaCrearUsuario = z.object({ nombre, email, rol, passwordTemporal: esquemaPasswordTemporal })
-export const esquemaEditarUsuario = z.object({ nombre, email, rol })
-/** Al editarse a sí mismo el rol no se envía desde el formulario (se conserva el actual). */
-export const esquemaEditarPropio = z.object({ nombre, email })
-
-export interface DatosFormularioUsuario {
-  nombre: string
-  email: string
-  rol: (typeof ROLES)[number]
-  passwordTemporal: string
+/** Mismo tipo de salida en ambos modos; la contraseña temporal solo se valida al crear. */
+export function esquemaUsuario(modo: 'crear' | 'editar') {
+  return z
+    .object({ nombre, email, rol, passwordTemporal: z.string() })
+    .superRefine((datos, ctx) => {
+      if (modo !== 'crear') return
+      const resultado = esquemaPasswordTemporal.safeParse(datos.passwordTemporal)
+      if (!resultado.success) {
+        ctx.addIssue({ code: 'custom', path: ['passwordTemporal'], message: resultado.error.issues[0].message })
+      }
+    })
 }
+
+export type DatosFormularioUsuario = z.output<ReturnType<typeof esquemaUsuario>>

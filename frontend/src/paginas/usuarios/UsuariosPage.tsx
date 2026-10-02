@@ -6,13 +6,21 @@ import { EstadoCarga, EstadoError, EstadoVacio } from '../../componentes/ui/Esta
 import { Paginacion } from '../../componentes/ui/Paginacion'
 import { Selector } from '../../componentes/ui/Selector'
 import { Tabla, type Columna } from '../../componentes/ui/Tabla'
-import { useActualizarUsuario, useCrearUsuario, useUsuarios } from '../../hooks/useUsuarios'
+import {
+  useActualizarUsuario,
+  useCambiarEstadoUsuario,
+  useCrearUsuario,
+  useRestablecerPassword,
+  useUsuarios,
+} from '../../hooks/useUsuarios'
+import { DialogoConfirmacion } from '../../componentes/ui/DialogoConfirmacion'
 import { useSesion } from '../../hooks/useSesion'
 import { mensajeError } from '../../lib/errores'
 import { ETIQUETA_ROL } from '../../lib/roles'
 import type { Rol } from '../../tipos/auth'
 import type { UsuarioResponse } from '../../tipos/usuarios'
 import { FormularioUsuario } from './FormularioUsuario'
+import { ModalPassword } from './ModalPassword'
 
 const TAMANO_PAGINA = 20
 const RETARDO_BUSQUEDA_MS = 300
@@ -45,6 +53,11 @@ export function UsuariosPage() {
   const [pagina, setPagina] = useState(0)
   const [edicion, setEdicion] = useState<'nuevo' | UsuarioResponse | null>(null)
 
+  const [aCambiarEstado, setACambiarEstado] = useState<UsuarioResponse | null>(null)
+  const [aRestablecer, setARestablecer] = useState<UsuarioResponse | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
+  const cambiarEstado = useCambiarEstadoUsuario()
+  const restablecer = useRestablecerPassword()
   const crear = useCrearUsuario()
   const actualizar = useActualizarUsuario()
   const mutacionForm = edicion === 'nuevo' ? crear : actualizar
@@ -93,9 +106,27 @@ export function UsuariosPage() {
       encabezado: 'Acciones',
       className: 'text-right',
       celda: (u) => (
-        <Boton variante="secundario" aria-label={`Editar ${u.nombre}`} onClick={() => setEdicion(u)}>
-          Editar
-        </Boton>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Boton variante="secundario" aria-label={`Editar ${u.nombre}`} onClick={() => setEdicion(u)}>
+            Editar
+          </Boton>
+          {u.id === yo?.id ? (
+            <span className="self-center text-xs font-medium text-oxford/60">Tu cuenta</span>
+          ) : (
+            <>
+              <Boton
+                variante={u.activo ? 'peligro' : 'secundario'}
+                aria-label={`${u.activo ? 'Desactivar' : 'Activar'} ${u.nombre}`}
+                onClick={() => setACambiarEstado(u)}
+              >
+                {u.activo ? 'Desactivar' : 'Activar'}
+              </Boton>
+              <Boton variante="secundario" aria-label={`Restablecer contraseña de ${u.nombre}`} onClick={() => setARestablecer(u)}>
+                Restablecer contraseña
+              </Boton>
+            </>
+          )}
+        </div>
       ),
     },
   ]
@@ -187,6 +218,11 @@ export function UsuariosPage() {
         />
       </form>
 
+      {aviso && (
+        <p role="status" className="rounded-lg bg-ok/10 px-3 py-2 text-sm font-medium text-oxford">
+          {aviso}
+        </p>
+      )}
       {contenido}
 
       {edicion !== null && (
@@ -210,6 +246,61 @@ export function UsuariosPage() {
               )
             }
           }}
+        />
+      )}
+
+      <DialogoConfirmacion
+        abierto={aCambiarEstado !== null}
+        titulo={aCambiarEstado?.activo ? 'Desactivar usuario' : 'Activar usuario'}
+        mensaje={
+          aCambiarEstado?.activo
+            ? `¿Desactivar a ${aCambiarEstado.nombre}? No podrá iniciar sesión. Siempre debe quedar al menos un administrador activo.`
+            : `¿Activar a ${aCambiarEstado?.nombre ?? ''}?`
+        }
+        textoConfirmar={aCambiarEstado?.activo ? 'Desactivar' : 'Activar'}
+        peligro={aCambiarEstado?.activo}
+        cargando={cambiarEstado.isPending}
+        error={cambiarEstado.isError ? mensajeError(cambiarEstado.error) : undefined}
+        onCancelar={() => {
+          setACambiarEstado(null)
+          cambiarEstado.reset()
+        }}
+        onConfirmar={() =>
+          aCambiarEstado &&
+          cambiarEstado.mutate(
+            { id: aCambiarEstado.id, activo: !aCambiarEstado.activo },
+            {
+              onSuccess: () => {
+                setACambiarEstado(null)
+                cambiarEstado.reset()
+              },
+            },
+          )
+        }
+      />
+
+      {aRestablecer !== null && (
+        <ModalPassword
+          key={aRestablecer.id}
+          usuario={aRestablecer}
+          guardando={restablecer.isPending}
+          error={restablecer.error}
+          onCancelar={() => {
+            setARestablecer(null)
+            restablecer.reset()
+          }}
+          onGuardar={(passwordTemporal) =>
+            restablecer.mutate(
+              { id: aRestablecer.id, passwordTemporal },
+              {
+                onSuccess: () => {
+                  setAviso(`Contraseña temporal fijada para ${aRestablecer.nombre}.`)
+                  setARestablecer(null)
+                  restablecer.reset()
+                },
+              },
+            )
+          }
         />
       )}
     </section>

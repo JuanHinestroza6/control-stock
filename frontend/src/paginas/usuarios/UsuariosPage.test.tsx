@@ -144,6 +144,51 @@ describe('UsuariosPage', () => {
     )
   })
 
+  it('no ofrece desactivar ni restablecer sobre la propia cuenta', async () => {
+    renderizarApp(<UsuariosPage />, { rol: 'ADMIN' })
+    await screen.findByText('Usuario 2')
+    expect(screen.queryByRole('button', { name: 'Desactivar Ana Pérez' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Restablecer contraseña de Ana Pérez' })).not.toBeInTheDocument()
+    expect(screen.getByText('Tu cuenta')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Desactivar Usuario 2' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Activar Usuario 3' })).toBeInTheDocument()
+  })
+
+  it('desactiva con confirmación', async () => {
+    vi.mocked(api.cambiarEstadoUsuario).mockResolvedValue(usuario(2, { activo: false }))
+    renderizarApp(<UsuariosPage />, { rol: 'ADMIN' })
+    await screen.findByText('Usuario 2')
+    await userEvent.click(screen.getByRole('button', { name: 'Desactivar Usuario 2' }))
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Desactivar' }))
+    await vi.waitFor(() => expect(api.cambiarEstadoUsuario).toHaveBeenCalledWith(2, false))
+  })
+
+  it('muestra el 422 de último administrador dentro del diálogo', async () => {
+    vi.mocked(api.cambiarEstadoUsuario).mockRejectedValue(errorHttp(422, 'Debe quedar al menos un administrador activo.'))
+    renderizarApp(<UsuariosPage />, { rol: 'ADMIN' })
+    await screen.findByText('Usuario 2')
+    await userEvent.click(screen.getByRole('button', { name: 'Desactivar Usuario 2' }))
+    const dialogo = screen.getByRole('dialog')
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Desactivar' }))
+    expect(await within(dialogo).findByText('Debe quedar al menos un administrador activo.')).toBeInTheDocument()
+  })
+
+  it('restablece la contraseña validando y confirma con aviso', async () => {
+    vi.mocked(api.restablecerPassword).mockResolvedValue(undefined)
+    renderizarApp(<UsuariosPage />, { rol: 'ADMIN' })
+    await screen.findByText('Usuario 2')
+    await userEvent.click(screen.getByRole('button', { name: 'Restablecer contraseña de Usuario 2' }))
+    const form = screen.getByRole('form', { name: 'Restablecer contraseña' })
+    await userEvent.type(within(form).getByLabelText('Contraseña temporal'), 'cambiar-esto-123')
+    await userEvent.click(within(form).getByRole('button', { name: 'Restablecer' }))
+    expect(await within(form).findByText('No puede empezar por "cambiar"')).toBeInTheDocument()
+    await userEvent.clear(within(form).getByLabelText('Contraseña temporal'))
+    await userEvent.type(within(form).getByLabelText('Contraseña temporal'), PASSWORD)
+    await userEvent.click(within(form).getByRole('button', { name: 'Restablecer' }))
+    await vi.waitFor(() => expect(api.restablecerPassword).toHaveBeenCalledWith(2, PASSWORD))
+    expect(await screen.findByRole('status')).toHaveTextContent('Contraseña temporal fijada para Usuario 2.')
+  })
+
   it('al editarse a sí mismo el rol está bloqueado y se conserva', async () => {
     vi.mocked(api.actualizarUsuario).mockResolvedValue(usuario(1))
     renderizarApp(<UsuariosPage />, { rol: 'ADMIN' })

@@ -34,3 +34,13 @@ export async function actualizarUsuario(id: number, datos: ActualizarUsuarioRequ
   const { data } = await cliente.put<UsuarioResponse>(`/usuarios/${id}`, datos)
   return data
 }
+
+export async function cambiarEstadoUsuario(id: number, activo: boolean): Promise<UsuarioResponse> {
+  const { data } = await cliente.patch<UsuarioResponse>(`/usuarios/${id}/estado`, { activo })
+  return data
+}
+
+/** Fija una contraseña temporal (el usuario deberá cambiarla y sus tokens quedan revocados). */
+export async function restablecerPassword(id: number, passwordTemporal: string): Promise<void> {
+  await cliente.put(`/usuarios/${id}/password`, { passwordTemporal })
+}
