@@ -2,6 +2,7 @@ package co.livorno.controlstock.auth;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -158,6 +159,39 @@ class AuthIntegracionTest {
             mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                             .content("{\"email\":\"temporal.desactivar@livorno.test\",\"password\":\"Clave123!\"}"))
                     .andExpect(status().isUnauthorized());
+        } finally {
+            repo.deleteById(u.getId());
+        }
+    }
+
+    @Test
+    void cambiarPassword_conTemporal_tokenNuevoValidoViejoRevocadoYLoginConLaNueva() throws Exception {
+        Usuario u = new Usuario("Cambia Pass", "cambia.pass@livorno.test", encoder.encode("Temporal-12345"),
+                Rol.VENDEDOR);
+        u.asignarPasswordTemporal(u.getPasswordHash(), java.time.LocalDateTime.now().minusMinutes(5));
+        u = repo.save(u);
+        try {
+            String viejo = login("cambia.pass@livorno.test", "Temporal-12345");
+            Thread.sleep(1100); // el token viejo debe quedar con iat anterior al cambio (precision de segundos)
+
+            String cuerpo = mvc.perform(put("/api/auth/yo/password")
+                            .header(HttpHeaders.AUTHORIZATION, "Bearer " + viejo)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"actual\":\"Temporal-12345\",\"nueva\":\"Definitiva-98765\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.usuario.debeCambiarPassword").value(false))
+                    .andReturn().getResponse().getContentAsString();
+            String nuevo = JsonPath.read(cuerpo, "$.token");
+
+            mvc.perform(get("/api/auth/yo").header(HttpHeaders.AUTHORIZATION, "Bearer " + nuevo))
+                    .andExpect(status().isOk());
+            mvc.perform(get("/api/auth/yo").header(HttpHeaders.AUTHORIZATION, "Bearer " + viejo))
+                    .andExpect(status().isUnauthorized());
+            login("cambia.pass@livorno.test", "Definitiva-98765");
+            mvc.perform(put("/api/auth/yo/password").header(HttpHeaders.AUTHORIZATION, "Bearer " + nuevo)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"actual\":\"incorrecta-123456\",\"nueva\":\"Otra-clave-98765\"}"))
+                    .andExpect(status().isUnprocessableEntity());
         } finally {
             repo.deleteById(u.getId());
         }

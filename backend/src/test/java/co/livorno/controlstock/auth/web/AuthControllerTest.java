@@ -77,6 +77,55 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.errores[?(@.campo=='password')]").exists());
     }
 
+    private static org.springframework.security.core.Authentication autenticado() {
+        var principal = new UsuarioAutenticado(5L, "ana@livorno.test", "Ana", "VENDEDOR");
+        return UsernamePasswordAuthenticationToken.authenticated(principal, "n/a",
+                List.of(new SimpleGrantedAuthority("ROLE_VENDEDOR")));
+    }
+
+    @Test
+    void cambiarPassword_sinToken_responde401() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/auth/yo/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"actual\":\"x\",\"nueva\":\"Definitiva-98765\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void cambiarPassword_valida_responde200ConTokenNuevo() throws Exception {
+        when(authService.cambiarPassword(org.mockito.ArgumentMatchers.eq(5L), any())).thenReturn(
+                LoginResponse.de("tok-nuevo", Instant.parse("2026-10-02T00:00:00Z"),
+                        new UsuarioSesionResponse(5L, "Ana", "ana@livorno.test", "VENDEDOR", false)));
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/auth/yo/password")
+                        .with(authentication(autenticado())).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"actual\":\"Temporal-12345\",\"nueva\":\"Definitiva-98765\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").value("tok-nuevo"))
+                .andExpect(jsonPath("$.usuario.debeCambiarPassword").value(false));
+    }
+
+    @Test
+    void cambiarPassword_nuevaInvalida_responde400ConErrorPorCampo() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/auth/yo/password")
+                        .with(authentication(autenticado())).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"actual\":\"Temporal-12345\",\"nueva\":\"corta\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errores[?(@.campo=='nueva')]").exists());
+    }
+
+    @Test
+    void cambiarPassword_actualIncorrecta_responde422() throws Exception {
+        when(authService.cambiarPassword(any(), any())).thenThrow(
+                new co.livorno.controlstock.comun.excepcion.ExcepcionNegocio("La contraseña actual no es correcta."));
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/auth/yo/password")
+                        .with(authentication(autenticado())).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"actual\":\"mala\",\"nueva\":\"Definitiva-98765\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.detail").value("La contraseña actual no es correcta."));
+    }
+
     @Test
     void yo_conUsuarioAutenticado_responde200() throws Exception {
         var principal = new UsuarioAutenticado(5L, "ana@livorno.test", "Ana", "ADMIN");

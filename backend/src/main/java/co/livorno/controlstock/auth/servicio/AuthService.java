@@ -1,6 +1,11 @@
 package co.livorno.controlstock.auth.servicio;
 
+import co.livorno.controlstock.auth.dto.CambiarPasswordRequest;
 import co.livorno.controlstock.auth.dto.LoginRequest;
+import co.livorno.controlstock.comun.excepcion.ExcepcionNegocio;
+import co.livorno.controlstock.comun.excepcion.RecursoNoEncontradoException;
+import java.time.Clock;
+import java.time.LocalDateTime;
 import co.livorno.controlstock.auth.dto.LoginResponse;
 import co.livorno.controlstock.auth.dto.UsuarioSesionResponse;
 import co.livorno.controlstock.usuario.modelo.Usuario;
@@ -24,8 +29,11 @@ public class AuthService {
     /** Hash de relleno (aleatorio, generado al construir) para igualar tiempos cuando el email no existe. */
     private final String hashRelleno;
 
+    private final Clock clock;
+
     public AuthService(UsuarioRepository usuarios, PasswordEncoder encoder, TokenService tokens,
-            LimitadorIntentosLogin limitador) {
+            LimitadorIntentosLogin limitador, Clock clock) {
+        this.clock = clock;
         this.usuarios = usuarios;
         this.encoder = encoder;
         this.tokens = tokens;
@@ -49,6 +57,27 @@ public class AuthService {
             throw new BadCredentialsException("Credenciales inválidas");
         }
         limitador.registrarExito(email, ip);
+        TokenService.TokenEmitido t = tokens.emitir(usuario);
+        return LoginResponse.de(t.token(), t.expiraEn(), UsuarioSesionResponse.de(usuario));
+    }
+
+    /**
+     * El usuario autenticado cambia su propia contraseña. Contraseña actual incorrecta es 422 (no 401: la sesión
+     * es válida). Fija passwordCambiadoEn (revoca los tokens anteriores) y emite un token nuevo con el mismo reloj,
+     * por lo que su iat no es anterior al cambio y sigue siendo válido.
+     */
+    @Transactional
+    public LoginResponse cambiarPassword(Long usuarioId, CambiarPasswordRequest solicitud) {
+        Usuario usuario = usuarios.findById(usuarioId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Usuario", usuarioId));
+        if (!encoder.matches(solicitud.actual(), usuario.getPasswordHash())) {
+            throw new ExcepcionNegocio("La contraseña actual no es correcta.");
+        }
+        if (encoder.matches(solicitud.nueva(), usuario.getPasswordHash())) {
+            throw new ExcepcionNegocio("La nueva contraseña debe ser distinta de la actual.");
+        }
+        usuario.cambiarPassword(encoder.encode(solicitud.nueva()), LocalDateTime.now(clock));
+        usuarios.saveAndFlush(usuario);
         TokenService.TokenEmitido t = tokens.emitir(usuario);
         return LoginResponse.de(t.token(), t.expiraEn(), UsuarioSesionResponse.de(usuario));
     }
