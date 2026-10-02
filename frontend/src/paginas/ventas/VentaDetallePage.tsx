@@ -1,10 +1,16 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router'
+import { BadgeEstadoVenta } from '../../componentes/dominio/BadgeEstadoVenta'
+import { ModalAnularVenta } from '../../componentes/dominio/ModalAnularVenta'
+import { ModalDevolucion } from '../../componentes/dominio/ModalDevolucion'
+import { Boton } from '../../componentes/ui/Boton'
 import { EstadoCarga, EstadoError } from '../../componentes/ui/Estados'
+import { useSesion } from '../../hooks/useSesion'
 import { useVenta } from '../../hooks/useVentas'
 import { mensajeError } from '../../lib/errores'
 import { formatearFecha, formatearMoneda } from '../../lib/formato'
+import { puedeAnularVenta, puedeVender } from '../../lib/permisos'
 import type { LineaVentaResponse } from '../../tipos/ventas'
-import { BadgeEstadoVenta } from '../../componentes/dominio/BadgeEstadoVenta'
 
 function Precio({ linea }: { linea: LineaVentaResponse }) {
   const descuento = linea.precioLista - linea.precioUnitario
@@ -23,6 +29,9 @@ export function VentaDetallePage() {
   const { id } = useParams()
   const ventaId = id !== undefined && /^\d+$/.test(id) ? Number(id) : undefined
   const consulta = useVenta(ventaId)
+  const { usuario } = useSesion()
+  const [devolviendo, setDevolviendo] = useState<LineaVentaResponse | null>(null)
+  const [anulando, setAnulando] = useState(false)
   // El costo llega null para VENDEDOR: la columna solo aparece si algún valor viene informado.
   const verCosto = consulta.data?.lineas.some((l) => l.costoUnitario !== null) ?? false
 
@@ -35,11 +44,19 @@ export function VentaDetallePage() {
     contenido = <EstadoError mensaje={mensajeError(consulta.error)} onReintentar={() => void consulta.refetch()} />
   } else {
     const v = consulta.data
+    const registrada = v.estado === 'REGISTRADA'
+    const puedeDevolver = registrada && puedeVender(usuario?.rol)
+    const puedeAnular = registrada && puedeAnularVenta(usuario?.rol)
     contenido = (
       <>
         <div className="flex flex-wrap items-center gap-3">
           <h1>Venta {v.numero}</h1>
           <BadgeEstadoVenta estado={v.estado} />
+          {puedeAnular && (
+            <Boton variante="peligro" className="ml-auto" onClick={() => setAnulando(true)}>
+              Anular venta
+            </Boton>
+          )}
         </div>
 
         <dl className="grid grid-cols-1 gap-3 rounded-lg border border-oxford/10 bg-fondo p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
@@ -82,6 +99,7 @@ export function VentaDetallePage() {
                 {verCosto && <th scope="col" className="hidden px-3 py-3 text-right text-xs font-medium md:table-cell">Costo unitario</th>}
                 <th scope="col" className="px-3 py-3 text-right text-xs font-medium">Subtotal</th>
                 <th scope="col" className="hidden px-3 py-3 text-right text-xs font-medium md:table-cell">Devueltas</th>
+                {puedeDevolver && <th scope="col" className="px-3 py-3 text-xs font-medium"><span className="sr-only">Acciones</span></th>}
               </tr>
             </thead>
             <tbody>
@@ -116,6 +134,20 @@ export function VentaDetallePage() {
                   )}
                   <td className="px-3 py-2 text-right">{formatearMoneda(l.subtotal)}</td>
                   <td className="hidden px-3 py-2 text-right md:table-cell">{l.cantidadDevuelta}</td>
+                  {puedeDevolver && (
+                    <td className="px-3 py-2 text-right">
+                      {l.cantidadDevuelta < l.cantidad && (
+                        <button
+                          type="button"
+                          onClick={() => setDevolviendo(l)}
+                          aria-label={`Devolver ${l.sku}`}
+                          className="font-medium text-acento hover:underline"
+                        >
+                          Devolver
+                        </button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -131,6 +163,12 @@ export function VentaDetallePage() {
         Volver a ventas
       </Link>
       {contenido}
+      {ventaId !== undefined && devolviendo && (
+        <ModalDevolucion ventaId={ventaId} linea={devolviendo} onCerrar={() => setDevolviendo(null)} />
+      )}
+      {ventaId !== undefined && anulando && consulta.data && (
+        <ModalAnularVenta ventaId={ventaId} numero={consulta.data.numero} onCerrar={() => setAnulando(false)} />
+      )}
     </section>
   )
 }
