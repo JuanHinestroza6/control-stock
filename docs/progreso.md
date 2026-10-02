@@ -5,7 +5,7 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
 ## Estado actual
 
 - Semana: 1
-- Fase en curso: 0 — Setup terminada (PR #1 fusionado); documentación PPI en rama `docs/ppi-fase-0`, PR pendiente
+- Fase en curso: 0 — Setup terminada (PR #1 y #2 fusionados); convención RNF en PR pendiente de merge
 - Última actualización: 2026-10-01
 
 ## Hecho
@@ -18,18 +18,18 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
       issuer, convertidor que recarga usuario, CORS, login/yo, limitador de intentos 429). 78/78 pruebas con Testcontainers
 - [x] Revisión final de fase 0: sin críticos; importantes y menores corregidos
 - [x] PR #1 (fase-0-setup) fusionado en main con CI en verde
-- [x] Documentación PPI fase 0 (rama `docs/ppi-fase-0`): fichas REQ-06 (CU-02) y REQ-12 (CU-12) con códigos del Word,
-      CU-13 "Iniciar sesión" nuevo ligado a REQ-02 (no funcional); diagramas de clases, secuencia del login y casos de uso
+- [x] Documentación PPI fase 0 (PR #2 fusionado): fichas REQ-06 (CU-02) y REQ-12 (CU-12) con códigos del Word,
+      CU-13 "Iniciar sesión" ligado a RNF-02; diagramas de clases, secuencia del login y casos de uso
+- [x] Convención RNF-01..RNF-05 para los no funcionales del Word (en `docs/dominio.md`); fichas y diagramas actualizados
 
 ## En curso
 
-- [ ] Rama `docs/ppi-fase-0` sin push: el usuario abre el PR. Diagramas sin renderizar (PlantUML no instalado)
+- [ ] PR de `docs/convencion-rnf` hacia main: pendiente de merge (lo hace el usuario)
 
 ## Próximos pasos
 
-1. Revisar los 3 diagramas con Alt+D en VS Code; push de `docs/ppi-fase-0` y PR (lo hace el usuario).
-2. Resolver la numeración REQ-02: en `dominio.md` es "Registrar operaciones de stock"; en el Word es el no funcional
-   "Seguridad y control". Ajustar la trazabilidad de `dominio.md`.
+1. Merge del PR de la convención RNF; `git switch main && git pull`.
+2. Revisar los 3 diagramas con Alt+D en VS Code (siguen sin renderizar: PlantUML no instalado).
 3. Iniciar `/fase 1`: CRUD de categorías, productos y variantes; matriz talla × color; CRUD de usuarios.
 
 ## Bloqueos y decisiones pendientes

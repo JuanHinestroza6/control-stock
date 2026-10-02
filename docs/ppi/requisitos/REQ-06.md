@@ -11,7 +11,7 @@
 | **Stakeholder** | Gerente |
 | **Necesidad** | NEC-06 |
 | **Caso de uso** | CU-02 "Gestión de usuarios y roles" |
-| **Relacionados** | CU-13 "Iniciar sesión" (requisito no funcional REQ-02 "Seguridad y control", NEC-06); REQ-12 |
+| **Relacionados** | CU-13 "Iniciar sesión" (requisito no funcional RNF-02 "Seguridad y control", NEC-06); REQ-12 |
 | **Prioridad** | Alta |
 | **Módulos** | `auth`, `usuario`, `comun` (seguridad); frontend: `componentes/layout`, `hooks` |
 
@@ -33,7 +33,7 @@ de acuerdo con la matriz de permisos de `docs/dominio.md`, y aplicar siempre el 
   VENDEDOR, CONTABILIDAD; Reservas y Alertas: ADMIN, INVENTARIO, VENDEDOR; Compras: ADMIN, INVENTARIO, CONTABILIDAD;
   Reportes: ADMIN, CONTABILIDAD; Usuarios: ADMIN.
 
-### Autenticación que soporta este requisito (CU-13 "Iniciar sesión", REQ-02 "Seguridad y control")
+### Autenticación que soporta este requisito (CU-13 "Iniciar sesión", RNF-02 "Seguridad y control")
 
 - `POST /api/auth/login` (público): correo normalizado (sin espacios, en minúsculas). Responde
   `LoginResponse{token, tipo "Bearer", expiraEn, usuario{id, nombre, email, rol}}`. Credenciales inválidas, usuario inexistente
@@ -63,7 +63,7 @@ de acuerdo con la matriz de permisos de `docs/dominio.md`, y aplicar siempre el 
 | CA-7 | El menú muestra solo los módulos permitidos para cada rol | Cumplido | `Sidebar.test.tsx`, `modulos.test.ts`, `Topbar.test.tsx` |
 | CA-8 | El ADMIN asigna y cambia roles desde la interfaz | Pendiente — Fase 1 | Por definir |
 
-### Criterios de CU-13 "Iniciar sesión" (REQ-02)
+### Criterios de CU-13 "Iniciar sesión" (RNF-02)
 
 | # | Criterio | Pruebas |
 |---|---|---|
@@ -76,7 +76,7 @@ de acuerdo con la matriz de permisos de `docs/dominio.md`, y aplicar siempre el 
 
 ## Observaciones
 
-- CU-13 "Iniciar sesión" no existe en el documento Word: se crea en esta fase y se liga al requisito no funcional REQ-02.
-- `docs/dominio.md` usa REQ-02 para "Registrar operaciones de stock" (funcional); en el Word, REQ-02 "Seguridad y control" es
-  no funcional. Confirmar si el Word numera aparte los no funcionales y ajustar la trazabilidad de `dominio.md`.
+- CU-13 "Iniciar sesión" no existe en el documento Word: se crea en esta fase y se liga al requisito no funcional RNF-02.
+- Convención de códigos (ver `docs/dominio.md`): REQ-xx para requisitos funcionales y RNF-xx para los no funcionales del
+  Word. El antiguo REQ-02 "Seguridad y control" del Word es RNF-02; REQ-02 sigue siendo "Registrar operaciones de stock".
 - El limitador de intentos es en memoria y usa `getRemoteAddr()`: detrás de un proxy inverso deberá revisarse.
