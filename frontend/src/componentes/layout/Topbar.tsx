@@ -1,3 +1,4 @@
+import { Link } from 'react-router'
 import { useSesion } from '../../hooks/useSesion'
 import { etiquetaRol } from '../../lib/roles'
 import { Boton } from '../ui/Boton'
@@ -65,6 +66,11 @@ export function Topbar({ onAbrirMenu, menuAbierto, idMenu, alertas = 0 }: Topbar
             <p className="text-sm font-medium">{usuario.nombre}</p>
             <p className="text-xs font-medium text-oxford/60">{etiquetaRol(usuario.rol)}</p>
           </div>
+        )}
+        {usuario && (
+          <Link to="/cuenta" className="text-sm font-medium text-acento hover:underline focus-visible:outline-2 focus-visible:outline-acento">
+            Mi cuenta
+          </Link>
         )}
         <Boton variante="primario" onClick={cerrar}>
           Salir

@@ -1,11 +1,17 @@
 import { Route, Routes } from 'react-router'
 import { LayoutPrincipal } from './componentes/layout/LayoutPrincipal'
 import { MODULOS } from './componentes/layout/modulos'
+import { CuentaPage } from './paginas/cuenta/CuentaPage'
 import { RutaProtegida } from './componentes/layout/RutaProtegida'
 import { LoginPage } from './paginas/auth/LoginPage'
 import { NoEncontradaPage } from './paginas/comun/NoEncontradaPage'
 import { ProximamentePage } from './paginas/comun/ProximamentePage'
 import { InicioPage } from './paginas/inicio/InicioPage'
+import { CategoriasPage } from './paginas/productos/CategoriasPage'
+import { ProductoDetallePage } from './paginas/productos/ProductoDetallePage'
+import { ProductoFormPage } from './paginas/productos/ProductoFormPage'
+import { ProductosPage } from './paginas/productos/ProductosPage'
+import { UsuariosPage } from './paginas/usuarios/UsuariosPage'
 
 export default function App() {
   return (
@@ -14,7 +20,18 @@ export default function App() {
       <Route element={<RutaProtegida />}>
         <Route element={<LayoutPrincipal />}>
           <Route index element={<InicioPage />} />
-          {MODULOS.filter((m) => m.ruta !== '/').map((m) => (
+          <Route path="/cuenta" element={<CuentaPage />} />
+          <Route path="/productos" element={<ProductosPage />} />
+          <Route path="/productos/:id" element={<ProductoDetallePage />} />
+          <Route path="/productos/categorias" element={<CategoriasPage />} />
+          <Route element={<RutaProtegida roles={['ADMIN', 'INVENTARIO']} />}>
+            <Route path="/productos/nuevo" element={<ProductoFormPage />} />
+            <Route path="/productos/:id/editar" element={<ProductoFormPage />} />
+          </Route>
+          <Route element={<RutaProtegida roles={['ADMIN']} />}>
+            <Route path="/usuarios" element={<UsuariosPage />} />
+          </Route>
+          {MODULOS.filter((m) => m.ruta !== '/' && m.clave !== 'productos' && m.clave !== 'usuarios').map((m) => (
             <Route key={m.clave} element={<RutaProtegida roles={m.roles} />}>
               <Route path={m.ruta} element={<ProximamentePage titulo={m.etiqueta} descripcion={m.descripcion} />} />
             </Route>

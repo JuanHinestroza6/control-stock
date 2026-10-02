@@ -16,7 +16,8 @@ Fuente de verdad del modelo de datos y las reglas de negocio. Si el código cont
 ## Entidades
 
 ```
-Usuario        id, nombre, email (único), passwordHash, rol, activo, creadoEn, actualizadoEn
+Usuario        id, nombre, email (único), passwordHash, rol, activo,
+               passwordCambiadoEn (nullable), debeCambiarPassword (default false), creadoEn, actualizadoEn
 Categoria      id, nombre (único), creadoEn, actualizadoEn
 Producto       id, codigo (único), nombre, categoriaId, precioCompra, precioVenta,
                leadTimeDias (default 15), loteMinimo (default 1), activo, creadoEn, actualizadoEn
@@ -44,6 +45,47 @@ JPA Auditing con un `Clock` en America/Bogota). Movimiento y las demás entidade
 
 Tallas válidas: `XS, S, M, L, XL, XXL` (y `UNICA` para accesorios). Colores: texto libre normalizado en mayúsculas.
 SKU sugerido: `{codigoProducto}-{talla}-{COLOR3}` → `LIV001-M-NEG`.
+
+## Catálogo (ADR-004)
+
+- **Normalización**: `codigo` del producto en mayúsculas, patrón `[A-Z0-9-]{2,20}`. Color: sin espacios extremos, espacios
+  internos colapsados, en mayúsculas (conserva tildes). Nombre de categoría: sin espacios extremos ni repetidos.
+  Unicidad sin distinguir mayúsculas ni tildes (collation `utf8mb4_0900_ai_ci`): "Rojo" y "ROJO" son el mismo color.
+- **SKU**: lo genera el servidor, nunca el cliente. `COLOR3` = tres primeros caracteres alfanuméricos del color sin tildes
+  (`MARRÓN` → `MAR`, `AZUL CIELO` → `AZU`; si el color tiene menos de 3, se usa completo). Si el SKU ya existe en
+  cualquier producto, se agrega el menor sufijo numérico libre desde 2: `LIV001-M-NEG`, `LIV001-M-NEG2`, `LIV001-M-NEG3`.
+- **Una variante por (producto, talla, color)**. Generar variantes es idempotente: crea las combinaciones faltantes y
+  reporta las existentes (activas o inactivas) sin modificarlas.
+- **UNICA es exclusiva**: un producto con variantes en talla UNICA no puede tener otras tallas, y viceversa (422).
+- **Campos inmutables**: `codigo` del producto; `sku`, `talla` y `color` de la variante. Un error se corrige desactivando
+  la variante y generando la correcta. Editables: datos y precios del producto; `stockMinimo` de la variante.
+- **Precios**: `precioCompra ≥ 0`, `precioVenta > 0`, escala 2. Se permite `precioVenta < precioCompra` (liquidaciones);
+  la interfaz advierte. `precioCompra` no se expone al rol VENDEDOR (llega `null`).
+- **Borrado**: lógico (`activo = false`) para producto, variante y usuario. Categoría: borrado físico solo si no tiene
+  productos (ni activos ni inactivos); si tiene, 409.
+- **Desactivar producto** desactiva también todas sus variantes. **Reactivar producto no reactiva variantes**: se
+  reactivan una a una. No se puede reactivar una variante de un producto inactivo (422) ni generar variantes en él (422).
+- **Reservas activas bloquean la desactivación**: no se puede desactivar una variante, ni un producto con alguna variante,
+  que tenga reservas ACTIVAS (409, mensaje con el SKU y las unidades reservadas). Hasta la Fase 3 se comprueba con
+  `stockReservado > 0` (equivalente: el reservado solo sube con reservas activas); en Fase 3 puede reforzarse consultando
+  la tabla de reservas.
+- **Estado de stock** (`Variante.estadoStock()`, mismo umbral que las alertas): `AGOTADO` si `disponible == 0`; `BAJO` si
+  `disponible ≤ umbral` (`puntoReorden`, o `stockMinimo` si no hay ROP); `OK` en otro caso.
+- **Categorías base** (migración V3): Camisetas, Hoodies, Jeans, Joggers, Chaquetas, Accesorios. El generador de datos
+  semilla las reutiliza.
+
+## Usuarios y contraseñas (ADR-003, ADR-005)
+
+- Solo el ADMIN administra usuarios. No hay borrado físico. El correo se normaliza (sin espacios, minúsculas) y es único.
+- Un ADMIN no puede desactivarse, cambiarse el rol ni restablecerse la contraseña a sí mismo desde la administración de
+  usuarios (422; su propia contraseña se cambia en "Mi cuenta"). Siempre debe quedar al menos un ADMIN activo (422).
+- Política de contraseña: 12 a 72 caracteres y como máximo 72 bytes en UTF-8 (límite de BCrypt); no puede empezar por
+  `cambiar` (valor de ejemplo). Al cambiar la propia, la nueva debe ser distinta de la actual.
+- La contraseña que asigna el ADMIN (al crear o al restablecer) es **temporal**: marca `debeCambiarPassword = true`.
+  Mientras esté activa, el usuario solo puede usar `GET /api/auth/yo` y `PUT /api/auth/yo/password`; el resto responde 403.
+  El ADMIN inicial de V2 no queda forzado.
+- Restablecer o cambiar la contraseña fija `passwordCambiadoEn` (truncado a segundos) y **revoca los tokens anteriores**:
+  un token con `iat < passwordCambiadoEn` responde 401. El cambio de la propia contraseña devuelve un token nuevo.
 
 ## Tipos de movimiento y su efecto
 
@@ -90,6 +132,7 @@ Después de cada movimiento se publica un evento (`@TransactionalEventListener(A
 | Funcionalidad | ADMIN | INVENTARIO | VENDEDOR | CONTABILIDAD |
 |---|---|---|---|---|
 | Usuarios y roles | CRUD | — | — | — |
+| Mi cuenta (cambiar mi contraseña) | Sí | Sí | Sí | Sí |
 | Productos / variantes | CRUD | CRUD | Ver | Ver |
 | Entradas y ajustes | Sí | Sí | — | — |
 | Ventas y devoluciones | Sí | — | Sí | Ver |
@@ -114,7 +157,7 @@ Después de cada movimiento se publica un evento (`@TransactionalEventListener(A
 | REQ-08 Devoluciones | venta |
 | REQ-09 Tendencias históricas | analitica |
 | REQ-10 Planeación de compras | compra + analitica (pronóstico) |
-| REQ-11 Gestión de productos | catalogo |
+| REQ-11 Gestión de productos (CU-11) | catalogo |
 | REQ-12 Registrar y gestionar usuarios (CU-12) | usuario |
 | Nuevo: Apartados | inventario (reservas) |
 | Nuevo: Clasificación ABC | analitica |

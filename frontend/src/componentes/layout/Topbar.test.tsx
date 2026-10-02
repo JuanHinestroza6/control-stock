@@ -19,4 +19,9 @@ describe('Topbar', () => {
     expect(screen.queryByRole('button', { name: /Alertas/ })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Salir' })).toBeInTheDocument()
   })
+
+  it('muestra el enlace Mi cuenta hacia /cuenta', () => {
+    montar('VENDEDOR')
+    expect(screen.getByRole('link', { name: 'Mi cuenta' })).toHaveAttribute('href', '/cuenta')
+  })
 })

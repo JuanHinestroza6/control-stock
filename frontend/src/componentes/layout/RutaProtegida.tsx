@@ -5,6 +5,8 @@ import { AccesoDenegado } from '../../paginas/comun/AccesoDenegado'
 import type { Rol } from '../../tipos/auth'
 import type { EstadoLogin } from '../../tipos/navegacion'
 
+const RUTA_CUENTA = '/cuenta'
+
 interface RutaProtegidaProps {
   /** Roles permitidos. Si se omite, basta con tener sesión. */
   roles?: Rol[]
@@ -22,6 +24,8 @@ export function RutaProtegida({ roles, children }: RutaProtegidaProps) {
     const estado: EstadoLogin = { desde: cierreVoluntario ? undefined : ubicacion.pathname + ubicacion.search }
     return <Navigate to="/login" replace state={estado} />
   }
+  // Contraseña temporal: el backend rechaza todo salvo /yo; aquí se lleva al usuario a /cuenta.
+  if (usuario.debeCambiarPassword && ubicacion.pathname !== RUTA_CUENTA) return <Navigate to={RUTA_CUENTA} replace />
   if (roles && !roles.includes(usuario.rol)) return <AccesoDenegado />
   return children ?? <Outlet />
 }

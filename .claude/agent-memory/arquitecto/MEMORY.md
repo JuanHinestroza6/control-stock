@@ -1,2 +1,3 @@
-- [Entorno y versiones](project_entorno_y_versiones.md) — sin JDK/Docker local (2026-10-01); Boot 3.x fuera de Initializr; MySQL 8.4
-- [Decisiones Fase 0](project_decisiones_fase0.md) — JWT resource-server 8h, admin por migración Java, auditoría con Clock, [DECIDIR] pendientes
+- [Entorno y versiones](project_entorno_y_versiones.md) — JDK 21 y Docker ya disponibles; Maven offline en sandbox; Boot 4.1.1 + MySQL 8.4
+- [Decisiones Fase 0](project_decisiones_fase0.md) — JWT resource-server 8h, admin por migración Java, auditoría con Clock
+- [Decisiones Fase 1](project_decisiones_fase1.md) — aprobadas: cascada al desactivar, revocación por iat, password temporal, V3–V6

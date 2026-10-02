@@ -31,7 +31,63 @@ class AuthServiceTest {
     @BeforeEach
     void preparar() {
         when(encoder.encode(anyString())).thenReturn("hash-relleno");
-        service = new AuthService(repo, encoder, tokens, limitador);
+        service = new AuthService(repo, encoder, tokens, limitador, RELOJ);
+    }
+
+    static final java.time.Clock RELOJ = java.time.Clock.fixed(Instant.parse("2026-10-01T15:00:30.789Z"),
+            co.livorno.controlstock.comun.config.ConfiguracionTiempo.ZONA);
+
+    private Usuario conPasswordTemporal() {
+        Usuario u = new Usuario("Ana", "ana@livorno.test", "hash-actual", Rol.VENDEDOR);
+        u.asignarPasswordTemporal("hash-actual", java.time.LocalDateTime.parse("2026-10-01T09:00:00"));
+        return u;
+    }
+
+    @Test
+    void cambiarPassword_valida_limpiaObligacionFijaFechaYEmiteTokenNuevo() {
+        Usuario u = conPasswordTemporal();
+        when(repo.findById(1L)).thenReturn(Optional.of(u));
+        when(encoder.matches("Actual-123456", "hash-actual")).thenReturn(true);
+        when(encoder.matches("Nueva-1234567", "hash-actual")).thenReturn(false);
+        when(encoder.encode("Nueva-1234567")).thenReturn("hash-nuevo");
+        when(tokens.emitir(u)).thenReturn(new TokenService.TokenEmitido("tok-nuevo", Instant.now()));
+
+        LoginResponse r = service.cambiarPassword(1L,
+                new co.livorno.controlstock.auth.dto.CambiarPasswordRequest("Actual-123456", "Nueva-1234567"));
+
+        assertThat(r.token()).isEqualTo("tok-nuevo");
+        assertThat(r.usuario().debeCambiarPassword()).isFalse();
+        assertThat(u.getPasswordHash()).isEqualTo("hash-nuevo");
+        assertThat(u.isDebeCambiarPassword()).isFalse();
+        assertThat(u.getPasswordCambiadoEn()).isEqualTo(java.time.LocalDateTime.parse("2026-10-01T10:00:30"));
+        verify(repo).saveAndFlush(u);
+    }
+
+    @Test
+    void cambiarPassword_actualIncorrecta_lanza422SinCambios() {
+        Usuario u = conPasswordTemporal();
+        when(repo.findById(1L)).thenReturn(Optional.of(u));
+        when(encoder.matches("mala", "hash-actual")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.cambiarPassword(1L,
+                new co.livorno.controlstock.auth.dto.CambiarPasswordRequest("mala", "Nueva-1234567")))
+                .isInstanceOf(co.livorno.controlstock.comun.excepcion.ExcepcionNegocio.class)
+                .hasMessage("La contraseña actual no es correcta.");
+        assertThat(u.isDebeCambiarPassword()).isTrue();
+        verify(tokens, never()).emitir(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void cambiarPassword_nuevaIgualALaActual_lanza422() {
+        Usuario u = conPasswordTemporal();
+        when(repo.findById(1L)).thenReturn(Optional.of(u));
+        when(encoder.matches("Actual-123456", "hash-actual")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.cambiarPassword(1L,
+                new co.livorno.controlstock.auth.dto.CambiarPasswordRequest("Actual-123456", "Actual-123456")))
+                .isInstanceOf(co.livorno.controlstock.comun.excepcion.ExcepcionNegocio.class)
+                .hasMessage("La nueva contraseña debe ser distinta de la actual.");
+        verify(repo, never()).saveAndFlush(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -73,6 +129,18 @@ class AuthServiceTest {
     }
 
     @Test
+    void login_conPasswordTemporal_informaDebeCambiarPassword() {
+        Usuario u = new Usuario("Ana", "ana@livorno.test", "hash-real", Rol.VENDEDOR);
+        u.asignarPasswordTemporal("hash-real", java.time.LocalDateTime.parse("2026-10-01T10:00:00"));
+        when(repo.findByEmail("ana@livorno.test")).thenReturn(Optional.of(u));
+        when(encoder.matches("clave", "hash-real")).thenReturn(true);
+        when(tokens.emitir(u)).thenReturn(new TokenService.TokenEmitido("tok", Instant.now()));
+
+        assertThat(service.login(new LoginRequest("ana@livorno.test", "clave"), "1.2.3.4")
+                .usuario().debeCambiarPassword()).isTrue();
+    }
+
+    @Test
     void login_usuarioInactivo_fallaAunqueLaClaveCoincida() {
         Usuario u = new Usuario("Ana", "ana@livorno.test", "hash-real", Rol.VENDEDOR);
         u.desactivar();
@@ -110,5 +178,50 @@ class AuthServiceTest {
                 .isInstanceOf(BadCredentialsException.class);
 
         verify(tokens, never()).emitir(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void cambiarPassword_actualIncorrecta_registraFalloEnElLimitadorPorUsuario() {
+        Usuario u = conPasswordTemporal();
+        when(repo.findById(1L)).thenReturn(Optional.of(u));
+        when(encoder.matches("mala", "hash-actual")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.cambiarPassword(1L,
+                new co.livorno.controlstock.auth.dto.CambiarPasswordRequest("mala", "Nueva-1234567")))
+                .isInstanceOf(co.livorno.controlstock.comun.excepcion.ExcepcionNegocio.class);
+
+        verify(limitador).verificarNoBloqueado("cambio-password:1", "-");
+        verify(limitador).registrarFallo("cambio-password:1", "-");
+        verify(limitador, never()).registrarExito(anyString(), anyString());
+    }
+
+    @Test
+    void cambiarPassword_exitosa_limpiaElContadorDeIntentos() {
+        Usuario u = conPasswordTemporal();
+        when(repo.findById(1L)).thenReturn(Optional.of(u));
+        when(encoder.matches("Actual-123456", "hash-actual")).thenReturn(true);
+        when(encoder.matches("Nueva-1234567", "hash-actual")).thenReturn(false);
+        when(encoder.encode("Nueva-1234567")).thenReturn("hash-nuevo");
+        when(tokens.emitir(u)).thenReturn(new TokenService.TokenEmitido("tok", Instant.now()));
+
+        service.cambiarPassword(1L,
+                new co.livorno.controlstock.auth.dto.CambiarPasswordRequest("Actual-123456", "Nueva-1234567"));
+
+        verify(limitador).registrarExito("cambio-password:1", "-");
+        verify(limitador, never()).registrarFallo(anyString(), anyString());
+    }
+
+    @Test
+    void cambiarPassword_bloqueado_lanzaDemasiadosIntentosSinVerificarLaContrasena() {
+        org.mockito.Mockito.doThrow(new co.livorno.controlstock.comun.excepcion.DemasiadosIntentosException(120))
+                .when(limitador).verificarNoBloqueado("cambio-password:1", "-");
+
+        assertThatThrownBy(() -> service.cambiarPassword(1L,
+                new co.livorno.controlstock.auth.dto.CambiarPasswordRequest("x", "Nueva-1234567")))
+                .isInstanceOfSatisfying(co.livorno.controlstock.comun.excepcion.DemasiadosIntentosException.class,
+                        e -> assertThat(e.getSegundosRestantes()).isEqualTo(120));
+
+        verify(repo, never()).findById(org.mockito.ArgumentMatchers.anyLong());
+        verify(encoder, never()).matches(anyString(), anyString());
     }
 }

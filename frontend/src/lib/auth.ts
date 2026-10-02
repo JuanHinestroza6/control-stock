@@ -70,7 +70,16 @@ export function leerSesion(ahora: Date = new Date()): Sesion | null {
     borrarSesion()
     return null
   }
-  return sesion
+  // Sesiones guardadas antes de la Fase 1 no traen el campo.
+  return { ...sesion, usuario: { ...sesion.usuario, debeCambiarPassword: sesion.usuario.debeCambiarPassword === true } }
+}
+
+export function marcarCambioPasswordRequerido(): Sesion | null {
+  const sesion = leerSesion()
+  if (!sesion) return null
+  const marcada = { ...sesion, usuario: { ...sesion.usuario, debeCambiarPassword: true } }
+  guardarSesion(marcada)
+  return marcada
 }
 
 export function tieneRol(sesion: Sesion | null | undefined, ...roles: Rol[]): boolean {

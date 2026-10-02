@@ -5,7 +5,13 @@ import co.livorno.controlstock.auth.seguridad.ManejadorErroresSeguridad;
 import co.livorno.controlstock.usuario.repositorio.UsuarioRepository;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import java.nio.charset.StandardCharsets;
+import co.livorno.controlstock.comun.seguridad.UsuarioAutenticado;
 import java.util.List;
+import java.util.function.Supplier;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authorization.AuthorizationDecision;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,6 +48,14 @@ public class ConfiguracionSeguridad {
         return new SecretKeySpec(props.secret().getBytes(StandardCharsets.UTF_8), "HmacSHA256");
     }
 
+    static AuthorizationDecision autenticadoSinCambioPendiente(Supplier<? extends Authentication> auth,
+            RequestAuthorizationContext contexto) {
+        Authentication a = auth.get();
+        boolean autenticado = a != null && a.isAuthenticated() && !(a instanceof AnonymousAuthenticationToken);
+        boolean debeCambiar = a != null && a.getPrincipal() instanceof UsuarioAutenticado u && u.debeCambiarPassword();
+        return new AuthorizationDecision(autenticado && !debeCambiar);
+    }
+
     @Bean
     public JwtDecoder jwtDecoder(PropiedadesJwt props) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(clave(props)).macAlgorithm(MacAlgorithm.HS256).build();
@@ -69,7 +83,11 @@ public class ConfiguracionSeguridad {
                 .authorizeHttpRequests(a -> a
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
-                        .anyRequest().authenticated())
+                        // Pueden usarse aunque haya un cambio de contraseña pendiente
+                        .requestMatchers(HttpMethod.GET, "/api/auth/yo").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/auth/yo/password").authenticated()
+                        // Resto: autenticado y sin cambio de contraseña pendiente (si no, 403 con codigo)
+                        .anyRequest().access(ConfiguracionSeguridad::autenticadoSinCambioPendiente))
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint(manejador)
                         .accessDeniedHandler(manejador))
