@@ -103,6 +103,41 @@ class VentaRepositoryTest {
     }
 
     @Test
+    void conDetalle_ventaConLineas_cargaLineasVarianteYProducto() {
+        Venta v = new Venta(vendedor, AHORA);
+        v.agregarLinea(variante, 1, new BigDecimal("59900"), new BigDecimal("59900"), BigDecimal.ZERO);
+        Long id = ventas.saveAndFlush(v).getId();
+        em.clear();
+
+        Venta leida = ventas.conDetalle(id).orElseThrow();
+
+        assertThat(em.getEntityManagerFactory().getPersistenceUnitUtil().isLoaded(leida.getDetalles().get(0)
+                .getVariante().getProducto())).isTrue();
+        assertThat(leida.getDetalles().get(0).getVariante().getProducto().getNombre()).isEqualTo("Camiseta");
+        assertThat(ventas.conDetalle(id + 999)).isEmpty();
+    }
+
+    @Test
+    void findAll_conFiltroDeEstadoYFecha_filtraYOrdena() {
+        Venta a = new Venta(vendedor, AHORA);
+        a.agregarLinea(variante, 1, new BigDecimal("59900"), new BigDecimal("59900"), BigDecimal.ZERO);
+        Venta b = new Venta(vendedor, AHORA.plusDays(1));
+        b.agregarLinea(variante, 1, new BigDecimal("59900"), new BigDecimal("59900"), BigDecimal.ZERO);
+        b.anular(vendedor, AHORA.plusDays(1), "error de captura");
+        ventas.saveAndFlush(a);
+        ventas.saveAndFlush(b);
+        em.clear();
+
+        org.springframework.data.jpa.domain.Specification<Venta> soloAnuladas =
+                (r, q, cb) -> cb.equal(r.get("estado"), EstadoVenta.ANULADA);
+        var pagina = ventas.findAll(soloAnuladas, org.springframework.data.domain.PageRequest.of(0, 10,
+                org.springframework.data.domain.Sort.by("fecha").descending()));
+
+        assertThat(pagina.getContent()).hasSize(1);
+        assertThat(pagina.getContent().get(0).getVendedor().getNombre()).isEqualTo("Ana");
+    }
+
+    @Test
     void check_filasInvalidas_seRechazan() {
         // estado ANULADA sin anulada_en
         assertThatThrownBy(() -> jdbc.update("""

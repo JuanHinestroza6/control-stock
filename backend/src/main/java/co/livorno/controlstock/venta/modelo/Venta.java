@@ -25,6 +25,7 @@ import java.util.List;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.BatchSize;
 
 /**
  * Agregado de venta: cabecera + líneas en cascada. No toca stock (regla de oro 1): VentaService llama a
@@ -64,6 +65,7 @@ public class Venta {
     @Column(name = "motivo_anulacion", length = 255)
     private String motivoAnulacion;
 
+    @BatchSize(size = 50)
     @OneToMany(mappedBy = "venta", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<DetalleVenta> detalles = new ArrayList<>();
 
