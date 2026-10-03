@@ -21,6 +21,15 @@ export function vencimientoRelativo(venceEn: string, ahora: Date = new Date()): 
   return { texto: `Vence en ${duracion(diff)}`, tono: diff < UMBRAL_POR_VENCER_H * HORA_MS ? 'alerta' : 'neutro' }
 }
 
+const DIA_MS = 24 * HORA_MS
+
+/** Horas máximas que se pueden extender ahora: sin pasar de 168 ni de `creadaEn` + 7 días (puede ser 0). */
+export function horasMaximasExtension(creadaEn: string, ahora: Date = new Date()): number {
+  const limite = new Date(creadaEn).getTime() + 7 * DIA_MS
+  const horas = Math.floor((limite - ahora.getTime()) / HORA_MS)
+  return Number.isNaN(horas) ? 168 : Math.max(0, Math.min(168, horas))
+}
+
 export const MAX_LINEAS_RESERVA = 20
 export const MAX_CANTIDAD_RESERVA = 100
 
