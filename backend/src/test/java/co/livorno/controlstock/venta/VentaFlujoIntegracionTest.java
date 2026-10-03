@@ -72,6 +72,8 @@ class VentaFlujoIntegracionTest {
         jdbc.update("DELETE FROM movimiento WHERE variante_id = ?", varianteId);
         jdbc.update("DELETE FROM detalle_venta WHERE variante_id = ?", varianteId);
         jdbc.update("DELETE FROM venta WHERE usuario_id = ?", usuarioId);
+        jdbc.update("DELETE FROM alerta WHERE variante_id = ?", varianteId);
+        jdbc.update("DELETE FROM reserva WHERE variante_id = ?", varianteId);
         jdbc.update("DELETE FROM variante WHERE id = ?", varianteId);
         jdbc.update("DELETE FROM producto WHERE id = ?", productoId);
         jdbc.update("DELETE FROM usuario WHERE id = ?", usuarioId);

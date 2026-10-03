@@ -50,6 +50,8 @@ class MovimientoConcurrenciaIntegracionTest {
     void limpiar() {
         for (Long v : variantesCreadas) {
             jdbc.update("DELETE FROM movimiento WHERE variante_id = ?", v);
+            jdbc.update("DELETE FROM alerta WHERE variante_id = ?", v);
+            jdbc.update("DELETE FROM reserva WHERE variante_id = ?", v);
             jdbc.update("DELETE FROM variante WHERE id = ?", v);
         }
         for (Long p : productos) {

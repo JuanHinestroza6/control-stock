@@ -7,6 +7,7 @@ import co.livorno.controlstock.catalogo.dto.GenerarVariantesResponse;
 import co.livorno.controlstock.catalogo.dto.GenerarVariantesResponse.Motivo;
 import co.livorno.controlstock.catalogo.dto.GenerarVariantesResponse.Omitida;
 import co.livorno.controlstock.catalogo.dto.VarianteResponse;
+import co.livorno.controlstock.catalogo.evento.UmbralCambiado;
 import co.livorno.controlstock.catalogo.modelo.Producto;
 import co.livorno.controlstock.catalogo.modelo.Talla;
 import co.livorno.controlstock.catalogo.modelo.Variante;
@@ -26,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +42,7 @@ public class VarianteService {
 
     private final ProductoRepository productos;
     private final VarianteRepository variantes;
+    private final ApplicationEventPublisher eventos;
 
     public List<VarianteResponse> listar(Long productoId, boolean incluirInactivas) {
         if (!productos.existsById(productoId)) {
@@ -109,7 +112,9 @@ public class VarianteService {
     public VarianteResponse actualizar(Long id, ActualizarVarianteRequest req) {
         Variante v = buscar(id);
         v.actualizarStockMinimo(req.stockMinimo());
-        return VarianteResponse.de(variantes.saveAndFlush(v));
+        Variante guardada = variantes.saveAndFlush(v);
+        eventos.publishEvent(new UmbralCambiado(guardada.getId()));
+        return VarianteResponse.de(guardada);
     }
 
     /** Igual al estado actual es no-op. Desactivar con reservado mayor a 0 da 409; activar con producto inactivo, 422. */

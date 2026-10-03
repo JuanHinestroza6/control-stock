@@ -34,6 +34,7 @@ class VarianteServiceTest {
 
     @Mock ProductoRepository productos;
     @Mock VarianteRepository variantes;
+    @Mock org.springframework.context.ApplicationEventPublisher eventos;
     @InjectMocks VarianteService servicio;
 
     private Producto producto(boolean activo) {
@@ -210,6 +211,9 @@ class VarianteServiceTest {
 
         assertThat(r.stockMinimo()).isEqualTo(9);
         assertThat(r.sku()).isEqualTo("A");
+        // el umbral cambió: el listener de alertas debe reevaluar la variante
+        org.mockito.Mockito.verify(eventos)
+                .publishEvent(new co.livorno.controlstock.catalogo.evento.UmbralCambiado(v.getId()));
     }
 
     @Test

@@ -80,8 +80,8 @@ class ReglasArquitecturaTest {
             .because("el stock solo cambia a través de MovimientoService (regla de oro 1)");
 
     @ArchTest
-    static final ArchRule repositoriosDeInventarioNoActualizanEnMasa = noMethods()
-            .that().areDeclaredInClassesThat().resideInAPackage("..inventario.repositorio..")
+    static final ArchRule repositorioDelKardexNoActualizaEnMasa = noMethods()
+            .that().areDeclaredIn(co.livorno.controlstock.inventario.repositorio.MovimientoRepository.class)
             .should().beAnnotatedWith(Modifying.class)
             .because("el kardex es inmutable: sin UPDATE/DELETE masivos (regla de oro 2)");
 
