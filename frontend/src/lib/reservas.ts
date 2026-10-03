@@ -1,6 +1,7 @@
 import type { TonoBadge } from '../componentes/ui/Badge'
 import type { InventarioItemResponse } from '../tipos/inventario'
-import type { CrearReservaRequest } from '../tipos/reservas'
+import type { ConvertirReservasRequest, CrearReservaRequest, ReservaResponse } from '../tipos/reservas'
+import { parsearPrecio } from './carrito'
 
 const HORA_MS = 3_600_000
 const UMBRAL_POR_VENCER_H = 12
@@ -28,6 +29,89 @@ export function horasMaximasExtension(creadaEn: string, ahora: Date = new Date()
   const limite = new Date(creadaEn).getTime() + 7 * DIA_MS
   const horas = Math.floor((limite - ahora.getTime()) / HORA_MS)
   return Number.isNaN(horas) ? 168 : Math.max(0, Math.min(168, horas))
+}
+
+export const MAX_RESERVAS_CONVERSION = 20
+
+/** Identidad del cliente para convertir: contacto en minúsculas y sin espacios (igual que el backend). */
+export function claveCliente(r: Pick<ReservaResponse, 'clienteContacto'>): string {
+  return r.clienteContacto.toLowerCase().replace(/\s+/g, '')
+}
+
+export interface LineaConversion {
+  varianteId: number
+  sku: string
+  productoNombre: string
+  talla: string
+  color: string
+  cantidad: number
+  precioLista: number
+}
+
+/** Agrupa las reservas por variante sumando cantidades (una línea de venta por variante). */
+export function agruparPorVariante(reservas: ReservaResponse[]): LineaConversion[] {
+  const mapa = new Map<number, LineaConversion>()
+  for (const r of reservas) {
+    const previa = mapa.get(r.varianteId)
+    if (previa) previa.cantidad += r.cantidad
+    else
+      mapa.set(r.varianteId, {
+        varianteId: r.varianteId,
+        sku: r.sku,
+        productoNombre: r.productoNombre,
+        talla: r.talla,
+        color: r.color,
+        cantidad: r.cantidad,
+        precioLista: r.precioVenta,
+      })
+  }
+  return [...mapa.values()]
+}
+
+/** Precio efectivo de una línea (vacío = lista) o undefined si es inválido. */
+export function precioConversion(l: LineaConversion, texto: string): number | undefined {
+  const p = parsearPrecio(texto, l.precioLista)
+  return p !== undefined && p > 0 && p <= l.precioLista ? p : undefined
+}
+
+export function totalConversion(lineas: LineaConversion[], precios: Record<number, string>): number {
+  const suma = lineas.reduce((a, l) => a + l.cantidad * (precioConversion(l, precios[l.varianteId] ?? '') ?? l.precioLista), 0)
+  return Math.round(suma * 100) / 100
+}
+
+export function descuentoConversion(lineas: LineaConversion[], precios: Record<number, string>): number {
+  const lista = lineas.reduce((a, l) => a + l.cantidad * l.precioLista, 0)
+  return Math.round((lista - totalConversion(lineas, precios)) * 100) / 100
+}
+
+export interface ResultadoConversion {
+  solicitud?: ConvertirReservasRequest
+  /** Por varianteId. */
+  errores: Record<number, string>
+  general?: string
+}
+
+/** Valida los precios (> 0 y ≤ lista) y arma la solicitud; solo envía los que difieren de la lista. */
+export function construirConversion(reservas: ReservaResponse[], precios: Record<number, string>): ResultadoConversion {
+  if (reservas.length === 0) return { errores: {}, general: 'Selecciona al menos una reserva.' }
+  if (reservas.length > MAX_RESERVAS_CONVERSION) return { errores: {}, general: `Máximo ${MAX_RESERVAS_CONVERSION} reservas por venta.` }
+  if (new Set(reservas.map(claveCliente)).size > 1) return { errores: {}, general: 'Las reservas deben ser del mismo cliente.' }
+  const lineas = agruparPorVariante(reservas)
+  const errores: Record<number, string> = {}
+  const enviar: { varianteId: number; precioUnitario: number }[] = []
+  for (const l of lineas) {
+    const texto = precios[l.varianteId] ?? ''
+    const p = precioConversion(l, texto)
+    if (p === undefined) {
+      const bruto = parsearPrecio(texto, l.precioLista)
+      errores[l.varianteId] = bruto !== undefined && bruto > l.precioLista ? 'No puede superar el precio de lista' : 'Precio inválido'
+    } else if (p !== l.precioLista) enviar.push({ varianteId: l.varianteId, precioUnitario: p })
+  }
+  if (Object.keys(errores).length > 0) return { errores }
+  return {
+    errores,
+    solicitud: { reservaIds: reservas.map((r) => r.id), ...(enviar.length > 0 ? { precios: enviar } : {}) },
+  }
 }
 
 export const MAX_LINEAS_RESERVA = 20

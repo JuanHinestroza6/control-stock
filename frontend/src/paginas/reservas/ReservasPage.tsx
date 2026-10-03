@@ -2,17 +2,21 @@ import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { BadgeEstadoReserva } from '../../componentes/dominio/BadgeEstadoReserva'
 import { Badge } from '../../componentes/ui/Badge'
+import { Boton } from '../../componentes/ui/Boton'
 import { Campo } from '../../componentes/ui/Campo'
 import { EstadoCarga, EstadoError, EstadoVacio } from '../../componentes/ui/Estados'
 import { Paginacion } from '../../componentes/ui/Paginacion'
 import { Selector } from '../../componentes/ui/Selector'
 import { Tabla, type Columna } from '../../componentes/ui/Tabla'
+import { ModalCancelarReserva } from '../../componentes/dominio/ModalCancelarReserva'
+import { ModalConvertirReservas } from '../../componentes/dominio/ModalConvertirReservas'
+import { ModalExtenderReserva } from '../../componentes/dominio/ModalExtenderReserva'
 import { useReservas } from '../../hooks/useReservas'
 import { useSesion } from '../../hooks/useSesion'
 import { mensajeError } from '../../lib/errores'
 import { formatearFecha } from '../../lib/formato'
-import { puedeReservar } from '../../lib/permisos'
-import { vencimientoRelativo } from '../../lib/reservas'
+import { puedeConvertirReserva, puedeReservar } from '../../lib/permisos'
+import { claveCliente, vencimientoRelativo } from '../../lib/reservas'
 import type { EstadoReserva, ReservaResponse } from '../../tipos/reservas'
 
 const TAMANO_PAGINA = 20
@@ -44,6 +48,15 @@ export function ReservasPage() {
   const [porVencer, setPorVencer] = useState(false)
   const [sort, setSort] = useState('venceEn,asc')
   const [pagina, setPagina] = useState(0)
+  const puedeConvertir = puedeConvertirReserva(usuario?.rol)
+  const [seleccion, setSeleccion] = useState<ReservaResponse[]>([])
+  const [convirtiendo, setConvirtiendo] = useState(false)
+  const [cancelando, setCancelando] = useState<ReservaResponse>()
+  const [extendiendo, setExtendiendo] = useState<ReservaResponse>()
+
+  const alternar = (r: ReservaResponse) =>
+    setSeleccion((s) => (s.some((x) => x.id === r.id) ? s.filter((x) => x.id !== r.id) : [...s, r]))
+  const clienteSeleccionado = seleccion.length > 0 ? claveCliente(seleccion[0]) : undefined
 
   const consulta = useReservas({
     estado: estado ? (estado as EstadoReserva) : undefined,
@@ -66,6 +79,28 @@ export function ReservasPage() {
   }
 
   const columnas: Columna<ReservaResponse>[] = [
+    ...(puedeConvertir
+      ? [
+          {
+            clave: 'seleccion',
+            encabezado: 'Sel.',
+            celda: (r: ReservaResponse) => {
+              if (r.estado !== 'ACTIVA') return null
+              const otro = clienteSeleccionado !== undefined && clienteSeleccionado !== claveCliente(r)
+              return (
+                <input
+                  type="checkbox"
+                  aria-label={`Seleccionar ${r.numero}`}
+                  checked={seleccion.some((x) => x.id === r.id)}
+                  disabled={otro}
+                  title={otro ? 'Solo se pueden convertir reservas del mismo cliente' : undefined}
+                  onChange={() => alternar(r)}
+                />
+              )
+            },
+          },
+        ]
+      : []),
     { clave: 'numero', encabezado: 'Reserva', celda: (r) => <span className="font-medium">{r.numero}</span> },
     {
       clave: 'cliente',
@@ -119,6 +154,25 @@ export function ReservasPage() {
         </div>
       ),
     },
+    ...(puedeNueva
+      ? [
+          {
+            clave: 'acciones',
+            encabezado: 'Acciones',
+            celda: (r: ReservaResponse) =>
+              r.estado === 'ACTIVA' ? (
+                <div className="flex gap-3">
+                  <button type="button" className={clasesLink} aria-label={`Extender ${r.numero}`} onClick={() => setExtendiendo(r)}>
+                    Extender
+                  </button>
+                  <button type="button" className={clasesLink} aria-label={`Cancelar ${r.numero}`} onClick={() => setCancelando(r)}>
+                    Cancelar
+                  </button>
+                </div>
+              ) : null,
+          },
+        ]
+      : []),
   ]
 
   let contenido
@@ -236,7 +290,41 @@ export function ReservasPage() {
         </p>
       )}
 
+      {puedeConvertir && seleccion.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-acento/30 bg-acento/5 p-3">
+          <p className="text-sm">
+            {seleccion.length} reserva(s) seleccionada(s) de {seleccion[0].clienteNombre}.
+          </p>
+          <div className="flex gap-2">
+            <Boton variante="secundario" onClick={() => setSeleccion([])}>
+              Limpiar selección
+            </Boton>
+            <Boton onClick={() => setConvirtiendo(true)}>Convertir en venta</Boton>
+          </div>
+        </div>
+      )}
+
       {contenido}
+
+      {convirtiendo && (
+        <ModalConvertirReservas
+          reservas={seleccion}
+          onCerrar={() => {
+            setConvirtiendo(false)
+            setSeleccion([])
+          }}
+        />
+      )}
+      {cancelando && (
+        <ModalCancelarReserva
+          reserva={cancelando}
+          onCerrar={() => {
+            setSeleccion((s) => s.filter((x) => x.id !== cancelando.id))
+            setCancelando(undefined)
+          }}
+        />
+      )}
+      {extendiendo && <ModalExtenderReserva reserva={extendiendo} onCerrar={() => setExtendiendo(undefined)} />}
     </section>
   )
 }
