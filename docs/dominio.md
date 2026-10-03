@@ -33,7 +33,8 @@ Venta          id, fecha, usuarioId, canal (nullable, reservado para el futuro),
 DetalleVenta   id, ventaId, varianteId, cantidad, precioLista, precioUnitario, costoUnitario
 Devolucion     id, detalleVentaId, cantidad, motivo, aptaParaVenta, fecha, usuarioId
 Reserva        id, varianteId, cantidad, clienteNombre, clienteContacto,
-               creadaEn, venceEn, estado, ventaId (nullable)
+               creadaEn, venceEn, estado, ventaId (nullable), usuarioId (quien la crea),
+               cerradaEn (nullable), cerradaPor (nullable: null = proceso del sistema), motivoCancelacion (nullable)
 Alerta         id, varianteId, tipo, estado, creadaEn, revisadaEn, atendidaEn, atendidaPor
 Pronostico     id, productoId, varianteId (nullable), periodo (YYYY-MM), cantidadProyectada,
                metodo, errorWape, calculadoEn
@@ -68,9 +69,9 @@ SKU sugerido: `{codigoProducto}-{talla}-{COLOR3}` → `LIV001-M-NEG`.
 - **Desactivar producto** desactiva también todas sus variantes. **Reactivar producto no reactiva variantes**: se
   reactivan una a una. No se puede reactivar una variante de un producto inactivo (422) ni generar variantes en él (422).
 - **Reservas activas bloquean la desactivación**: no se puede desactivar una variante, ni un producto con alguna variante,
-  que tenga reservas ACTIVAS (409, mensaje con el SKU y las unidades reservadas). Hasta la Fase 3 se comprueba con
-  `stockReservado > 0` (equivalente: el reservado solo sube con reservas activas); en Fase 3 puede reforzarse consultando
-  la tabla de reservas.
+  que tenga reservas ACTIVAS (409, mensaje con el SKU, el número de apartados y las unidades). Desde la Fase 3 se consulta
+  la tabla de reservas (ADR-007) a través de la interfaz `catalogo.servicio.ConsultaReservasActivas`, implementada en
+  inventario, y se mantiene también la comprobación `stockReservado > 0` como defensa.
 - **Estado de stock** (`Variante.estadoStock()`, mismo umbral que las alertas): `AGOTADO` si `disponible == 0`; `BAJO` si
   `disponible ≤ umbral` (`puntoReorden`, o `stockMinimo` si no hay ROP); `OK` en otro caso.
 - **Categorías base** (migración V3): Camisetas, Hoodies, Jeans, Joggers, Chaquetas, Accesorios. El generador de datos
@@ -117,12 +118,13 @@ Validaciones en `MovimientoService` (lanzan `ExcepcionNegocio` → 422, no se gu
 
 Concurrencia (ADR-006): `@Version` en `Variante`. Un choque (`OptimisticLockingFailureException`) o un bloqueo de la base
 (`PessimisticLockingFailureException`) responde 409 sin reintento en el servidor; el cliente conserva el formulario y el
-usuario vuelve a confirmar. Las operaciones de varias líneas procesan las variantes ordenadas por id.
+usuario vuelve a confirmar. Las operaciones de varias líneas procesan las variantes ordenadas por id. Las operaciones
+sobre reservas bloquean primero la fila de la reserva y después tocan la variante (orden reserva → variante, ADR-007).
 
 Kardex inmutable: entidad `@Immutable`, sin setters, repositorio sin métodos de actualización ni borrado. Sin triggers.
 
-Después de cada movimiento se publica `StockCambiado(varianteId)`. En la Fase 2 solo se publica; desde la Fase 3 un
-`@TransactionalEventListener(AFTER_COMMIT)` evalúa las alertas.
+Después de cada movimiento se publica `StockCambiado(varianteId)`. Desde la Fase 3 un
+`@TransactionalEventListener(AFTER_COMMIT)` evalúa las alertas en una transacción nueva (ver "Alertas", ADR-007).
 
 ## Entradas, ventas y costos (ADR-006)
 
@@ -141,14 +143,17 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. En la Fase 2
 
 ## Máquinas de estado
 
-- **Reserva**: `ACTIVA → CONVERTIDA` (al vender) | `ACTIVA → CANCELADA` (manual) | `ACTIVA → VENCIDA` (tarea programada cada 15 min).
-  Vencimiento por defecto: 48 h. CANCELADA y VENCIDA generan movimiento LIBERACION.
+- **Reserva**: `ACTIVA → CONVERTIDA` (al vender) | `ACTIVA → CANCELADA` (manual, motivo obligatorio) | `ACTIVA → VENCIDA`
+  (tarea programada cada 15 min). Vencimiento por defecto: 48 h. CANCELADA y VENCIDA generan movimiento LIBERACION.
+  Toda transición fija `cerradaEn` y `cerradaPor` (null en VENCIDA); sobre una reserva no ACTIVA → 409. Detalle en
+  "Reservas (apartados)".
 - **Venta**: `REGISTRADA → ANULADA` (solo ADMIN, motivo obligatorio). Anular genera un movimiento ANULACION_VENTA (+físico)
   por línea y guarda `anuladaEn`, `anuladaPor` y `motivoAnulacion`. Anular una venta ANULADA → 409. Una venta con
   devoluciones no se anula (422: se corrige con ajustes). Anular y devolver bloquean la fila de la venta
-  (`PESSIMISTIC_WRITE`). Si la venta vino de una reserva (Fase 3), anular solo devuelve el físico: la reserva sigue
-  CONVERTIDA y no se reactiva.
-- **Alerta**: `ACTIVA → ATENDIDA`. Si ya hay una ACTIVA para la misma variante y tipo, no se crea otra: se actualiza `revisadaEn`.
+  (`PESSIMISTIC_WRITE`). Si la venta vino de reservas, anular solo devuelve el físico (ANULACION_VENTA): las reservas
+  siguen CONVERTIDAS y no se reactivan.
+- **Alerta**: `ACTIVA → ATENDIDA` (manual por ADMIN o INVENTARIO, o automática cuando la condición deja de cumplirse, con
+  `atendidaPor` null). Si ya hay una ACTIVA para la misma variante y tipo, no se crea otra: se actualiza `revisadaEn`.
 - **PlanCompra**: `BORRADOR → APROBADO → RECIBIDO` (al recibir genera ENTRADAS).
 
 ## Devoluciones
@@ -158,13 +163,52 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. En la Fase 2
 - `aptaParaVenta = true` → movimiento DEVOLUCION (+físico). `false` → se registra la devolución sin sumar stock.
 - Como una devolución no apta no modifica `Variante`, la validación se protege bloqueando la fila de la venta.
 
-## Alertas
+## Reservas (apartados) (ADR-007)
 
-| Tipo | Condición |
-|---|---|
-| STOCK_BAJO | `disponible ≤ puntoReorden` (o `≤ stockMinimo` si no hay ROP calculado) |
-| AGOTADO | `disponible == 0` |
-| SIN_ROTACION | sin ventas en 60 días y `físico > 0` (se calcula en la tarea nocturna) |
+- **Una variante por reserva.** Crear acepta de 1 a 20 líneas (variante, cantidad 1–100) de un mismo cliente y genera una
+  reserva ACTIVA por línea en una sola transacción, con un movimiento RESERVA cada una (referencia `RESERVA/{id}`).
+  Variante repetida → 400; variante o producto inactivo → 422; cantidad > disponible → 422. Número visible `R-000012`.
+- **Cliente**: `clienteNombre` (2–120) y `clienteContacto` (3–120, texto libre: teléfono, @usuario de Instagram o TikTok),
+  sin espacios extremos ni repetidos. Datos mínimos (Ley 1581): no se exportan y CONTABILIDAD no los ve.
+- **Vigencia**: `vigenciaHoras` opcional al crear (1–168, por defecto 48, configurable). `venceEn = creadaEn + vigencia`.
+  **Extender** una reserva ACTIVA fija `venceEn = ahora + horas` (1–168); el total desde `creadaEn` no puede superar 7 días
+  (422).
+- **El estado manda**: una reserva ACTIVA se puede convertir, cancelar o extender aunque `venceEn` ya haya pasado y la
+  tarea aún no la haya procesado. Toda transición bloquea la fila de la reserva (`PESSIMISTIC_WRITE`) y verifica que siga
+  ACTIVA; si no, 409 "La reserva R-000012 ya está CONVERTIDA."
+- **Cancelar**: motivo obligatorio (5–200). Movimiento LIBERACION con el usuario y referencia `RESERVA/{id}`.
+- **Vencimiento automático**: tarea `@Scheduled` cada 15 min (configurable, se apaga en pruebas y en el perfil `seed`). Busca
+  reservas ACTIVAS con `venceEn ≤ ahora` (hora del `Clock`, America/Bogota) y procesa **cada una en su propia
+  transacción**: si sigue ACTIVA, movimiento LIBERACION con `usuarioId` null y estado VENCIDA; si no, la omite
+  (idempotente). Un fallo se registra en el log y se reintenta en el ciclo siguiente.
+- **Convertir en venta**: una o varias reservas ACTIVAS (máx. 20, ids sin repetir) **del mismo cliente** (contacto
+  normalizado igual; si no, 422) → **una venta**. Las líneas se agrupan por variante (cantidad sumada); un movimiento
+  VENTA_RESERVA por línea con referencia `VENTA/{id}`. `precioLista` = `precioVenta` del producto **al convertir**;
+  `precioUnitario` opcional por variante (`0 < precio ≤ lista`; permite respetar un precio cotizado menor);
+  `costoUnitario` = `precioCompra` al convertir. El vendedor de la venta es quien convierte. Cada reserva queda CONVERTIDA
+  con `ventaId`. Se bloquean las reservas en orden de id y se procesan las variantes en orden de id.
+- **Roles**: crear, cancelar y extender: ADMIN, INVENTARIO y VENDEDOR (cualquiera, no solo quien la creó; queda
+  `cerradaPor`). Convertir: ADMIN y VENDEDOR (crea una venta).
+- Un AJUSTE_NEGATIVO no puede consumir unidades reservadas (requiere `cantidad ≤ disponible`): primero se cancela la reserva.
+
+## Alertas (ADR-007)
+
+| Tipo | Condición | Fase |
+|---|---|---|
+| AGOTADO | `disponible == 0` | 3 (por evento) |
+| STOCK_BAJO | `0 < disponible ≤ umbral` (`puntoReorden`, o `stockMinimo` si no hay ROP calculado) | 3 (por evento) |
+| SIN_ROTACION | sin ventas en 60 días y `físico > 0` (se calcula en la tarea nocturna) | 5 |
+
+- **AGOTADO y STOCK_BAJO son excluyentes** (coinciden con `Variante.estadoStock()`): al pasar de BAJO a AGOTADO se cierra
+  la de STOCK_BAJO y se abre la de AGOTADO, y viceversa; al volver a OK se cierran ambas. Cerrar = ATENDIDA automática con
+  `atendidaPor` null.
+- Se evalúan con un `@TransactionalEventListener(AFTER_COMMIT)` sobre `StockCambiado` y sobre `UmbralCambiado` (publicado al
+  editar `stockMinimo`), en una transacción nueva (`REQUIRES_NEW`). Un fallo del listener se registra en el log y nunca
+  llega al usuario (la operación ya se confirmó). Variantes inactivas no generan alertas y no aparecen en el listado.
+- Una sola alerta ACTIVA por variante y tipo, garantizada además por un índice único en la base.
+- Atender a mano una alerta cuya condición sigue vigente la cierra; el siguiente movimiento de esa variante vuelve a
+  abrirla.
+- La re-evaluación nocturna de todas las variantes y SIN_ROTACION llegan en la Fase 5.
 
 ## Roles y permisos
 
@@ -175,7 +219,8 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. En la Fase 2
 | Productos / variantes | CRUD | CRUD | Ver | Ver |
 | Entradas y ajustes | Sí | Sí | — | — |
 | Ventas y devoluciones | Sí | — | Sí | Ver |
-| Reservas | Sí | Sí | Sí | — |
+| Reservas (crear, cancelar, extender) | Sí | Sí | Sí | — |
+| Convertir reservas en venta | Sí | — | Sí | — |
 | Kardex | Ver | Ver | — | Ver |
 | Alertas | Ver / atender | Ver / atender | Ver | — |
 | Analítica (ABC, ROP, pronóstico) | Sí | Ver | Más vendidos | Ver |
@@ -185,6 +230,9 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. En la Fase 2
 Notas de la matriz (Fase 2): la consulta de inventario actual (stock por variante, sin costos) está abierta a todo
 usuario autenticado porque el VENDEDOR la usa para buscar al vender. Anular ventas: solo ADMIN. Los costos (`precioCompra`,
 `costoUnitario` de ventas y entradas) no se exponen al VENDEDOR.
+
+Notas de la matriz (Fase 3): convertir reservas crea una venta, por eso INVENTARIO no convierte aunque gestione reservas.
+Atender alertas: ADMIN e INVENTARIO; VENDEDOR solo las ve (incluida la campana).
 
 ## Trazabilidad con el documento PPI
 

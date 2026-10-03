@@ -44,7 +44,7 @@ public Movimiento registrar(SolicitudMovimiento solicitud) {
   valida los invariantes (físico ≥ 0, reservado ≥ 0, reservado ≤ físico) y lanza `IllegalStateException` si se rompen.
   La prueba ArchUnit `ReglasArquitecturaTest` falla si alguna clase distinta de `inventario.servicio.MovimientoService`
   lo invoca (ADR-006).
-- `@Version` en `Variante`: si dos ventas concurrentes chocan, una falla con `OptimisticLockingFailureException`; el manejador global responde 409 y el cliente reintenta.
+- `@Version` en `Variante`: si dos ventas concurrentes chocan, una falla con `OptimisticLockingFailureException`; el manejador global responde 409 sin reintento en el servidor; el cliente conserva el formulario y el usuario vuelve a confirmar (ADR-006).
 - Ventas, devoluciones, reservas y recepción de compras llaman a `MovimientoService`; nunca tocan `Variante` directamente.
 
 ## Efectos por tipo
@@ -68,10 +68,18 @@ Implementa los efectos en el enum `TipoMovimiento` para que no haya `switch` rep
 - `Movimiento` no tiene `@Setter`, el repositorio no expone métodos de borrado/actualización y la tabla no se modifica en migraciones posteriores salvo para agregar columnas.
 - Cada movimiento guarda `referenciaTipo` + `referenciaId` (VENTA/42, RESERVA/7, PLAN_COMPRA/3) para trazar su origen.
 
-## Reservas
+## Reservas (ADR-007)
 
-- Vencen a las 48 h por defecto. Tarea `@Scheduled(fixedDelay = 15 min)` → busca ACTIVAS vencidas → movimiento LIBERACION → estado VENCIDA.
-- Convertir en venta: crea la venta con movimiento VENTA_RESERVA y marca la reserva CONVERTIDA con `ventaId`.
+- Una variante por reserva. RESERVA y LIBERACION llevan referencia `RESERVA/{id}`; VENTA_RESERVA, `VENTA/{id}`.
+- Toda transición (convertir, cancelar, extender, vencer) bloquea la fila de la reserva (`PESSIMISTIC_WRITE`) y verifica
+  que siga ACTIVA (si no, 409). Orden de bloqueo: reserva → variante. El estado manda: ACTIVA con `venceEn` pasado aún se
+  puede convertir hasta que la tarea la venza.
+- Vigencia 1–168 h (48 por defecto); extender hasta 7 días desde `creadaEn`.
+- Tarea `@Scheduled` cada 15 min (apagada en pruebas y `seed`): consulta ids ACTIVAS con `venceEn ≤ ahora` y llama a
+  `vencer(id, ahora)` **en una transacción por reserva** → LIBERACION (`usuarioId` null) → VENCIDA. Idempotente.
+- Convertir: varias reservas ACTIVAS del mismo cliente → una venta (líneas agrupadas por variante, precio de lista al
+  convertir). Vive en el módulo `venta`; `Reserva.ventaId` es un `Long`, no una relación (inventario no depende de venta).
+- Anular una venta que vino de reservas solo genera ANULACION_VENTA; las reservas siguen CONVERTIDAS.
 
 ## Devoluciones
 
@@ -80,10 +88,14 @@ Implementa los efectos en el enum `TipoMovimiento` para que no haya `switch` rep
 
 ## Alertas
 
-- Listener `@TransactionalEventListener(phase = AFTER_COMMIT)` sobre `StockCambiado` evalúa STOCK_BAJO y AGOTADO.
+- Listener `@TransactionalEventListener(phase = AFTER_COMMIT)` sobre `StockCambiado` (y `UmbralCambiado`) evalúa
+  STOCK_BAJO y AGOTADO con `@Transactional(propagation = REQUIRES_NEW)` (Spring 6.1+ rechaza otra propagación) y
+  try/catch con log: una excepción aquí llegaría al cliente como 500 con la operación ya confirmada.
+- Excluyentes, igual que `estadoStock()`: AGOTADO si disponible = 0; STOCK_BAJO si 0 < disponible ≤ umbral.
 - Umbral: `puntoReorden` si existe, si no `stockMinimo`.
-- No duplicar: si hay alerta ACTIVA del mismo tipo para la variante, solo actualiza `revisadaEn`.
-- Si el stock se recupera por encima del umbral, la alerta ACTIVA pasa a ATENDIDA automáticamente.
+- No duplicar: si hay alerta ACTIVA del mismo tipo para la variante, solo actualiza `revisadaEn` (además, índice único).
+- Si la condición deja de cumplirse, la alerta ACTIVA pasa a ATENDIDA automáticamente (`atendidaPor` null).
+- SIN_ROTACION y la re-evaluación nocturna: Fase 5.
 
 ## Pruebas obligatorias para cualquier cambio en esta zona
 
@@ -91,3 +103,5 @@ Implementa los efectos en el enum `TipoMovimiento` para que no haya `switch` rep
 - Rechazo cuando la cantidad deja stock negativo o supera el disponible.
 - Consistencia: tras N movimientos aleatorios, el stock de la variante coincide con la suma del kardex.
 - Concurrencia: dos ventas simultáneas del último ítem → exactamente una falla.
+- Reservas: suma de reservas ACTIVAS de la variante = `stockReservado`; vencer y convertir la misma reserva a la vez →
+  exactamente una transición.

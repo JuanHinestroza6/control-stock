@@ -2,3 +2,4 @@
 - [Decisiones Fase 0](project_decisiones_fase0.md) — JWT resource-server 8h, admin por migración Java, auditoría con Clock
 - [Decisiones Fase 1](project_decisiones_fase1.md) — aprobadas: cascada al desactivar, revocación por iat, password temporal, V3–V6
 - [Decisiones Fase 2](project_decisiones_fase2.md) — aprobadas: aplicarMovimiento + ArchUnit, ANULACION_VENTA, costo en entradas, precioLista, V8–V10
+- [Decisiones Fase 3](project_decisiones_fase3.md) — aprobadas: reservas con lock de fila, conversión en módulo venta, alertas AFTER_COMMIT, V11–V12
