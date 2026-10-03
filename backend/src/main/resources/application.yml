@@ -56,3 +56,10 @@ app:
     # Limitador en memoria de intentos fallidos (clave = email + IP)
     max-intentos: ${LOGIN_MAX_INTENTOS:5}
     ventana: ${LOGIN_VENTANA:15m}
+  tareas:
+    # false apaga @Scheduled (pruebas y generador de datos semilla)
+    habilitadas: ${TAREAS_HABILITADAS:true}
+  reservas:
+    vigencia-horas: 48 # vigencia por defecto de un apartado (1 a 168)
+    vencimiento:
+      intervalo: PT15M # cada cuánto se vencen las reservas ACTIVAS pasadas de fecha

@@ -256,6 +256,40 @@ class ReservaServiceTest {
     }
 
     @Test
+    void vencer_activa_generaLiberacionDelSistemaYLaMarcaVencida() {
+        Reserva r = activa(12L, v5, 2);
+        when(reservas.bloquear(12L)).thenReturn(Optional.of(r));
+
+        boolean vencio = servicio.vencer(12L, AHORA.plusHours(49));
+
+        assertThat(vencio).isTrue();
+        assertThat(r.getEstado()).isEqualTo(EstadoReserva.VENCIDA);
+        assertThat(r.getCerradaPor()).isNull();
+        ArgumentCaptor<SolicitudMovimiento> c = ArgumentCaptor.forClass(SolicitudMovimiento.class);
+        verify(movimientos).registrar(c.capture());
+        assertThat(c.getValue().tipo()).isEqualTo(TipoMovimiento.LIBERACION);
+        assertThat(c.getValue().usuarioId()).isNull();
+        assertThat(c.getValue().cantidad()).isEqualTo(2);
+        assertThat(c.getValue().referenciaTipo()).isEqualTo("RESERVA");
+        assertThat(c.getValue().referenciaId()).isEqualTo(12L);
+        assertThat(c.getValue().observacion()).isEqualTo("Vencimiento automático");
+    }
+
+    @Test
+    void vencer_noActivaOInexistente_devuelveFalseSinMovimiento() {
+        Reserva convertida = activa(12L, v5, 2);
+        convertida.convertir(77L, AHORA, 3L);
+        when(reservas.bloquear(12L)).thenReturn(Optional.of(convertida));
+        when(reservas.bloquear(13L)).thenReturn(Optional.empty());
+
+        assertThat(servicio.vencer(12L, AHORA.plusHours(49))).isFalse();
+        assertThat(servicio.vencer(13L, AHORA.plusHours(49))).isFalse();
+
+        assertThat(convertida.getEstado()).isEqualTo(EstadoReserva.CONVERTIDA);
+        verify(movimientos, never()).registrar(any());
+    }
+
+    @Test
     void listar_porVencer_usaLimiteDeDoceHorasYPatronEscapado() {
         when(reservas.buscar(any(), any(), any(), any(), any()))
                 .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(activa(12L, v5, 2))));

@@ -16,3 +16,5 @@ app:
     expiracion: 1h
   cors:
     origenes: http://localhost:5173
+  tareas:
+    habilitadas: false # sin tareas programadas en pruebas (inestables); se invocan a mano

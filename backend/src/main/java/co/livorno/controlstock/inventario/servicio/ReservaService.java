@@ -122,6 +122,23 @@ public class ReservaService {
         return aRespuestas(List.of(r)).get(0);
     }
 
+    /**
+     * Vencimiento automático (lo invoca la tarea, una transacción por reserva). Bloquea la fila: si ya no está ACTIVA
+     * (otro proceso la convirtió o canceló) la omite y devuelve false. LIBERACION con usuarioId null (sistema).
+     */
+    @Transactional
+    public boolean vencer(Long id, LocalDateTime ahora) {
+        Reserva r = reservas.bloquear(id).orElse(null);
+        if (r == null || !r.estaActiva()) {
+            return false;
+        }
+        r.vencer(ahora);
+        movimientos.registrar(new SolicitudMovimiento(r.getVariante().getId(), TipoMovimiento.LIBERACION,
+                r.getCantidad(), null, null, "RESERVA", r.getId(), "Vencimiento automático"));
+        reservas.saveAndFlush(r);
+        return true;
+    }
+
     public Page<ReservaResponse> listar(EstadoReserva estado, String q, Long varianteId, boolean porVencer,
             Pageable pageable) {
         Ordenamiento.validar(pageable, ORDEN_PERMITIDO);
