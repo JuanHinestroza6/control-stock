@@ -25,6 +25,21 @@ export function puedeVerKardex(rol: Rol | undefined): boolean {
   return rol === 'ADMIN' || rol === 'INVENTARIO' || rol === 'CONTABILIDAD'
 }
 
+/** Crear, cancelar y extender reservas: ADMIN, INVENTARIO y VENDEDOR. */
+export function puedeReservar(rol: Rol | undefined): boolean {
+  return rol === 'ADMIN' || rol === 'INVENTARIO' || rol === 'VENDEDOR'
+}
+
+/** Convertir reservas en venta: ADMIN y VENDEDOR. */
+export function puedeConvertirReserva(rol: Rol | undefined): boolean {
+  return rol === 'ADMIN' || rol === 'VENDEDOR'
+}
+
+/** Atender alertas: ADMIN e INVENTARIO (el VENDEDOR solo las ve). */
+export function puedeAtenderAlertas(rol: Rol | undefined): boolean {
+  return rol === 'ADMIN' || rol === 'INVENTARIO'
+}
+
 /** Ver costos: todos los roles menos VENDEDOR. */
 export function puedeVerCostos(rol: Rol | undefined): boolean {
   return rol !== undefined && rol !== 'VENDEDOR'
