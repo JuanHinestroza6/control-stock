@@ -27,6 +27,7 @@ function Celda({ celda }: { celda: CeldaMatriz | undefined }) {
     <div className="flex flex-col items-center gap-1" title={`${celda.sku}: físico ${celda.stockFisico}, reservado ${celda.stockReservado}`}>
       <span className="text-base font-bold text-oxford">{celda.stockDisponible}</span>
       <BadgeStock estado={celda.estadoStock} />
+      {celda.stockReservado > 0 && <span className="text-xs font-medium text-acento">R {celda.stockReservado}</span>}
       <span className="text-xs text-oxford/70">{celda.sku}</span>
     </div>
   )

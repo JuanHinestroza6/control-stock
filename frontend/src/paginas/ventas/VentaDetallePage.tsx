@@ -88,6 +88,12 @@ export function VentaDetallePage() {
           </div>
         )}
 
+        {v.reservas.length > 0 && (
+          <p className="text-sm text-oxford/70">
+            Origen: {v.reservas.length === 1 ? 'apartado' : 'apartados'} {v.reservas.join(', ')}.
+          </p>
+        )}
+
         <div className="overflow-x-auto rounded-lg border border-oxford/10 bg-fondo">
           <table className="w-full text-left text-sm">
             <caption className="sr-only">Líneas de la venta</caption>
