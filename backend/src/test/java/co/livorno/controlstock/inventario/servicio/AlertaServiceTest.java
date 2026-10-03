@@ -40,12 +40,13 @@ class AlertaServiceTest {
 
     @Mock VarianteRepository variantes;
     @Mock AlertaRepository alertas;
+    @Mock co.livorno.controlstock.usuario.repositorio.UsuarioRepository usuarios;
 
     AlertaService servicio;
 
     @BeforeEach
     void preparar() {
-        servicio = new AlertaService(variantes, alertas, RELOJ);
+        servicio = new AlertaService(variantes, alertas, RELOJ, usuarios);
     }
 
     /** Variante con stock mínimo 5, físico y reservado dados. */
@@ -137,6 +138,40 @@ class AlertaServiceTest {
         assertThat(a.getAtendidaEn()).isEqualTo(AHORA);
         assertThatThrownBy(() -> a.atender(3L, AHORA)).isInstanceOf(ConflictoException.class)
                 .hasMessage("La alerta ya fue atendida.");
+    }
+
+    @Test
+    void atender_activa_cierraConUsuarioYFecha() {
+        Variante v = new Variante(new co.livorno.controlstock.catalogo.modelo.Producto("LIV001", "Camiseta",
+                null, java.math.BigDecimal.ONE, java.math.BigDecimal.TEN, null, null), "X", Talla.M, "NEGRO", 5);
+        Alerta a = new Alerta(v, TipoAlerta.AGOTADO, AHORA.minusHours(1));
+        when(alertas.bloquear(4L)).thenReturn(Optional.of(a));
+
+        var r = servicio.atender(4L, 3L);
+
+        assertThat(r.estado()).isEqualTo(co.livorno.controlstock.inventario.modelo.EstadoAlerta.ATENDIDA);
+        assertThat(a.getAtendidaPor()).isEqualTo(3L);
+        assertThat(a.getAtendidaEn()).isEqualTo(AHORA);
+    }
+
+    @Test
+    void atender_inexistente_lanza404() {
+        when(alertas.bloquear(4L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.atender(4L, 3L))
+                .isInstanceOf(co.livorno.controlstock.comun.excepcion.RecursoNoEncontradoException.class);
+    }
+
+    @Test
+    void resumen_sumaActivasYSeparaPorTipo() {
+        when(alertas.contarActivasPorTipo()).thenReturn(java.util.List.of(
+                new Object[] {TipoAlerta.AGOTADO, 2L}, new Object[] {TipoAlerta.STOCK_BAJO, 5L}));
+
+        var r = servicio.resumen();
+
+        assertThat(r.activas()).isEqualTo(7);
+        assertThat(r.agotado()).isEqualTo(2);
+        assertThat(r.stockBajo()).isEqualTo(5);
     }
 
     @Test

@@ -106,6 +106,29 @@ class AlertaRepositoryTest {
         assertThatThrownBy(() -> insertar("OTRO", "ACTIVA", null)).isInstanceOf(DataAccessException.class);
     }
 
+    @Test
+    void buscarYResumen_soloVariantesActivasYFiltrosOpcionales() {
+        alertas.abrirOActualizar(varianteId, "AGOTADO", T1);
+        alertas.abrirOActualizar(varianteId, "STOCK_BAJO", T1);
+        alertas.cerrarActiva(varianteId, TipoAlerta.STOCK_BAJO, T2);
+
+        var todas = alertas.buscar(null, null, org.springframework.data.domain.PageRequest.of(0, 10));
+        var activas = alertas.buscar(EstadoAlerta.ACTIVA, null, org.springframework.data.domain.PageRequest.of(0, 10));
+        var bajo = alertas.buscar(null, TipoAlerta.STOCK_BAJO, org.springframework.data.domain.PageRequest.of(0, 10));
+
+        assertThat(todas.getTotalElements()).isEqualTo(2);
+        assertThat(activas.getContent()).extracting(a -> a.getTipo()).containsExactly(TipoAlerta.AGOTADO);
+        assertThat(bajo.getContent()).extracting(a -> a.getEstado()).containsExactly(EstadoAlerta.ATENDIDA);
+        assertThat(activas.getContent().get(0).getVariante().getProducto().getNombre()).isEqualTo("Camiseta");
+        assertThat(alertas.contarActivasPorTipo()).hasSize(1);
+        assertThat(alertas.bloquear(activas.getContent().get(0).getId())).isPresent();
+
+        jdbc.update("update variante set activo = false where id = ?", varianteId);
+        assertThat(alertas.buscar(null, null, org.springframework.data.domain.PageRequest.of(0, 10))
+                .getTotalElements()).isZero();
+        assertThat(alertas.contarActivasPorTipo()).isEmpty();
+    }
+
     private void insertar(String tipo, String estado, LocalDateTime atendidaEn) {
         jdbc.update("insert into alerta (variante_id, tipo, estado, creada_en, revisada_en, atendida_en)"
                 + " values (?, ?, ?, ?, ?, ?)", varianteId, tipo, estado, T1, T1, atendidaEn);
