@@ -30,7 +30,7 @@ describe('destino tras iniciar sesión', () => {
 
   it('tras Salir (cierre voluntario) el siguiente login va a /', async () => {
     loginResponde('VENDEDOR')
-    renderizarApp(<App />, { ruta: '/reservas', rol: 'VENDEDOR' })
+    renderizarApp(<App />, { ruta: '/analitica', rol: 'VENDEDOR' })
     await userEvent.click(screen.getByRole('button', { name: 'Salir' }))
     await iniciarSesion()
     expect(await screen.findByRole('heading', { level: 1, name: 'Hola, Ana Pérez' })).toBeInTheDocument()
@@ -38,9 +38,9 @@ describe('destino tras iniciar sesión', () => {
 
   it('el acceso directo sin sesión conserva el destino', async () => {
     loginResponde('VENDEDOR')
-    renderizarApp(<App />, { ruta: '/reservas' })
+    renderizarApp(<App />, { ruta: '/analitica' })
     await iniciarSesion()
-    expect(await screen.findByRole('heading', { level: 1, name: 'Reservas' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Analítica' })).toBeInTheDocument()
   })
 
   it('si el destino no está permitido para el rol que entra, va a / y no a acceso denegado', async () => {
@@ -53,12 +53,12 @@ describe('destino tras iniciar sesión', () => {
 
   it('tras expirar la sesión en una ruta, el nuevo login vuelve a esa ruta', async () => {
     loginResponde('ADMIN')
-    renderizarApp(<App />, { ruta: '/reservas', rol: 'ADMIN' })
+    renderizarApp(<App />, { ruta: '/analitica', rol: 'ADMIN' })
     act(() => {
       window.dispatchEvent(new Event(EVENTO_SESION_EXPIRADA))
     })
     await iniciarSesion()
-    expect(await screen.findByRole('heading', { level: 1, name: 'Reservas' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Analítica' })).toBeInTheDocument()
   })
 
   it('al expirar la sesión se limpia la caché de consultas', () => {
