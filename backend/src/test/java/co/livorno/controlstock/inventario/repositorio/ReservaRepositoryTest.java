@@ -138,6 +138,28 @@ class ReservaRepositoryTest {
     }
 
     @Test
+    void buscar_filtrosCombinados_devuelveSoloLasQueCoinciden() {
+        Reserva a = guardar(T0.plusHours(5));
+        Reserva b = reservas.saveAndFlush(Reserva.de(variante, 1, "Luis_100%", "luis@mail.co", T0,
+                T0.plusHours(40), usuario.getId()));
+        Reserva c = guardar(T0.plusHours(1));
+        c.vencer(T0.plusHours(2));
+        reservas.saveAndFlush(c);
+        PageRequest pag = PageRequest.of(0, 20, org.springframework.data.domain.Sort.by("venceEn"));
+
+        assertThat(reservas.buscar(null, null, null, null, pag).getContent())
+                .extracting(Reserva::getId).containsExactly(c.getId(), a.getId(), b.getId());
+        assertThat(reservas.buscar(EstadoReserva.ACTIVA, null, null, null, pag).getTotalElements()).isEqualTo(2);
+        assertThat(reservas.buscar(null, variante.getId(), "%LIV001-M%", null, pag).getTotalElements()).isEqualTo(3);
+        assertThat(reservas.buscar(null, null, "%luis!_100!%%", null, pag).getContent())
+                .extracting(Reserva::getId).containsExactly(b.getId());
+        assertThat(reservas.buscar(null, null, "%3001234567%", null, pag).getTotalElements()).isEqualTo(2);
+        // porVencer: ACTIVA con venceEn < límite (c está VENCIDA y no cuenta)
+        assertThat(reservas.buscar(null, null, null, T0.plusHours(12), pag).getContent())
+                .extracting(Reserva::getId).containsExactly(a.getId());
+    }
+
+    @Test
     void bloquear_variasReservas_devuelveFilasOrdenadasPorId() {
         Reserva a = guardar(T0.plusHours(48));
         Reserva b = guardar(T0.plusHours(24));

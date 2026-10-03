@@ -1,11 +1,13 @@
 package co.livorno.controlstock.inventario.repositorio;
 
+import co.livorno.controlstock.inventario.modelo.EstadoReserva;
 import co.livorno.controlstock.inventario.modelo.Reserva;
 import jakarta.persistence.LockModeType;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -31,4 +33,33 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
             order by r.venceEn, r.id
             """)
     List<Long> idsVencidas(@Param("ahora") LocalDateTime ahora, Pageable pageable);
+
+    /** Reserva con variante y producto en un solo SELECT. */
+    @Query("select r from Reserva r join fetch r.variante v join fetch v.producto where r.id = :id")
+    Optional<Reserva> conVariante(@Param("id") Long id);
+
+    /**
+     * Listado filtrado; los filtros nulos se ignoran. {@code patron} (nombre o contacto del cliente, SKU) debe venir de
+     * {@code ProductoRepository.patronContiene}. {@code limite} no nulo = solo ACTIVA con {@code venceEn < limite}.
+     */
+    @Query(value = """
+            select r from Reserva r join fetch r.variante v join fetch v.producto p
+            where (:estado is null or r.estado = :estado)
+              and (:varianteId is null or v.id = :varianteId)
+              and (:patron is null or r.clienteNombre like :patron escape '!'
+                   or r.clienteContacto like :patron escape '!' or v.sku like :patron escape '!')
+              and (:limite is null or (r.estado = co.livorno.controlstock.inventario.modelo.EstadoReserva.ACTIVA
+                   and r.venceEn < :limite))
+            """,
+            countQuery = """
+            select count(r) from Reserva r join r.variante v
+            where (:estado is null or r.estado = :estado)
+              and (:varianteId is null or v.id = :varianteId)
+              and (:patron is null or r.clienteNombre like :patron escape '!'
+                   or r.clienteContacto like :patron escape '!' or v.sku like :patron escape '!')
+              and (:limite is null or (r.estado = co.livorno.controlstock.inventario.modelo.EstadoReserva.ACTIVA
+                   and r.venceEn < :limite))
+            """)
+    Page<Reserva> buscar(@Param("estado") EstadoReserva estado, @Param("varianteId") Long varianteId,
+            @Param("patron") String patron, @Param("limite") LocalDateTime limite, Pageable pageable);
 }
