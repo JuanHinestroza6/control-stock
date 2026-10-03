@@ -57,6 +57,7 @@ class VentaServiceTest {
     @Mock UsuarioRepository usuarios;
     @Mock MovimientoService movimientos;
     @Mock UsuarioActual usuarioActual;
+    @Mock co.livorno.controlstock.inventario.repositorio.ReservaRepository reservas;
 
     VentaService servicio;
     Producto producto;
@@ -65,7 +66,8 @@ class VentaServiceTest {
 
     @BeforeEach
     void preparar() {
-        servicio = new VentaService(ventas, devoluciones, variantes, usuarios, movimientos, usuarioActual, RELOJ);
+        servicio = new VentaService(ventas, devoluciones, variantes, usuarios, movimientos, usuarioActual, RELOJ,
+                reservas);
         producto = new Producto("LIV001", "Camiseta", new Categoria("Camisetas"), new BigDecimal("20000"),
                 new BigDecimal("59900"), null, null);
         v5 = variante(5L, "LIV001-M-NEG", Talla.M);

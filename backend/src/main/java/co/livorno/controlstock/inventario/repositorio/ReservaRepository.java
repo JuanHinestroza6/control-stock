@@ -34,6 +34,9 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
             """)
     List<Long> idsVencidas(@Param("ahora") LocalDateTime ahora, Pageable pageable);
 
+    /** Reservas convertidas en una venta (orden de id). */
+    List<Reserva> findByVentaIdOrderById(Long ventaId);
+
     /** Reserva con variante y producto en un solo SELECT. */
     @Query("select r from Reserva r join fetch r.variante v join fetch v.producto where r.id = :id")
     Optional<Reserva> conVariante(@Param("id") Long id);
