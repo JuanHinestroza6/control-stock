@@ -37,6 +37,29 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
     /** Reservas convertidas en una venta (orden de id). */
     List<Reserva> findByVentaIdOrderById(Long ventaId);
 
+    /** Apartados y unidades ACTIVOS de una variante; vacío si no hay ninguno. */
+    @Query("""
+            select new co.livorno.controlstock.inventario.repositorio.ApartadosVariante(
+                v.id, v.sku, count(r), sum(r.cantidad))
+            from Reserva r join r.variante v
+            where v.id = :varianteId
+              and r.estado = co.livorno.controlstock.inventario.modelo.EstadoReserva.ACTIVA
+            group by v.id, v.sku
+            """)
+    Optional<ApartadosVariante> apartadosActivosDeVariante(@Param("varianteId") Long varianteId);
+
+    /** Variantes de un producto con apartados ACTIVOS, por id de variante (usar Pageable para limitar). */
+    @Query("""
+            select new co.livorno.controlstock.inventario.repositorio.ApartadosVariante(
+                v.id, v.sku, count(r), sum(r.cantidad))
+            from Reserva r join r.variante v
+            where v.producto.id = :productoId
+              and r.estado = co.livorno.controlstock.inventario.modelo.EstadoReserva.ACTIVA
+            group by v.id, v.sku
+            order by v.id
+            """)
+    List<ApartadosVariante> apartadosActivosPorProducto(@Param("productoId") Long productoId, Pageable pageable);
+
     /** Reserva con variante y producto en un solo SELECT. */
     @Query("select r from Reserva r join fetch r.variante v join fetch v.producto where r.id = :id")
     Optional<Reserva> conVariante(@Param("id") Long id);

@@ -43,6 +43,7 @@ public class VarianteService {
     private final ProductoRepository productos;
     private final VarianteRepository variantes;
     private final ApplicationEventPublisher eventos;
+    private final ConsultaReservasActivas reservasActivas;
 
     public List<VarianteResponse> listar(Long productoId, boolean incluirInactivas) {
         if (!productos.existsById(productoId)) {
@@ -128,7 +129,12 @@ public class VarianteService {
                 }
                 v.activar();
             } else {
-                if (v.getStockReservado() > 0) {
+                var apartados = reservasActivas.resumenDeVariante(v.getId());
+                if (apartados.hayApartados()) {
+                    throw new ConflictoException("La variante " + v.getSku() + " tiene " + apartados.apartados()
+                            + " apartados activos (" + apartados.unidades() + " unidades).");
+                }
+                if (v.getStockReservado() > 0) { // defensa: el reservado solo sube con reservas activas
                     throw new ConflictoException("La variante " + v.getSku() + " tiene " + v.getStockReservado()
                             + " unidades en apartados activos.");
                 }

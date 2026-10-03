@@ -43,6 +43,7 @@ public class ProductoService {
     private final VarianteRepository variantes;
     private final CategoriaRepository categorias;
     private final UsuarioActual usuarioActual;
+    private final ConsultaReservasActivas reservasActivas;
 
     public Page<ProductoResumenResponse> listar(String q, Long categoriaId, Boolean activo, Pageable pageable) {
         Ordenamiento.validar(pageable, ORDEN_PERMITIDO);
@@ -95,6 +96,10 @@ public class ProductoService {
             if (activo) {
                 producto.activar();
             } else {
+                reservasActivas.primeraVarianteConApartados(id).ifPresent(a -> {
+                    throw new ConflictoException("No se puede desactivar el producto: la variante " + a.sku()
+                            + " tiene " + a.apartados() + " apartados activos (" + a.unidades() + " unidades).");
+                });
                 List<Variante> deLaFamilia = variantes.findByProductoId(id);
                 deLaFamilia.stream().filter(v -> v.getStockReservado() > 0).findFirst().ifPresent(v -> {
                     throw new ConflictoException("No se puede desactivar el producto: la variante " + v.getSku()

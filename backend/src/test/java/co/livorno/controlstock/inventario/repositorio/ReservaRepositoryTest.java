@@ -160,6 +160,36 @@ class ReservaRepositoryTest {
     }
 
     @Test
+    void apartadosActivos_porVarianteYPorProducto_cuentaSoloLasActivas() {
+        guardar(T0.plusHours(48)); // 2 unidades
+        guardar(T0.plusHours(24)); // 2 unidades
+        Reserva cancelada = guardar(T0.plusHours(10));
+        cancelada.cancelar("Cliente desistió", T0.plusHours(1), usuario.getId());
+        reservas.saveAndFlush(cancelada);
+
+        var deVariante = reservas.apartadosActivosDeVariante(variante.getId()).orElseThrow();
+        var deProducto = reservas.apartadosActivosPorProducto(variante.getProducto().getId(), PageRequest.of(0, 1));
+
+        assertThat(deVariante.apartados()).isEqualTo(2);
+        assertThat(deVariante.unidades()).isEqualTo(4);
+        assertThat(deVariante.sku()).isEqualTo("LIV001-M-NEG");
+        assertThat(deProducto).hasSize(1);
+        assertThat(deProducto.get(0).varianteId()).isEqualTo(variante.getId());
+        assertThat(deProducto.get(0).unidades()).isEqualTo(4);
+    }
+
+    @Test
+    void apartadosActivos_sinReservasActivas_devuelveVacio() {
+        Reserva r = guardar(T0.plusHours(48));
+        r.vencer(T0.plusHours(49));
+        reservas.saveAndFlush(r);
+
+        assertThat(reservas.apartadosActivosDeVariante(variante.getId())).isEmpty();
+        assertThat(reservas.apartadosActivosPorProducto(variante.getProducto().getId(), PageRequest.of(0, 1)))
+                .isEmpty();
+    }
+
+    @Test
     void bloquear_variasReservas_devuelveFilasOrdenadasPorId() {
         Reserva a = guardar(T0.plusHours(48));
         Reserva b = guardar(T0.plusHours(24));
