@@ -4,68 +4,72 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
 
 ## Estado actual
 
-- Semana: 2
-- Fase en curso: 2 — Operación terminada (rama `fase-2-operacion` publicada); siguiente: Fase 3 (apartados)
-- Última actualización: 2026-10-02
+- Semana: 3
+- Fase en curso: 3 — Apartados (rama `fase-3-apartados`, sin push): código, revisión y PPI terminados; falta la prueba
+  manual T3 del usuario
+- Última actualización: 2026-10-04
 
 ## Hecho
 
 - [x] Fase 0 — Setup: monorepo, infra, CI, auth JWT, frontend base; PPI REQ-06/REQ-12, convención RNF (PR #1–#3)
-- [x] Fase 1 — Núcleo: catálogo (categorías, productos, variantes, SKU, matriz) y usuarios (ADR-004, ADR-005); PPI
-      REQ-11; T3 manual sin errores (PR #4)
-- [x] Fase 2 — plan (docs/fases/fase-2-plan.md) y ADR-006 (punto único de stock con ArchUnit, ANULACION_VENTA,
-      409 sin reintento, kardex inmutable, entradas con costo; costo 0 no actualiza precioCompra)
-- [x] Fase 2 — backend: V8 kardex, MovimientoService, inventario, entradas/ajustes, kardex, V9 ventas (precioLista,
-      costoUnitario), anulación, V10 devoluciones; concurrencia probada. 440/440 pruebas
-- [x] Fase 2 — frontend: inventario, entrada por matriz, ajuste, kardex, nueva venta, listado/detalle, devolución,
-      anulación, rutas por rol. 304/304 pruebas, lint y build OK
-- [x] Fase 2 — revisión final: sin críticos; 1 importante (ArchUnit) y 7 menores corregidos (6705c7c, 898bb19)
-- [x] Fase 2 — PPI: fichas REQ-01 (CU-04), REQ-02 (CU-03) y REQ-08 (CU-09) con datos del Word; diagramas de
-      clases de operación y secuencia de registrar venta
-- [x] Fase 2 — T3: prueba manual con el backend real completa, sin errores (2026-10-02)
+- [x] Fase 1 — Núcleo: catálogo y usuarios (ADR-004, ADR-005); PPI REQ-11; T3 sin errores (PR #4)
+- [x] Fase 2 — Operación: kardex, MovimientoService, entradas, ajustes, ventas, anulación, devoluciones (ADR-006); PPI
+      REQ-01, REQ-02, REQ-08; T3 sin errores (PR #5)
+- [x] Fase 3 — plan (docs/fases/fase-3-plan.md) y ADR-007 (reservas y alertas)
+- [x] Fase 3 — backend: V11 reservas (crear, cancelar, extender, vencimiento cada 15 min), conversión de varias reservas
+      del mismo cliente en una venta, desactivación bloqueada por apartados, V12 alertas STOCK_BAJO/AGOTADO excluyentes
+      por evento, V13 + anonimización nocturna (Ley 1581, 90 días); concurrencia probada. 558/558 pruebas
+- [x] Fase 3 — frontend: reservas (listado, nueva, cancelar, extender, convertir), indicadores de reservado, alertas y
+      campana, rutas por rol. 359/359 pruebas, lint y build OK
+- [x] Fase 3 — revisión final: sin críticos; 1 importante (alertas con bloqueo de variante) y 7 menores corregidos
+- [x] Fase 3 — PPI: fichas REQ-04 y REQ-13 (Apartados, propuesto); diagramas de estados de Reserva y de conversión
 
 ## En curso
 
-- [ ] PR de `fase-2-operacion` hacia main (lo abre el usuario cuando lo decida)
+- [ ] T3 de la fase 3: prueba manual con el backend real (la hace el usuario; ver "Prueba manual T3 — fase 3")
 
 ## Próximos pasos
 
-1. PR y merge de `fase-2-operacion`; luego `git switch main && git pull`.
-2. Revisar los diagramas con Alt+D (PlantUML no instalado).
-3. Iniciar `/fase 3`: apartados (reservas), alertas y tareas programadas.
+1. Ejecutar la prueba manual T3 de la fase 3 y reportar lo que falle.
+2. Push de `fase-3-apartados` y PR solo cuando el usuario lo pida.
+3. Asignar stakeholder, NEC, CU y prioridad de REQ-04 y REQ-13 contra el Word; revisar diagramas con Alt+D.
 
 ## Bloqueos y decisiones pendientes (aceptados, sin acción)
 
 - Validación del body antes de `@PreAuthorize`: un rol sin permiso con body inválido recibe 400 en vez de 403.
 - Revocación por `iat` con precisión de segundos: un token emitido en el mismo segundo del cambio sigue válido (ADR-005).
 - Desactivación simultánea de los dos últimos ADMIN: el perdedor del deadlock de MySQL recibe 409 (decisión del usuario).
-- Reglas para fases futuras: las ventas ANULADAS se excluyen de demanda, ABC y rentabilidad (fases 5–7); anular una venta
-  que vino de una reserva solo devuelve físico y la reserva queda CONVERTIDA (fase 3).
+- Reservas: hasta 15 min de reservado de más tras vencer (la tarea corre cada 15 min); atender a mano una alerta vigente
+  la reabre con el siguiente movimiento (regla del dominio).
+- Para fases futuras: ventas ANULADAS fuera de demanda, ABC y rentabilidad (fases 5–7); SIN_ROTACION y re-evaluación
+  nocturna de alertas en la fase 5; el generador de datos semilla (fase 4) corre con el perfil `seed`, que apaga las tareas.
 
-## Prueba manual T3 — fase 2 (PowerShell 5, desde la raíz del repo) — completada 2026-10-02
+## Prueba manual T3 — fase 3 (PowerShell 5, desde la raíz del repo)
 
-1. Arranque igual que en la fase 1: `.env` completo, `docker compose up -d mysql` (esperar `healthy`), en `backend`
-   `.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=dev"` (Flyway aplica V8–V10 solo) y en `frontend`
-   `npm run dev`. Abre http://localhost:5173 y entra con `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
-2. Verificación (crea antes un usuario INVENTARIO, uno VENDEDOR y uno CONTABILIDAD si no existen):
-   - [x] Inventario: el producto con variantes de la fase 1 aparece en 0 y AGOTADO; filtros y búsqueda funcionan.
-   - [x] Como INVENTARIO, "Nueva entrada" con cantidades en la matriz y costo 25000 → el stock sube y el detalle del
-         producto muestra precioCompra 25000. Otra entrada con costo 0 → stock sube y precioCompra no cambia.
-   - [x] Ajuste negativo con observación → el stock baja; el kardex de esa variante muestra ENTRADA y AJUSTE con los
-         saldos antes → después encadenados.
-   - [x] Como VENDEDOR, nueva venta con 2 variantes, una con precio menor que la lista → el detalle muestra el
-         descuento y no muestra el costo; el stock baja. Pedir más que el disponible no se permite.
-   - [x] Devolver 1 unidad apta → stock +1; devolver 1 no apta → stock igual; ambas aparecen en el detalle.
-   - [x] Como ADMIN, anular esa venta → 422 (tiene devoluciones). Anular otra venta sin devoluciones con motivo →
-         stock repuesto y el kardex muestra ANULACION_VENTA.
-   - [x] Como CONTABILIDAD: ve inventario, kardex y ventas con costo, sin botones para registrar ni anular.
-   - [x] Como INVENTARIO no ve Ventas; como VENDEDOR no ve Kardex ni entradas.
+1. Arranque igual que en fases anteriores: `.env` completo, `docker compose up -d mysql` (esperar `healthy`), en
+   `backend` `.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=dev"` (Flyway aplica V11–V13 solo) y en `frontend`
+   `npm run dev`. Abre http://localhost:5173. Usa los usuarios ADMIN, INVENTARIO, VENDEDOR y CONTABILIDAD de la fase 2.
+2. Verificación:
+   - [ ] Como VENDEDOR, "Nuevo apartado" con 2 variantes para un cliente (nombre y teléfono) y vigencia 24 h → aparecen
+         2 reservas ACTIVAS; el inventario y la matriz muestran el reservado y el disponible baja.
+   - [ ] Apartar más que el disponible no se permite.
+   - [ ] Como INVENTARIO, extender una reserva 24 h → cambia el vencimiento; pedir más de 7 días desde la creación → error.
+   - [ ] Cancelar una reserva con motivo → pasa a CANCELADA y el reservado baja; el kardex muestra LIBERACION "Cancelada".
+   - [ ] Como VENDEDOR, seleccionar las reservas ACTIVAS del cliente y "Convertir en venta" con un precio menor que la
+         lista → se crea la venta con el descuento y "Origen: apartados R-…"; las reservas quedan CONVERTIDAS.
+   - [ ] Intentar convertir reservas de dos clientes distintos no se permite.
+   - [ ] Intentar desactivar una variante con un apartado ACTIVO → mensaje con apartados y unidades.
+   - [ ] Alertas: vender hasta dejar una variante en 0 → aparece AGOTADO en /alertas y la campana suma; reponer con una
+         entrada → la alerta se cierra sola ("Automático"). Con stock bajo el mínimo aparece STOCK_BAJO (nunca ambas).
+   - [ ] Como INVENTARIO, "Atender" una alerta activa; como VENDEDOR solo se ven (sin botón).
+   - [ ] Como CONTABILIDAD no ve Reservas ni Alertas ni la campana.
+   - [ ] (Opcional) Crear una reserva con vigencia 1 h y esperar a que venza: en ≤ 15 min pasa a VENCIDA con LIBERACION.
 
 ## Notas para la próxima sesión
 
-- Maven en el sandbox de Claude Code: usar `./mvnw -o` (offline). ArchUnit 1.5.1 ya está en `~/.m2`. Si se agregan
-  dependencias, ejecutar `./mvnw` con red (MAVEN_OPTS=-Djavax.net.ssl.trustStoreType=Windows-ROOT).
-- Al encadenar verificación y commit, cortar ante cualquier fallo (`verify && commit`), sin `grep` intermedios que
-  cambien el código de salida.
-- El limitador de login es en memoria y usa `getRemoteAddr()`; detrás de un proxy inverso habrá que revisarlo.
-- CI fijado en `ubuntu-24.04` (ubuntu-latest pasa a Ubuntu 26 el 2026-10-19); migrar a propósito cuando convenga.
+- Maven en el sandbox de Claude Code: usar `./mvnw -o` (offline). Si se agregan dependencias, ejecutar `./mvnw` con red
+  (MAVEN_OPTS=-Djavax.net.ssl.trustStoreType=Windows-ROOT).
+- Docker Desktop debe estar arriba: sin él se omiten las pruebas con Testcontainers (no hacer commit en ese caso).
+- Al encadenar verificación y commit, cortar ante cualquier fallo (`verify && commit`).
+- Las pruebas de integración que borran variantes deben borrar antes `alerta` y `reserva` (claves foráneas).
+- CI fijado en `ubuntu-24.04`; el limitador de login es en memoria (`getRemoteAddr()`).
