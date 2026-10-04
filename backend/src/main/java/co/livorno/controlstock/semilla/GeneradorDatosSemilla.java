@@ -29,19 +29,22 @@ public class GeneradorDatosSemilla {
     private final ProteccionesSemilla protecciones;
     private final UsuariosDemo usuariosDemo;
     private final CreadorCatalogo creadorCatalogo;
+    private final SimuladorDiario simulador;
     private final RelojSimulado reloj;
     private final ComoUsuario comoUsuario;
     private final TransactionTemplate transaccion;
     private final EntityManager entityManager;
 
     public GeneradorDatosSemilla(PropiedadesSemilla propiedades, ProteccionesSemilla protecciones,
-                                 UsuariosDemo usuariosDemo, CreadorCatalogo creadorCatalogo, RelojSimulado reloj,
+                                 UsuariosDemo usuariosDemo, CreadorCatalogo creadorCatalogo, SimuladorDiario simulador,
+                                 RelojSimulado reloj,
                                  ComoUsuario comoUsuario, TransactionTemplate transaccion,
                                  EntityManager entityManager) {
         this.propiedades = propiedades;
         this.protecciones = protecciones;
         this.usuariosDemo = usuariosDemo;
         this.creadorCatalogo = creadorCatalogo;
+        this.simulador = simulador;
         this.reloj = reloj;
         this.comoUsuario = comoUsuario;
         this.transaccion = transaccion;
@@ -89,9 +92,12 @@ public class GeneradorDatosSemilla {
         entityManager.flush();
         entityManager.clear();
 
-        log.info("Datos semilla: {} productos, {} variantes, {} unidades iniciales ({} a {}).",
-                creado.productoIds().size(), creado.variantes().size(), unidades, inicio, fin);
+        ResultadoSimulacion simulacion = simulador.simular(creado, modelo, usuarios, inicio, fin, aleatorioCostos,
+                new Random(propiedades.semillaAleatoria() + 2));
+
+        log.info("Datos semilla: {} productos, {} variantes, {} unidades iniciales ({} a {}); {}.",
+                creado.productoIds().size(), creado.variantes().size(), unidades, inicio, fin, simulacion);
         return new ResumenSemilla(true, inicio, fin, usuarios.size(), creado.productoIds().size(),
-                creado.variantes().size(), unidades);
+                creado.variantes().size(), unidades, simulacion);
     }
 }

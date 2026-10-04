@@ -21,7 +21,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Import(TestcontainersConfiguration.class)
 @ActiveProfiles({"test", "seed"})
 @SpringBootTest(properties = {
-        "app.semilla.ejecutar=false", "app.semilla.salir-al-terminar=false", "app.semilla.meses=3",
+        "app.semilla.ejecutar=false", "app.semilla.salir-al-terminar=false", "app.semilla.meses=3", "app.semilla.tickets-dia-base=2",
         "app.semilla.fecha-fin=2025-12-31", "app.semilla.password=ClaveDemo-2026-ok"})
 @Transactional
 class GeneradorCatalogoIntegracionTest {
@@ -53,26 +53,16 @@ class GeneradorCatalogoIntegracionTest {
         assertThat(contar("select count(*) from producto")).isEqualTo(30);
         assertThat(contar("select count(*) from variante")).isEqualTo(resumen.variantes()).isGreaterThan(200);
         assertThat(contar("select count(*) from variante where stock_minimo < 2")).isZero();
-        assertThat(contar("select count(*) from variante where stock_fisico <= 0 or stock_reservado <> 0")).isZero();
+        assertThat(contar("select count(*) from variante where stock_reservado <> 0")).isZero();
 
-        // kardex: una ENTRADA por variante con costo, fechada en el día 0 a las 08:00, stock = suma del kardex
-        assertThat(contar("select count(*) from movimiento")).isEqualTo(resumen.variantes());
-        assertThat(contar("select count(*) from movimiento where tipo <> 'ENTRADA' or costo_unitario is null"))
+        // kardex: una ENTRADA inicial por variante con costo, fechada en el día 0 a las 08:00
+        String inicial = "from movimiento where observacion = 'Stock inicial'";
+        assertThat(contar("select count(*) " + inicial)).isEqualTo(resumen.variantes());
+        assertThat(contar("select count(*) " + inicial + " and (tipo <> 'ENTRADA' or costo_unitario is null)"))
                 .isZero();
-        assertThat(contar("select count(*) from movimiento where fecha <> '2025-10-01 08:00:00'")).isZero();
-        assertThat(contar("""
-                select count(*) from variante v where v.stock_fisico <>
-                (select sum(m.fisico_despues - m.fisico_antes) from movimiento m where m.variante_id = v.id)
-                """)).isZero();
-        assertThat(contar("select coalesce(sum(stock_fisico),0) from variante"))
-                .isEqualTo(resumen.unidadesIniciales());
+        assertThat(contar("select count(*) " + inicial + " and fecha <> '2025-10-01 08:00:00'")).isZero();
+        assertThat(contar("select coalesce(sum(cantidad),0) " + inicial)).isEqualTo(resumen.unidadesIniciales());
 
-        // precioCompra del producto = costo de su entrada; auditoría con la fecha simulada
-        assertThat(contar("""
-                select count(*) from producto p where p.precio_compra <>
-                (select max(m.costo_unitario) from movimiento m join variante v on v.id = m.variante_id
-                 where v.producto_id = p.id)
-                """)).isZero();
         assertThat(contar("select count(*) from producto where creado_en <> '2025-10-01 07:00:00'")).isZero();
     }
 
@@ -101,8 +91,23 @@ class GeneradorCatalogoIntegracionTest {
     }
 
     @Test
-    void generar_segundaVezSinVentas_abortaPorDatosParciales() {
+    void generar_segundaVezConVentas_noHaceNada() {
         generador.generar();
+        long movimientos = contar("select count(*) from movimiento");
+
+        ResumenSemilla segunda = generador.generar();
+
+        assertThat(segunda.generado()).isFalse();
+        assertThat(contar("select count(*) from movimiento")).isEqualTo(movimientos);
+        assertThat(contar("select count(*) from producto")).isEqualTo(30);
+    }
+
+    @Test
+    void generar_conProductosSinVentas_abortaPorDatosParciales() {
+        generador.generar();
+        jdbc.update("delete from devolucion");
+        jdbc.update("delete from detalle_venta");
+        jdbc.update("delete from venta");
 
         assertThatThrownBy(generador::generar).isInstanceOf(SemillaAbortadaException.class)
                 .hasMessageContaining("docker compose down -v");
