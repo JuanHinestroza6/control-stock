@@ -244,7 +244,7 @@ Atender alertas: ADMIN e INVENTARIO; VENDEDOR solo las ve (incluida la campana).
 | REQ-01 Visualizar stock y atributos en tiempo real (CU-04) | catalogo, inventario |
 | REQ-02 Registrar automáticamente operaciones de stock (CU-03) | inventario |
 | REQ-03 Reportes de rentabilidad | reporte |
-| REQ-04 Alertas de stock mínimo | inventario (alertas) + analitica (ROP) |
+| REQ-04 Emitir alertas de nivel mínimo de stock (CU-10) | inventario (alertas) + analitica (ROP) |
 | REQ-05 Productos más vendidos | analitica |
 | REQ-06 Controlar el acceso y roles de usuario (CU-02) | auth, usuario |
 | REQ-07 Reportes contables | reporte |
@@ -253,7 +253,7 @@ Atender alertas: ADMIN e INVENTARIO; VENDEDOR solo las ve (incluida la campana).
 | REQ-10 Planeación de compras | compra + analitica (pronóstico) |
 | REQ-11 Gestión de productos (CU-11) | catalogo |
 | REQ-12 Registrar y gestionar usuarios (CU-12) | usuario |
-| Nuevo: Apartados | inventario (reservas) |
+| REQ-13 Gestionar apartados (CU-14, nuevo) | inventario (reservas), venta (conversión) |
 | Nuevo: Clasificación ABC | analitica |
 
 Nota: en el documento PPI, REQ-08 y REQ-09 tienen nombre y descripción cruzados; corregir en la próxima versión.
@@ -262,8 +262,10 @@ Nota: en el documento PPI, REQ-08 y REQ-09 tienen nombre y descripción cruzados
 
 - `REQ-xx`: requisitos funcionales (tabla anterior). `RNF-xx`: requisitos no funcionales del documento Word, que allí
   aparecen numerados como REQ-01..REQ-05; aquí se renombran a RNF-01..RNF-05 para no chocar con los funcionales.
-- `CU-xx`: casos de uso. CU-13 "Iniciar sesión" no existe en el Word; se creó en la fase 0 y se liga a RNF-02.
-- `NEC-xx`: necesidades del Word, con dos dígitos (NEC-010 del Word es NEC-10).
+- `CU-xx`: casos de uso. Nuevos, no presentes en el Word: CU-13 "Iniciar sesión" (fase 0, ligado a RNF-02) y CU-14
+  "Gestionar apartados" (fase 3, REQ-13).
+- `NEC-xx`: necesidades del Word, con dos dígitos (NEC-010 del Word es NEC-10). Nueva: NEC-11 "Apartar prendas para
+  clientes que reservan por redes sociales" (REQ-13).
 
 | Requisito no funcional | Stakeholder | Necesidades | Prioridad | Área principal |
 |---|---|---|---|---|

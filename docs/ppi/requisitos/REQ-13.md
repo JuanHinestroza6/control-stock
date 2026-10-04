@@ -1,19 +1,19 @@
-# REQ-13 — Gestionar Apartados (FO-ERS) — PROPUESTO
+# REQ-13 — Gestionar Apartados (FO-ERS)
 
-> Requisito **nuevo, no incluido en el documento Word**. El código `REQ-13` es **provisional**: continúa la numeración
-> existente (REQ-01..REQ-12) y debe confirmarse o reemplazarse al incorporarlo al documento oficial.
+> Requisito **nuevo**, no incluido en la versión actual del documento Word; se agrega con el código REQ-13, la
+> necesidad NEC-11 y el caso de uso CU-14 (también nuevos; ver la convención de códigos en `docs/dominio.md`).
 > Estado a la fecha: implementado en la Fase 3 (backend y frontend), rama `fase-3-apartados`.
 
 | Campo | Contenido |
 |---|---|
-| **Código** | REQ-13 (provisional, propuesto) |
+| **Código** | REQ-13 (nuevo) |
 | **Nombre** | Gestionar Apartados |
 | **Tipo** | Funcional |
-| **Stakeholder** | Por asignar (contrastar con el Word) |
-| **Necesidad** | Por asignar (contrastar con el Word) |
-| **Caso de uso** | Por asignar (contrastar con el Word) |
+| **Stakeholder** | Vendedor |
+| **Necesidad** | NEC-11 (nueva): "Apartar prendas para clientes que reservan por redes sociales" |
+| **Caso de uso** | CU-14 "Gestionar apartados" (nuevo) |
 | **Relacionados** | REQ-01 (indicador de stock reservado); REQ-02 (movimientos RESERVA, LIBERACION, VENTA_RESERVA); REQ-04 (alertas sobre el disponible); REQ-06 (roles); REQ-11 (desactivación bloqueada por apartados) |
-| **Prioridad** | Por asignar (contrastar con el Word) |
+| **Prioridad** | Alta |
 | **Módulos** | `inventario` (`ReservaService`, `VencimientoReservasTarea`, `AnonimizacionReservasTarea`, `ReservaController`), `venta` (`VentaService.registrarDesdeReservas`), `catalogo` (`ConsultaReservasActivas`); frontend: `paginas/reservas`, `componentes/dominio` (modales de reserva) |
 
 ## Descripción
@@ -99,8 +99,7 @@ El apartado puede convertirse en venta, cancelarse, extenderse o vencer automát
 
 ## Observaciones
 
-- Requisito propuesto: no existe en el Word. Stakeholder, necesidad, caso de uso y prioridad quedan por asignar y no se
-  asumen. Se sugiere crear un caso de uso propio (los códigos CU-01..CU-13 ya están usados).
+- Requisito nuevo: no existe en la versión actual del Word; incorporar REQ-13, NEC-11 y CU-14 en la próxima versión.
 - Inconsistencias del Word: REQ-08 y REQ-09 con nombre y descripción cruzados; NEC-010 debería ser NEC-10.
 - Pendiente aceptado: el campo `canal` de la venta sigue reservado para el futuro (no se captura el canal del apartado).
 - Diagramas: `diagramas/estados-reserva.puml`, `diagramas/secuencia-convertir-reservas.puml`.

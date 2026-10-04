@@ -1,4 +1,4 @@
-# REQ-04 — Alertas de Stock Mínimo (FO-ERS)
+# REQ-04 — Emitir Alertas de Nivel Mínimo de Stock (FO-ERS)
 
 > Estado a la fecha: implementado parcialmente en la Fase 3 (backend y frontend), rama `fase-3-apartados`.
 > Alcance de esta fase: alertas STOCK_BAJO y AGOTADO por evento. SIN_ROTACION y la re-evaluación nocturna corresponden a la Fase 5.
@@ -6,13 +6,13 @@
 | Campo | Contenido |
 |---|---|
 | **Código** | REQ-04 |
-| **Nombre** | Alertas de Stock Mínimo |
+| **Nombre** | Emitir Alertas de Nivel Mínimo de Stock |
 | **Tipo** | Funcional |
-| **Stakeholder** | Por asignar (contrastar con el Word) |
-| **Necesidad** | Por asignar (contrastar con el Word) |
-| **Caso de uso** | Por asignar (contrastar con el Word) |
+| **Stakeholder** | Asistente de gerencia |
+| **Necesidad** | NEC-04 |
+| **Caso de uso** | CU-10 |
 | **Relacionados** | REQ-01 (estado de stock); REQ-02 (movimientos que disparan la evaluación); REQ-13 (apartados modifican el disponible) |
-| **Prioridad** | Por asignar (contrastar con el Word) |
+| **Prioridad** | Media |
 | **Módulos** | `inventario` (`AlertaService`, `AlertaListener`, `AlertaController`), `catalogo` (evento `UmbralCambiado`); frontend: `paginas/alertas`, campana en `componentes/layout/Topbar`, `hooks/useAlertas` |
 
 ## Descripción
