@@ -212,6 +212,37 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. Desde la Fas
 - Atender a mano una alerta cuya condición sigue vigente la cierra; el siguiente movimiento de esa variante vuelve a
   abrirla.
 - La re-evaluación nocturna de todas las variantes y SIN_ROTACION llegan en la Fase 5.
+- El listener se puede apagar con `app.alertas.por-evento=false` (por defecto `true`). Solo el perfil `seed` lo apaga; el
+  generador evalúa todas las variantes al terminar (ver "Datos semilla").
+
+## Datos semilla (ADR-008)
+
+- **Propósito**: 24 meses de historia de demostración para la analítica (ABC, ROP, pronóstico) y la sustentación. No son
+  datos de referencia: no van en migraciones.
+- **Módulo `semilla`** (`co.livorno.controlstock.semilla`): todas sus clases llevan `@Profile("seed")` y ningún otro módulo
+  depende de él (ArchUnit). Se ejecuta con los perfiles `dev,seed`, carga y **termina la aplicación** (código 0 si todo
+  salió bien, 1 si falló). Después se arranca normal con `dev`.
+- **Solo servicios reales**: catálogo, entradas, ajustes, ventas, devoluciones, anulaciones y reservas pasan por los mismos
+  servicios que usa la API; el stock cambia solo vía `MovimientoService`. Nada de inserts directos de stock ni de kardex.
+  El generador fija el usuario que actúa en el contexto de seguridad (VENDEDOR vende, devuelve y convierte; INVENTARIO
+  ingresa, ajusta y reserva; ADMIN anula); los vencimientos usan `ReservaService.vencer(id, ahora)` con `usuarioId` null.
+- **Reloj simulado (solo en `seed`)**: un `Clock` ajustable marcado `@Primary` reemplaza al del sistema; los servicios y la
+  auditoría fechan con él. Solo avanza (retroceder lanza excepción), así el kardex queda cronológico, y vuelve al reloj
+  del sistema al terminar. Las operaciones de cada día simulado se ejecutan en orden de hora.
+- **Todo o nada**: una sola transacción para toda la carga (con `flush` y `clear` por día simulado). Cualquier error de
+  negocio revierte todo y deja la base como estaba; el generador valida el disponible antes de vender.
+- **Protecciones e idempotencia**: si ya hay ventas, registra "ya hay datos" y no hace nada; si hay productos o
+  movimientos pero no ventas, aborta con un mensaje claro; no corre con un perfil `prod` activo. Para regenerar se borra la
+  base (`docker compose down -v`); no hay borrado en código (el kardex es inmutable).
+- **Usuarios demo**: `admin@livorno.co`, `inventario@livorno.co`, `ventas@livorno.co`, `contabilidad@livorno.co`, uno por
+  rol, con la contraseña de la variable de entorno `SEED_PASSWORD` (obligatoria; misma política de contraseñas). No quedan
+  con cambio de contraseña obligatorio. Si el correo ya existe, se reutiliza. Conviven con el ADMIN inicial de V2.
+- **Determinismo**: semilla aleatoria fija (42 por defecto) y fecha final configurable (`app.semilla.fecha-fin`, anterior a hoy;
+  vacía = ayer). Con la misma semilla, la misma fecha final y una base vacía, el resultado es el mismo.
+- **Datos de cliente** de las reservas: ficticios. Las reservas ACTIVAS se crean en las últimas 48 h de la historia con
+  vigencia de 72 a 168 h; conviene regenerar la víspera de la sustentación.
+- **Verificación al terminar**: stock = suma del kardex por variante, reservado = suma de reservas ACTIVAS, ningún stock
+  negativo; si falla, la carga se revierte.
 
 ## Roles y permisos
 

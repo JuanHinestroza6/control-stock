@@ -24,7 +24,8 @@ control-stock/
 └── .claude/    agentes y skills del equipo
 ```
 
-Módulos backend: `comun`, `auth`, `usuario`, `catalogo`, `inventario`, `venta`, `analitica`, `compra`, `reporte`.
+Módulos backend: `comun`, `auth`, `usuario`, `catalogo`, `inventario`, `venta`, `analitica`, `compra`, `reporte`,
+`semilla` (generador de datos de demostración, solo perfil `seed`; ningún módulo depende de él).
 Capas dentro de cada módulo: `web` (controllers), `servicio`, `repositorio`, `modelo` (entidades), `dto`.
 
 ## Comandos
@@ -35,7 +36,7 @@ Capas dentro de cada módulo: `web` (controllers), `servicio`, `repositorio`, `m
 | Correr backend | `./mvnw spring-boot:run` | `mvnw.cmd spring-boot:run` |
 | Pruebas backend | `./mvnw test` | `mvnw.cmd test` |
 | Verificación completa | `./mvnw verify` | `mvnw.cmd verify` |
-| Cargar datos semilla | `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev,seed` | `mvnw.cmd ...` igual |
+| Cargar datos semilla (base vacía, `SEED_PASSWORD` en `.env`; carga y termina) | `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev,seed` | `mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=dev,seed"` |
 | Frontend | `npm run dev` / `npm run test` / `npm run build` / `npm run lint` (dentro de `frontend/`) | igual |
 
 Detecta el sistema operativo antes de ejecutar comandos Maven y usa la variante correcta.
