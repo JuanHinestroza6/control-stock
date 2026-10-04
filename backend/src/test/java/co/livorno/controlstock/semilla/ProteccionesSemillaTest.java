@@ -36,11 +36,26 @@ class ProteccionesSemillaTest {
         entorno.setActiveProfiles("prod", "seed");
         // entonces
         assertThatThrownBy(protecciones::validarPerfil).isInstanceOf(SemillaAbortadaException.class)
-                .hasMessageContaining("prod");
+                .hasMessageContaining("dev");
     }
 
     @Test
-    void validarPerfil_sinProd_noHaceNada() {
+    void validarPerfil_soloSeed_aborta() {
+        entorno.setActiveProfiles("seed");
+        assertThatThrownBy(protecciones::validarPerfil).isInstanceOf(SemillaAbortadaException.class)
+                .hasMessageContaining("solo corre con el perfil dev");
+    }
+
+    @Test
+    void validarPerfil_perfilDesconocido_aborta() {
+        entorno.setActiveProfiles("staging", "seed");
+        assertThatThrownBy(protecciones::validarPerfil).isInstanceOf(SemillaAbortadaException.class);
+    }
+
+    @Test
+    void validarPerfil_conDevOTest_noHaceNada() {
+        assertThatCode(protecciones::validarPerfil).doesNotThrowAnyException();
+        entorno.setActiveProfiles("test", "seed");
         assertThatCode(protecciones::validarPerfil).doesNotThrowAnyException();
     }
 

@@ -1,4 +1,7 @@
 # Perfil del generador de datos de demostración (ADR-008). Úsalo junto con dev: -Dspring-boot.run.profiles=dev,seed
+spring:
+  main:
+    web-application-type: none # sin servidor HTTP durante la carga (el RelojSimulado no debe servir peticiones)
 app:
   tareas:
     habilitadas: false

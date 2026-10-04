@@ -61,11 +61,22 @@ public class UsuariosDemo {
         Map<Rol, UsuarioAutenticado> resultado = new EnumMap<>(Rol.class);
         for (Demo demo : USUARIOS) {
             Usuario usuario = usuarios.findByEmail(demo.email())
+                    .map(existente -> validarExistente(demo, existente))
                     .orElseGet(() -> usuarios.save(
                             new Usuario(demo.nombre(), demo.email(), encoder.encode(password), demo.rol())));
             resultado.put(demo.rol(), new UsuarioAutenticado(usuario.getId(), usuario.getEmail(),
                     usuario.getNombre(), usuario.getRol().name(), false));
         }
         return resultado;
+    }
+
+    /** Un correo demo ya existente debe tener el rol esperado y estar activo; si no, no se reutiliza. */
+    private Usuario validarExistente(Demo demo, Usuario existente) {
+        if (existente.getRol() != demo.rol() || !existente.isActivo()) {
+            throw new SemillaAbortadaException("El usuario " + demo.email() + " ya existe con rol "
+                    + existente.getRol() + (existente.isActivo() ? "" : " e inactivo") + " (se esperaba "
+                    + demo.rol() + " activo). Corrígelo o usa una base limpia: docker compose down -v.");
+        }
+        return existente;
     }
 }

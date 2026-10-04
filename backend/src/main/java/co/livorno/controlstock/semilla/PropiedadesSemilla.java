@@ -29,4 +29,12 @@ public record PropiedadesSemilla(
             password = null;
         }
     }
+
+    /** Enmascara la contraseña para que no aparezca en logs ni en mensajes. */
+    @Override
+    public String toString() {
+        return "PropiedadesSemilla[ejecutar=" + ejecutar + ", salirAlTerminar=" + salirAlTerminar
+                + ", semillaAleatoria=" + semillaAleatoria + ", meses=" + meses + ", fechaFin=" + fechaFin
+                + ", ticketsDiaBase=" + ticketsDiaBase + ", password=" + (password == null ? "null" : "****") + "]";
+    }
 }

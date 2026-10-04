@@ -173,6 +173,7 @@ public class SimuladorDiario {
 
         private final List<VarianteCreada> variantes;
         private final Map<Clave, Integer> indicePorClave = new HashMap<>();
+        private final Map<Long, Integer> indicePorVarianteId = new HashMap<>();
         private final Map<String, List<Integer>> variantesPorProducto = new LinkedHashMap<>();
         private final Map<String, ProductoSemilla> productoPorCodigo = new LinkedHashMap<>();
         private final int[] fisico;
@@ -224,6 +225,9 @@ public class SimuladorDiario {
             this.inventario = usuarios.get(Rol.INVENTARIO);
             this.admin = usuarios.get(Rol.ADMIN);
             this.variantes = catalogo.variantes();
+            for (int i = 0; i < variantes.size(); i++) {
+                indicePorVarianteId.put(variantes.get(i).id(), i);
+            }
             this.corteReposicion = fin.minusMonths(MESES_SIN_REPOSICION);
             this.corteDesactivacion = fin.minusMonths(MESES_DESCONTINUADO);
             this.fisico = new int[variantes.size()];
@@ -510,12 +514,11 @@ public class SimuladorDiario {
         }
 
         private int indiceDeVariante(Long varianteId) {
-            for (int i = 0; i < variantes.size(); i++) {
-                if (variantes.get(i).id().equals(varianteId)) {
-                    return i;
-                }
+            Integer idx = indicePorVarianteId.get(varianteId);
+            if (idx == null) {
+                throw new IllegalStateException("Variante desconocida " + varianteId);
             }
-            throw new IllegalStateException("Variante desconocida " + varianteId);
+            return idx;
         }
 
         private void anular(VentaDetalleResponse v, String motivo) {

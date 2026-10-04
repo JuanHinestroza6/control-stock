@@ -78,7 +78,12 @@ public class GeneradorDatosSemilla {
         } finally {
             reloj.volverAlSistema();
         }
-        if (resumen == null || !resumen.generado()) {
+        if (resumen == null) {
+            return null;
+        }
+        if (!resumen.generado()) {
+            // Recupera el fallo posterior al commit: re-evalúa alertas de forma idempotente.
+            reevaluarAlertas();
             return resumen;
         }
         return cerrar(resumen, t0);
@@ -89,9 +94,7 @@ public class GeneradorDatosSemilla {
      * ({@code AlertaService.evaluar} usa REQUIRES_NEW), variante por variante en orden de id.
      */
     private ResumenSemilla cerrar(ResumenSemilla resumen, long t0) {
-        List<Long> ids = jdbc.queryForList("select id from variante order by id", Long.class);
-        ids.forEach(alertaService::evaluar);
-        verificador.verificarAlertas();
+        reevaluarAlertas();
         Map<String, Long> porTipo = new HashMap<>();
         jdbc.query("select tipo, count(*) as n from alerta where estado = 'ACTIVA' group by tipo",
                 rs -> {
@@ -100,6 +103,13 @@ public class GeneradorDatosSemilla {
         Long activas = jdbc.queryForObject("select count(*) from reserva where estado = 'ACTIVA'", Long.class);
         return resumen.conCierre(activas == null ? 0 : activas, porTipo.getOrDefault("AGOTADO", 0L),
                 porTipo.getOrDefault("STOCK_BAJO", 0L), System.currentTimeMillis() - t0);
+    }
+
+    /** Evalúa las alertas de todas las variantes (idempotente) y verifica que coincidan con el stock. */
+    void reevaluarAlertas() {
+        List<Long> ids = jdbc.queryForList("select id from variante order by id", Long.class);
+        ids.forEach(alertaService::evaluar);
+        verificador.verificarAlertas();
     }
 
     private ResumenSemilla cargar(LocalDate fin) {

@@ -15,6 +15,7 @@ import org.springframework.security.web.access.intercept.RequestAuthorizationCon
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -73,7 +74,9 @@ public class ConfiguracionSeguridad {
         return new BCryptPasswordEncoder();
     }
 
+    /** Solo en aplicaciones web: el perfil seed corre sin servidor HTTP y no tiene HttpSecurity. */
     @Bean
+    @ConditionalOnWebApplication
     public SecurityFilterChain filtros(HttpSecurity http, UsuarioRepository usuarios) throws Exception {
         ManejadorErroresSeguridad manejador = new ManejadorErroresSeguridad();
         http

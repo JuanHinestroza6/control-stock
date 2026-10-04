@@ -3,13 +3,14 @@ package co.livorno.controlstock.semilla;
 import co.livorno.controlstock.catalogo.repositorio.ProductoRepository;
 import co.livorno.controlstock.venta.repositorio.VentaRepository;
 import java.time.LocalDate;
+import java.util.Arrays;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
-/** Guardas de la carga (ADR-008, D5 y D7): perfil prod, fecha final y estado de la base. Solo lectura. */
+/** Guardas de la carga (ADR-008, D5 y D7): perfil permitido (dev o test), fecha final y estado de la base. Solo lectura. */
 @Component
 @Profile("seed")
 public class ProteccionesSemilla {
@@ -32,10 +33,12 @@ public class ProteccionesSemilla {
         this.jdbc = jdbc;
     }
 
-    /** Se niega a correr con el perfil prod. */
+    /** Lista de permitidos: solo corre si el entorno acepta {@code dev} o {@code test}; cualquier otro caso aborta. */
     public void validarPerfil() {
-        if (entorno.acceptsProfiles(Profiles.of("prod"))) {
-            throw new SemillaAbortadaException("El generador de datos semilla no corre con el perfil prod.");
+        if (!entorno.acceptsProfiles(Profiles.of("dev", "test"))) {
+            throw new SemillaAbortadaException("El generador de datos semilla solo corre con el perfil dev (o test); "
+                    + "perfiles activos: " + Arrays.toString(entorno.getActiveProfiles())
+                    + ". Usa -Dspring-boot.run.profiles=dev,seed.");
         }
     }
 

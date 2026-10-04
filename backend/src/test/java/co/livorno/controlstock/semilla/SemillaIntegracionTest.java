@@ -176,4 +176,29 @@ class SemillaIntegracionTest {
                 .map(f -> f.get("tipo") + "=" + f.get("u")).toList());
         return h;
     }
+
+    @Test
+    void generar_baseYaCargadaConAlertasPerdidas_lasRecuperaDeFormaIdempotente() {
+        generador.generar();
+        long esperadas = contar("select count(*) from alerta where estado = 'ACTIVA'");
+        assertThat(esperadas).isPositive();
+        // simula el fallo posterior al commit: las alertas no llegaron a evaluarse
+        jdbc.update("delete from alerta");
+
+        ResumenSemilla segunda = generador.generar();
+
+        assertThat(segunda.generado()).isFalse();
+        assertThat(contar("select count(*) from alerta where estado = 'ACTIVA'")).isEqualTo(esperadas);
+        generador.generar();
+        assertThat(contar("select count(*) from alerta where estado = 'ACTIVA'")).isEqualTo(esperadas);
+    }
+
+    @Test
+    void verificarCarga_usuarioDemoConOtroRol_falla() {
+        ResumenSemilla r = generador.generar();
+        jdbc.update("update usuario set rol = 'INVENTARIO' where email = 'ventas@livorno.co'");
+
+        assertThatThrownBy(() -> verificador.verificarCarga(r.inicio(), r.fin()))
+                .isInstanceOf(SemillaAbortadaException.class).hasMessageContaining("usuarios demo");
+    }
 }

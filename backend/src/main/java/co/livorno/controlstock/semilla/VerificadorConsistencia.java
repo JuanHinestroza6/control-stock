@@ -72,8 +72,14 @@ public class VerificadorConsistencia {
                 select count(*) from reserva where (estado = 'CONVERTIDA' and venta_id is null)
                 or (estado = 'VENCIDA' and cerrada_por is not null) or (estado = 'ACTIVA' and cerrada_en is not null)
                 or (estado <> 'ACTIVA' and cerrada_en is null)""");
-        reglas.put("usuarios demo incompletos o con cambio forzado", """
-                select case when count(distinct rol) = 4 and sum(debe_cambiar_password) = 0 then 0 else 1 end
+        reglas.put("usuarios demo con rol distinto, inactivos o con cambio forzado", """
+                select case when count(*) = 4 and sum(case
+                  when (email = 'admin@livorno.co' and rol = 'ADMIN')
+                    or (email = 'inventario@livorno.co' and rol = 'INVENTARIO')
+                    or (email = 'ventas@livorno.co' and rol = 'VENDEDOR')
+                    or (email = 'contabilidad@livorno.co' and rol = 'CONTABILIDAD') then 0 else 1 end) = 0
+                  and sum(debe_cambiar_password) = 0 and sum(case when activo = 1 then 0 else 1 end) = 0
+                  then 0 else 1 end
                 from usuario where email in ('admin@livorno.co', 'inventario@livorno.co', 'ventas@livorno.co',
                 'contabilidad@livorno.co')""");
 
