@@ -1,3 +1,14 @@
+# Perfil del generador de datos de demostración (ADR-008). Úsalo junto con dev: -Dspring-boot.run.profiles=dev,seed
 app:
   tareas:
     habilitadas: false
+  alertas:
+    por-evento: false # las alertas se evalúan al final de la carga, no una por movimiento
+  semilla:
+    ejecutar: true
+    salir-al-terminar: true
+    semilla-aleatoria: 42
+    meses: 24
+    fecha-fin: # vacía = ayer (America/Bogota); debe ser anterior a hoy
+    tickets-dia-base: 12 # se calibra en T1 para unas 12 mil ventas
+    password: ${SEED_PASSWORD:} # obligatoria; misma política que las contraseñas (12-72 caracteres)

@@ -23,4 +23,10 @@ class DependenciasEntreModulosTest {
             .that().resideInAPackage("co.livorno.controlstock.inventario..")
             .should().dependOnClassesThat().resideInAPackage("co.livorno.controlstock.venta..")
             .because("venta ya depende de inventario; Reserva.ventaId es un Long (ADR-007)");
+
+    @ArchTest
+    static final ArchRule nadieFueraDeSemillaDependeDeSemilla = noClasses()
+            .that().resideOutsideOfPackage("co.livorno.controlstock.semilla..")
+            .should().dependOnClassesThat().resideInAPackage("co.livorno.controlstock.semilla..")
+            .because("el generador de datos de demostración depende de los módulos, nunca al revés (ADR-008)");
 }
