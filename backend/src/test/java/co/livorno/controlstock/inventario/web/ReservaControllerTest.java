@@ -103,8 +103,6 @@ class ReservaControllerTest {
         String linea = "{\"varianteId\":1,\"cantidad\":1}";
         String veintiuna = String.join(",", Collections.nCopies(21, linea));
         for (String cuerpo : List.of(
-                "{\"clienteNombre\":\"A\",\"clienteContacto\":\"300\",\"lineas\":[" + linea + "]}",
-                "{\"clienteNombre\":\"Ana\",\"clienteContacto\":\"30\",\"lineas\":[" + linea + "]}",
                 "{\"clienteNombre\":\"Ana\",\"clienteContacto\":\"300\",\"lineas\":[]}",
                 "{\"clienteNombre\":\"Ana\",\"clienteContacto\":\"300\",\"lineas\":[" + veintiuna + "]}",
                 "{\"clienteNombre\":\"Ana\",\"clienteContacto\":\"300\",\"lineas\":[{\"varianteId\":1,\"cantidad\":101}]}",

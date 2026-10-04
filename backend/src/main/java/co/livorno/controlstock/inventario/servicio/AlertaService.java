@@ -83,7 +83,8 @@ public class AlertaService {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void evaluar(Long varianteId) {
-        Variante v = variantes.findById(varianteId).orElse(null);
+        // Bloquea la variante: dos evaluaciones simultáneas se serializan y la última ve el stock final confirmado.
+        Variante v = variantes.bloquearPorId(varianteId).orElse(null);
         if (v == null) {
             return;
         }

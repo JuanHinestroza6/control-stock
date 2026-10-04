@@ -11,5 +11,6 @@ public record ConvertirReservasRequest(
         @NotEmpty(message = "Indica al menos una reserva")
         @Size(max = 20, message = "Se pueden convertir máximo 20 reservas a la vez")
         List<@NotNull(message = "El id de la reserva es obligatorio") Long> reservaIds,
+        @Size(max = 20, message = "Se pueden indicar máximo 20 precios")
         List<@Valid PrecioReservaRequest> precios) {
 }

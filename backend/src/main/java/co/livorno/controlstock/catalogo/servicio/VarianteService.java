@@ -122,12 +122,14 @@ public class VarianteService {
     @Transactional
     public VarianteResponse cambiarEstado(Long id, boolean activo) {
         Variante v = buscar(id);
+        boolean reactivada = false;
         if (v.isActivo() != activo) {
             if (activo) {
                 if (!v.getProducto().isActivo()) {
                     throw new ExcepcionNegocio("Activa primero el producto " + v.getProducto().getCodigo() + ".");
                 }
                 v.activar();
+                reactivada = true;
             } else {
                 var apartados = reservasActivas.resumenDeVariante(v.getId());
                 if (apartados.hayApartados()) {
@@ -141,6 +143,9 @@ public class VarianteService {
                 v.desactivar();
             }
             variantes.saveAndFlush(v);
+            if (reactivada) {
+                eventos.publishEvent(new UmbralCambiado(v.getId())); // reevalúa las alertas de la variante reactivada
+            }
         }
         return VarianteResponse.de(v);
     }

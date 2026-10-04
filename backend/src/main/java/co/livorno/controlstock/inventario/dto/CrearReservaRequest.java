@@ -10,10 +10,10 @@ import java.util.List;
 
 public record CrearReservaRequest(
         @NotBlank(message = "El nombre del cliente es obligatorio")
-        @Size(min = 2, max = 120, message = "El nombre del cliente debe tener entre 2 y 120 caracteres")
+        @Size(max = 500, message = "El nombre del cliente es demasiado largo")
         String clienteNombre,
         @NotBlank(message = "El contacto del cliente es obligatorio")
-        @Size(min = 3, max = 120, message = "El contacto del cliente debe tener entre 3 y 120 caracteres")
+        @Size(max = 500, message = "El contacto del cliente es demasiado largo")
         String clienteContacto,
         @Min(value = 1, message = "La vigencia mínima es 1 hora")
         @Max(value = 168, message = "La vigencia máxima es 168 horas") Integer vigenciaHoras,

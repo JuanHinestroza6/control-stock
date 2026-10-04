@@ -145,6 +145,18 @@ class ReservaServiceTest {
     }
 
     @Test
+    void crear_nombreOContactoCortosOLargosTrasRecortar_lanza400SinGuardar() {
+        var linea = List.of(new LineaReservaRequest(5L, 1));
+        assertThatThrownBy(() -> servicio.crear(new CrearReservaRequest("  A  ", "3001234", null, linea)))
+                .isInstanceOf(SolicitudInvalidaException.class).hasMessageContaining("nombre del cliente");
+        assertThatThrownBy(() -> servicio.crear(new CrearReservaRequest("Ana", "  12  ", null, linea)))
+                .isInstanceOf(SolicitudInvalidaException.class).hasMessageContaining("contacto del cliente");
+        assertThatThrownBy(() -> servicio.crear(new CrearReservaRequest("x".repeat(121), "3001234", null, linea)))
+                .isInstanceOf(SolicitudInvalidaException.class);
+        Mockito.verifyNoInteractions(reservas, movimientos);
+    }
+
+    @Test
     void crear_varianteRepetida_lanza400SinGuardar() {
         assertThatThrownBy(() -> servicio.crear(crear(null, new LineaReservaRequest(5L, 1),
                 new LineaReservaRequest(5L, 2))))
@@ -201,7 +213,7 @@ class ReservaServiceTest {
         assertThat(c.getValue().usuarioId()).isEqualTo(3L);
         assertThat(c.getValue().referenciaTipo()).isEqualTo("RESERVA");
         assertThat(c.getValue().referenciaId()).isEqualTo(12L);
-        assertThat(c.getValue().observacion()).isEqualTo("Cancelada: Cliente desistió");
+        assertThat(c.getValue().observacion()).isEqualTo("Cancelada");
     }
 
     @Test

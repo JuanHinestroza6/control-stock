@@ -53,7 +53,7 @@ class AlertaServiceTest {
     private Variante variante(int fisico, int reservado) {
         Variante v = new Variante(null, "LIV001-M-NEG", Talla.M, "NEGRO", 5);
         v.aplicarMovimiento(fisico, reservado);
-        when(variantes.findById(ID)).thenReturn(Optional.of(v));
+        when(variantes.bloquearPorId(ID)).thenReturn(Optional.of(v));
         return v;
     }
 
@@ -114,7 +114,7 @@ class AlertaServiceTest {
 
     @Test
     void evaluar_varianteInexistente_noHaceNada() {
-        when(variantes.findById(ID)).thenReturn(Optional.empty());
+        when(variantes.bloquearPorId(ID)).thenReturn(Optional.empty());
 
         servicio.evaluar(ID);
 

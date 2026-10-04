@@ -298,7 +298,7 @@ class ReservasAlertasIntegracionTest {
         assertThat(reservado(a)).isEqualTo(3);
         assertThat(tiposKardex(inventario, a)).containsExactlyInAnyOrder("ENTRADA", "RESERVA", "RESERVA", "LIBERACION");
         enviar("GET", "/api/movimientos?varianteId=" + a + "&tipo=LIBERACION", inventario, null)
-                .andExpect(jsonPath("$.content[0].observacion").value("Cancelada: cliente desistio"))
+                .andExpect(jsonPath("$.content[0].observacion").value("Cancelada"))
                 .andExpect(jsonPath("$.content[0].referenciaTipo").value("RESERVA"))
                 .andExpect(jsonPath("$.content[0].referenciaId").value((int) rA2));
         assertThat(tiposAlerta(vendedor, a, "ACTIVA")).containsExactly("STOCK_BAJO");

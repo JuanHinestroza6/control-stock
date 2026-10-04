@@ -69,6 +69,10 @@ public class ReservaService {
     /** Todo o nada: una reserva ACTIVA y un movimiento RESERVA por línea; cualquier error revierte todo. */
     @Transactional
     public List<ReservaResponse> crear(CrearReservaRequest request) {
+        String nombre = normalizar(request.clienteNombre());
+        String contacto = normalizar(request.clienteContacto());
+        validarLargo(nombre, "El nombre del cliente", 2, 120);
+        validarLargo(contacto, "El contacto del cliente", 3, 120);
         Set<Long> vistos = new HashSet<>();
         for (LineaReservaRequest l : request.lineas()) {
             if (!vistos.add(l.varianteId())) {
@@ -81,8 +85,6 @@ public class ReservaService {
                 .sorted(Comparator.comparing(LineaReservaRequest::varianteId)).toList();
 
         Long usuarioId = usuarioActual.id();
-        String nombre = normalizar(request.clienteNombre());
-        String contacto = normalizar(request.clienteContacto());
         LocalDateTime ahora = LocalDateTime.now(clock);
         int horas = request.vigenciaHoras() == null ? vigenciaPorDefectoHoras : request.vigenciaHoras();
 
@@ -109,7 +111,7 @@ public class ReservaService {
         String motivo = request.motivo().strip();
         r.cancelar(motivo, LocalDateTime.now(clock), usuarioId); // 409 si no está ACTIVA
         movimientos.registrar(new SolicitudMovimiento(r.getVariante().getId(), TipoMovimiento.LIBERACION,
-                r.getCantidad(), null, usuarioId, "RESERVA", r.getId(), "Cancelada: " + motivo));
+                r.getCantidad(), null, usuarioId, "RESERVA", r.getId(), "Cancelada"));
         reservas.saveAndFlush(r);
         return aRespuestas(List.of(r)).get(0);
     }
@@ -175,6 +177,13 @@ public class ReservaService {
             nombres.put(u.getId(), u.getNombre());
         }
         return nombres;
+    }
+
+    private static void validarLargo(String texto, String campo, int min, int max) {
+        if (texto.length() < min || texto.length() > max) {
+            throw new SolicitudInvalidaException(
+                    campo + " debe tener entre " + min + " y " + max + " caracteres sin contar espacios sobrantes.");
+        }
     }
 
     /** Sin espacios en los extremos y con los internos colapsados. */
