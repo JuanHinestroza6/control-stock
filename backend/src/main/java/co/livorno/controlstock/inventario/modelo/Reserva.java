@@ -32,6 +32,9 @@ public class Reserva {
     /** Tope de vida de una reserva desde su creación. */
     public static final int DIAS_MAXIMOS = 7;
 
+    /** Valor que reemplaza los datos del cliente al anonimizar. */
+    public static final String ANONIMIZADO = "[anonimizado]";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -43,10 +46,10 @@ public class Reserva {
     @Column(nullable = false, updatable = false)
     private int cantidad;
 
-    @Column(name = "cliente_nombre", nullable = false, length = 120, updatable = false)
+    @Column(name = "cliente_nombre", nullable = false, length = 120)
     private String clienteNombre;
 
-    @Column(name = "cliente_contacto", nullable = false, length = 120, updatable = false)
+    @Column(name = "cliente_contacto", nullable = false, length = 120)
     private String clienteContacto;
 
     @Column(name = "creada_en", nullable = false, updatable = false)
@@ -141,6 +144,26 @@ public class Reserva {
             throw new ExcepcionNegocio("Una reserva no puede durar más de " + DIAS_MAXIMOS + " días.");
         }
         this.venceEn = nuevo;
+    }
+
+    /**
+     * Supresión de datos personales (Ley 1581, ADR-007): reemplaza nombre y contacto del cliente. Solo reservas ya
+     * cerradas; una ACTIVA lanza 409. Idempotente.
+     */
+    public void anonimizar() {
+        exigirNoActiva();
+        this.clienteNombre = ANONIMIZADO;
+        this.clienteContacto = ANONIMIZADO;
+    }
+
+    public boolean estaAnonimizada() {
+        return ANONIMIZADO.equals(clienteNombre) && ANONIMIZADO.equals(clienteContacto);
+    }
+
+    private void exigirNoActiva() {
+        if (estado == EstadoReserva.ACTIVA) {
+            throw new ConflictoException("La reserva " + numero() + " sigue ACTIVA; no se puede anonimizar.");
+        }
     }
 
     private void exigirActiva() {

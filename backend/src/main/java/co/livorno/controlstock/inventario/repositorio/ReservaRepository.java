@@ -88,4 +88,18 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
             """)
     Page<Reserva> buscar(@Param("estado") EstadoReserva estado, @Param("varianteId") Long varianteId,
             @Param("patron") String patron, @Param("limite") LocalDateTime limite, Pageable pageable);
+
+    /**
+     * Reservas cerradas (no ACTIVAS) con {@code cerradaEn <= limite} que aún conservan datos del cliente (usa
+     * idx_reserva_estado_cerrada). Pasar un Pageable de una sola página como lote.
+     */
+    @Query("""
+            select r from Reserva r
+            where r.estado <> co.livorno.controlstock.inventario.modelo.EstadoReserva.ACTIVA
+              and r.cerradaEn <= :limite
+              and (r.clienteNombre <> :marca or r.clienteContacto <> :marca)
+            order by r.id
+            """)
+    List<Reserva> pendientesDeAnonimizar(@Param("limite") LocalDateTime limite, @Param("marca") String marca,
+            Pageable pageable);
 }

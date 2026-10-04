@@ -36,6 +36,36 @@ class ReservaTest {
     }
 
     @Test
+    void anonimizar_activa_lanzaConflictoYConservaDatos() {
+        Reserva r = nueva();
+
+        assertThatThrownBy(r::anonimizar).isInstanceOf(ConflictoException.class);
+
+        assertThat(r.getClienteNombre()).isEqualTo("Ana");
+        assertThat(r.getClienteContacto()).isEqualTo("3001234567");
+    }
+
+    @Test
+    void anonimizar_reservaCerradaEnCualquierEstado_reemplazaDatosYEsIdempotente() {
+        Reserva cancelada = nueva();
+        cancelada.cancelar("Cliente desistió", T0.plusHours(1), 5L);
+        Reserva vencida = nueva();
+        vencida.vencer(T0.plusHours(49));
+        Reserva convertida = nueva();
+        convertida.convertir(7L, T0.plusHours(2), 5L);
+
+        for (Reserva r : java.util.List.of(cancelada, vencida, convertida)) {
+            r.anonimizar();
+            r.anonimizar();
+            assertThat(r.getClienteNombre()).isEqualTo("[anonimizado]");
+            assertThat(r.getClienteContacto()).isEqualTo("[anonimizado]");
+            assertThat(r.estaAnonimizada()).isTrue();
+        }
+        assertThat(cancelada.getEstado()).isEqualTo(EstadoReserva.CANCELADA);
+        assertThat(convertida.getVentaId()).isEqualTo(7L);
+    }
+
+    @Test
     void numero_conId12_devuelveR000012() {
         assertThat(nueva().numero()).isEqualTo("R-000012");
     }

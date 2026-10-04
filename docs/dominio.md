@@ -181,6 +181,9 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. Desde la Fas
   reservas ACTIVAS con `venceEn ≤ ahora` (hora del `Clock`, America/Bogota) y procesa **cada una en su propia
   transacción**: si sigue ACTIVA, movimiento LIBERACION con `usuarioId` null y estado VENCIDA; si no, la omite
   (idempotente). Un fallo se registra en el log y se reintenta en el ciclo siguiente.
+- **Anonimización (Ley 1581)**: tarea nocturna (02:30 America/Bogota) que reemplaza nombre y contacto del cliente por
+  `[anonimizado]` en reservas cerradas (CANCELADA, VENCIDA, CONVERTIDA) hace 90 días o más (`app.reservas.anonimizacion.dias`,
+  configurable). Idempotente; no genera movimientos ni toca stock; las ACTIVAS nunca se anonimizan.
 - **Convertir en venta**: una o varias reservas ACTIVAS (máx. 20, ids sin repetir) **del mismo cliente** (contacto
   normalizado igual; si no, 422) → **una venta**. Las líneas se agrupan por variante (cantidad sumada); un movimiento
   VENTA_RESERVA por línea con referencia `VENTA/{id}`. `precioLista` = `precioVenta` del producto **al convertir**;

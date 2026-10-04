@@ -36,6 +36,12 @@ alertas. Había siete cuestiones abiertas:
    `estadoStock()`: AGOTADO si disponible = 0, STOCK_BAJO si 0 < disponible ≤ umbral; al cambiar de una a otra se cierra
    la anterior (ATENDIDA con `atendidaPor` null). Una ACTIVA por variante y tipo garantizada por un índice único sobre una
    columna generada. SIN_ROTACION y la re-evaluación nocturna pasan a la Fase 5.
+8. **Supresión de datos del cliente (Ley 1581)**: retención de 90 días configurable
+   (`app.reservas.anonimizacion.dias`). Una tarea nocturna (`app.reservas.anonimizacion.cron`, 02:30 America/Bogota,
+   apagada con `app.tareas.habilitadas=false`) reemplaza `clienteNombre` y `clienteContacto` por `[anonimizado]` en las
+   reservas cerradas (CANCELADA, VENCIDA, CONVERTIDA) con `cerradaEn ≤ ahora − días`, en lotes de 200 y una transacción
+   por lote; el log solo registra la cantidad. Es idempotente, no genera movimientos ni toca stock. El kardex no contiene
+   datos del cliente, así que no requiere cambios. Migración V13: índice `(estado, cerrada_en)`.
 
 ## Alternativas consideradas
 - Una reserva → una venta — más simple, pero un cliente con tres prendas genera tres ventas y tres números.
