@@ -34,7 +34,15 @@ class VarianteServiceTest {
 
     @Mock ProductoRepository productos;
     @Mock VarianteRepository variantes;
+    @Mock org.springframework.context.ApplicationEventPublisher eventos;
+    @Mock co.livorno.controlstock.catalogo.servicio.ConsultaReservasActivas reservasActivas;
     @InjectMocks VarianteService servicio;
+
+    @org.junit.jupiter.api.BeforeEach
+    void sinApartadosPorDefecto() {
+        org.mockito.Mockito.lenient().when(reservasActivas.resumenDeVariante(any()))
+                .thenReturn(new ConsultaReservasActivas.Resumen(0, 0));
+    }
 
     private Producto producto(boolean activo) {
         Producto p = new Producto("LIV001", "Camiseta", new Categoria("Camisetas"), new BigDecimal("20000"),
@@ -210,6 +218,9 @@ class VarianteServiceTest {
 
         assertThat(r.stockMinimo()).isEqualTo(9);
         assertThat(r.sku()).isEqualTo("A");
+        // el umbral cambió: el listener de alertas debe reevaluar la variante
+        org.mockito.Mockito.verify(eventos)
+                .publishEvent(new co.livorno.controlstock.catalogo.evento.UmbralCambiado(v.getId()));
     }
 
     @Test
@@ -233,6 +244,19 @@ class VarianteServiceTest {
     }
 
     @Test
+    void cambiarEstado_desactivarConApartadosActivos_lanza409ConCantidades() {
+        Variante v = existente(producto(true), "LIV001-M-NEG", Talla.M, "NEGRO", true);
+        when(variantes.findById(5L)).thenReturn(Optional.of(v));
+        when(reservasActivas.resumenDeVariante(any())).thenReturn(new ConsultaReservasActivas.Resumen(2, 5));
+
+        assertThatThrownBy(() -> servicio.cambiarEstado(5L, false))
+                .isInstanceOf(co.livorno.controlstock.comun.excepcion.ConflictoException.class)
+                .hasMessage("La variante LIV001-M-NEG tiene 2 apartados activos (5 unidades).");
+        assertThat(v.isActivo()).isTrue();
+        verify(variantes, never()).saveAndFlush(any());
+    }
+
+    @Test
     void cambiarEstado_desactivarSinReservado_desactiva() {
         Variante v = existente(producto(true), "A", Talla.M, "NEGRO", true);
         when(variantes.findById(5L)).thenReturn(Optional.of(v));
@@ -251,11 +275,24 @@ class VarianteServiceTest {
     }
 
     @Test
-    void cambiarEstado_activarConProductoActivo_activa() {
+    void cambiarEstado_activarConProductoActivo_activaYReevaluaAlertas() {
         Variante v = existente(producto(true), "A", Talla.M, "NEGRO", false);
         when(variantes.findById(5L)).thenReturn(Optional.of(v));
 
         assertThat(servicio.cambiarEstado(5L, true).activo()).isTrue();
+
+        org.mockito.Mockito.verify(eventos)
+                .publishEvent(new co.livorno.controlstock.catalogo.evento.UmbralCambiado(v.getId()));
+    }
+
+    @Test
+    void cambiarEstado_activarYaActiva_noPublicaEvento() {
+        Variante v = existente(producto(true), "A", Talla.M, "NEGRO", true);
+        when(variantes.findById(5L)).thenReturn(Optional.of(v));
+
+        servicio.cambiarEstado(5L, true);
+
+        org.mockito.Mockito.verifyNoInteractions(eventos);
     }
 
     @Test

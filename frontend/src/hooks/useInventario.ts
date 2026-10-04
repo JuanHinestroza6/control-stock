@@ -12,7 +12,7 @@ import type {
 } from '../tipos/inventario'
 
 /** Claves que toda operación de stock deja obsoletas. */
-const CLAVES_STOCK = ['inventario', 'movimientos', 'matriz', 'variantes', 'productos', 'producto']
+const CLAVES_STOCK = ['inventario', 'movimientos', 'matriz', 'variantes', 'productos', 'producto', 'reservas', 'reserva', 'alertas']
 
 export function invalidarStock(qc: QueryClient, extra: string[] = []) {
   return Promise.all([...CLAVES_STOCK, ...extra].map((k) => qc.invalidateQueries({ queryKey: [k] })))

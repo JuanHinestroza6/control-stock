@@ -28,3 +28,13 @@ Nuevos en Fase 2 (rama fase-2-operacion, 2026-10-02):
 **How to apply:** en cada revisión, cruzar unicidad con la collation, buscar excepciones de Java alcanzables desde un
 endpoint, leer ADR/plan línea por línea contra el código, pedir prueba concurrente con @Lock/@Version y revisar que las
 reglas ArchUnit no puedan quedar vacuas. Relacionado: [[project-fase0-pendientes]].
+
+Fase 3 (rama fase-3-apartados, 2026-10-02), sin críticos:
+- Se repitió el 8: `CrearReservaRequest` con `@Size(min=2/3)` y `normalizar()` (strip) en el servicio. El 6 empeoró: la
+  regla "@Modifying prohibido" se estrechó a MovimientoRepository para permitir AlertaRepository; nada impide un
+  UPDATE masivo de `variante.stock_*` en otro repositorio.
+9. Listeners AFTER_COMMIT + REQUIRES_NEW que leen el agregado sin bloquearlo (AlertaService.evaluar): dos evaluaciones
+   concurrentes de la misma variante pueden dejar una alerta obsoleta o AGOTADO y STOCK_BAJO activas a la vez. Pedir
+   bloqueo de la fila de la variante al evaluar y prueba con dos hilos.
+10. Datos personales (Ley 1581) copiados a tablas inmutables (motivo de cancelación en la observación del kardex) y sin
+    plan de supresión/anonimización de `reserva.cliente_*` (columnas updatable=false).

@@ -11,6 +11,11 @@ vi.mock('./paginas/ventas/VentasPage', () => ({ VentasPage: () => <p>pagina vent
 vi.mock('./paginas/ventas/VentaNuevaPage', () => ({ VentaNuevaPage: () => <p>pagina venta nueva</p> }))
 vi.mock('./paginas/ventas/VentaDetallePage', () => ({ VentaDetallePage: () => <p>pagina venta detalle</p> }))
 
+vi.mock('./paginas/reservas/ReservasPage', () => ({ ReservasPage: () => <p>pagina reservas</p> }))
+vi.mock('./paginas/reservas/ReservaNuevaPage', () => ({ ReservaNuevaPage: () => <p>pagina reserva nueva</p> }))
+vi.mock('./paginas/alertas/AlertasPage', () => ({ AlertasPage: () => <p>pagina alertas</p> }))
+vi.mock('./api/alertas')
+
 const ROLES: Rol[] = ['ADMIN', 'INVENTARIO', 'VENDEDOR', 'CONTABILIDAD']
 
 /** Rutas de Fase 2 y roles con acceso (docs/dominio.md y plan de Fase 2). */
@@ -21,6 +26,9 @@ const RUTAS: [string, string, Rol[]][] = [
   ['/ventas', 'pagina ventas', ['ADMIN', 'VENDEDOR', 'CONTABILIDAD']],
   ['/ventas/7', 'pagina venta detalle', ['ADMIN', 'VENDEDOR', 'CONTABILIDAD']],
   ['/ventas/nueva', 'pagina venta nueva', ['ADMIN', 'VENDEDOR']],
+  ['/reservas', 'pagina reservas', ['ADMIN', 'INVENTARIO', 'VENDEDOR']],
+  ['/reservas/nueva', 'pagina reserva nueva', ['ADMIN', 'INVENTARIO', 'VENDEDOR']],
+  ['/alertas', 'pagina alertas', ['ADMIN', 'INVENTARIO', 'VENDEDOR']],
 ]
 
 describe('rutas de inventario y ventas por rol', () => {

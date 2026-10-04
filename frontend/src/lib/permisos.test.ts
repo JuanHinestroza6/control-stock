@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  puedeAtenderAlertas,
+  puedeConvertirReserva,
+  puedeReservar,
   puedeAnularVenta,
   puedeEditarCatalogo,
   puedeMoverStock,
@@ -35,5 +38,18 @@ describe('permisos de la fase 2', () => {
   })
   it('puedeVerCostos', () => {
     expect(roles.map(puedeVerCostos)).toEqual([true, true, false, true, false])
+  })
+})
+
+describe('permisos de la fase 3', () => {
+  const roles = ['ADMIN', 'INVENTARIO', 'VENDEDOR', 'CONTABILIDAD', undefined] as const
+  it('puedeReservar', () => {
+    expect(roles.map(puedeReservar)).toEqual([true, true, true, false, false])
+  })
+  it('puedeConvertirReserva', () => {
+    expect(roles.map(puedeConvertirReserva)).toEqual([true, false, true, false, false])
+  })
+  it('puedeAtenderAlertas', () => {
+    expect(roles.map(puedeAtenderAlertas)).toEqual([true, true, false, false, false])
   })
 })

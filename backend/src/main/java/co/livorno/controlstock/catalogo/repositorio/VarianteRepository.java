@@ -1,14 +1,21 @@
 package co.livorno.controlstock.catalogo.repositorio;
 
 import co.livorno.controlstock.catalogo.modelo.Variante;
+import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface VarianteRepository extends JpaRepository<Variante, Long> {
+
+    /** Lectura con bloqueo de fila (FOR UPDATE): ve siempre lo último confirmado. Lo usa la evaluación de alertas. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select v from Variante v where v.id = :id")
+    Optional<Variante> bloquearPorId(@Param("id") Long id);
 
     Optional<Variante> findBySku(String sku);
 

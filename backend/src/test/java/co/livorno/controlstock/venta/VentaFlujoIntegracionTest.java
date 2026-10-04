@@ -70,8 +70,10 @@ class VentaFlujoIntegracionTest {
         SecurityContextHolder.clearContext();
         jdbc.update("DELETE FROM devolucion WHERE usuario_id = ?", usuarioId);
         jdbc.update("DELETE FROM movimiento WHERE variante_id = ?", varianteId);
+        jdbc.update("DELETE FROM reserva WHERE variante_id = ?", varianteId);
         jdbc.update("DELETE FROM detalle_venta WHERE variante_id = ?", varianteId);
         jdbc.update("DELETE FROM venta WHERE usuario_id = ?", usuarioId);
+        jdbc.update("DELETE FROM alerta WHERE variante_id = ?", varianteId);
         jdbc.update("DELETE FROM variante WHERE id = ?", varianteId);
         jdbc.update("DELETE FROM producto WHERE id = ?", productoId);
         jdbc.update("DELETE FROM usuario WHERE id = ?", usuarioId);
@@ -84,6 +86,43 @@ class VentaFlujoIntegracionTest {
     private VentaDetalleResponse vender(int cantidad) {
         return ventaService.registrar(new RegistrarVentaRequest(List.of(new LineaVentaRequest(varianteId, cantidad,
                 null))));
+    }
+
+    @Test
+    void convertirReservasYAnular_lasReservasSiguenConvertidasYSoloSeReponeElFisico() {
+        // dado: 2 unidades apartadas de las 5 físicas (reserva ACTIVA coherente con stock_reservado)
+        jdbc.update("UPDATE variante SET stock_reservado = 2 WHERE id = ?", varianteId);
+        jdbc.update("INSERT INTO reserva (variante_id, cantidad, cliente_nombre, cliente_contacto, creada_en, vence_en,"
+                + " estado, usuario_id) VALUES (?, 2, 'Ana', '300', NOW(6), DATE_ADD(NOW(6), INTERVAL 1 DAY),"
+                + " 'ACTIVA', ?)", varianteId, usuarioId);
+        Long reservaId = jdbc.queryForObject("SELECT id FROM reserva WHERE variante_id = ?", Long.class, varianteId);
+
+        // cuando: se convierte en venta
+        VentaDetalleResponse venta = ventaService.registrarDesdeReservas(
+                new co.livorno.controlstock.venta.dto.ConvertirReservasRequest(List.of(reservaId), null));
+
+        // entonces: físico 3, reservado 0, reserva CONVERTIDA con la venta y un VENTA_RESERVA
+        assertThat(fisico()).isEqualTo(3);
+        assertThat(jdbc.queryForObject("SELECT stock_reservado FROM variante WHERE id = ?", Integer.class, varianteId))
+                .isZero();
+        assertThat(jdbc.queryForObject("SELECT venta_id FROM reserva WHERE id = ?", Long.class, reservaId))
+                .isEqualTo(venta.id());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM movimiento WHERE tipo = 'VENTA_RESERVA' AND variante_id = ?"
+                + " AND referencia_id = ?", Integer.class, varianteId, venta.id())).isEqualTo(1);
+        assertThat(ventaService.obtener(venta.id()).reservas()).containsExactly(venta.reservas().get(0));
+
+        // convertirla otra vez: 409
+        assertThatThrownBy(() -> ventaService.registrarDesdeReservas(
+                new co.livorno.controlstock.venta.dto.ConvertirReservasRequest(List.of(reservaId), null)))
+                .isInstanceOf(ConflictoException.class);
+
+        // anular: repone el físico y la reserva sigue CONVERTIDA (no se reactiva)
+        ventaService.anular(venta.id(), new AnularVentaRequest("error de captura"));
+        assertThat(fisico()).isEqualTo(5);
+        assertThat(jdbc.queryForObject("SELECT stock_reservado FROM variante WHERE id = ?", Integer.class, varianteId))
+                .isZero();
+        assertThat(jdbc.queryForObject("SELECT estado FROM reserva WHERE id = ?", String.class, reservaId))
+                .isEqualTo("CONVERTIDA");
     }
 
     @Test

@@ -1,0 +1,22 @@
+package co.livorno.controlstock.inventario.dto;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
+import java.util.List;
+
+public record CrearReservaRequest(
+        @NotBlank(message = "El nombre del cliente es obligatorio")
+        @Size(max = 500, message = "El nombre del cliente es demasiado largo")
+        String clienteNombre,
+        @NotBlank(message = "El contacto del cliente es obligatorio")
+        @Size(max = 500, message = "El contacto del cliente es demasiado largo")
+        String clienteContacto,
+        @Min(value = 1, message = "La vigencia mínima es 1 hora")
+        @Max(value = 168, message = "La vigencia máxima es 168 horas") Integer vigenciaHoras,
+        @NotEmpty(message = "Agrega al menos una línea")
+        @Size(max = 20, message = "Una reserva admite hasta 20 líneas") List<@Valid LineaReservaRequest> lineas) {
+}

@@ -62,6 +62,9 @@ class CatalogoIntegracionTest {
     @AfterEach
     void limpiar() {
         for (Long id : productosCreados) {
+            for (String t : new String[] {"alerta", "reserva"}) {
+                jdbc.update("DELETE FROM " + t + " WHERE variante_id IN (SELECT id FROM variante WHERE producto_id = ?)", id);
+            }
             jdbc.update("DELETE FROM variante WHERE producto_id = ?", id);
             jdbc.update("DELETE FROM producto WHERE id = ?", id);
         }

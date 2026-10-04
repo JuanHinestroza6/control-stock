@@ -7,7 +7,12 @@ import co.livorno.controlstock.comun.excepcion.RecursoNoEncontradoException;
 import co.livorno.controlstock.comun.excepcion.SolicitudInvalidaException;
 import co.livorno.controlstock.comun.seguridad.UsuarioActual;
 import co.livorno.controlstock.comun.web.Ordenamiento;
+import co.livorno.controlstock.comun.excepcion.ConflictoException;
 import co.livorno.controlstock.inventario.dto.SolicitudMovimiento;
+import co.livorno.controlstock.inventario.modelo.Reserva;
+import co.livorno.controlstock.inventario.repositorio.ReservaRepository;
+import co.livorno.controlstock.venta.dto.ConvertirReservasRequest;
+import co.livorno.controlstock.venta.dto.PrecioReservaRequest;
 import co.livorno.controlstock.inventario.modelo.TipoMovimiento;
 import co.livorno.controlstock.inventario.servicio.MovimientoService;
 import co.livorno.controlstock.usuario.modelo.Usuario;
@@ -27,10 +32,14 @@ import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -54,6 +63,7 @@ public class VentaService {
     private final MovimientoService movimientos;
     private final UsuarioActual usuarioActual;
     private final Clock clock;
+    private final ReservaRepository reservas;
 
     /** Todo o nada: cualquier error (stock, precio, variante) revierte la venta y los movimientos. */
     @Transactional
@@ -77,17 +87,7 @@ public class VentaService {
         for (LineaVentaRequest l : ordenadas) {
             Variante v = variantes.findById(l.varianteId())
                     .orElseThrow(() -> new RecursoNoEncontradoException("Variante", l.varianteId()));
-            if (!v.isActivo() || !v.getProducto().isActivo()) {
-                throw new ExcepcionNegocio("La variante " + v.getSku() + " está inactiva y no se puede vender.");
-            }
-            BigDecimal lista = v.getProducto().getPrecioVenta().setScale(2, RoundingMode.HALF_UP);
-            BigDecimal unitario = l.precioUnitario() == null ? lista
-                    : l.precioUnitario().setScale(2, RoundingMode.HALF_UP);
-            if (unitario.compareTo(lista) > 0) {
-                throw new ExcepcionNegocio("El precio de " + v.getSku() + " no puede superar el de lista ("
-                        + lista.toPlainString() + ").");
-            }
-            venta.agregarLinea(v, l.cantidad(), lista, unitario, v.getProducto().getPrecioCompra());
+            agregarLinea(venta, v, l.cantidad(), l.precioUnitario());
         }
         ventas.saveAndFlush(venta); // asigna el id para la referencia del kardex
 
@@ -96,6 +96,97 @@ public class VentaService {
                     d.getCantidad(), null, usuarioId, "VENTA", venta.getId(), null));
         }
         return VentaDetalleResponse.de(venta, puedeVerCosto());
+    }
+
+    /**
+     * Construcción de una línea compartida por la venta directa y la conversión de reservas: variante y producto
+     * activos (422); precioLista = precioVenta actual; precioUnitario opcional (0 &lt; precio &le; lista);
+     * costoUnitario = precioCompra actual.
+     */
+    private void agregarLinea(Venta venta, Variante v, int cantidad, BigDecimal precioUnitario) {
+        if (!v.isActivo() || !v.getProducto().isActivo()) {
+            throw new ExcepcionNegocio("La variante " + v.getSku() + " está inactiva y no se puede vender.");
+        }
+        BigDecimal lista = v.getProducto().getPrecioVenta().setScale(2, RoundingMode.HALF_UP);
+        BigDecimal unitario = precioUnitario == null ? lista : precioUnitario.setScale(2, RoundingMode.HALF_UP);
+        if (unitario.compareTo(lista) > 0) {
+            throw new ExcepcionNegocio("El precio de " + v.getSku() + " no puede superar el de lista ("
+                    + lista.toPlainString() + ").");
+        }
+        venta.agregarLinea(v, cantidad, lista, unitario, v.getProducto().getPrecioCompra());
+    }
+
+    /**
+     * Convierte reservas ACTIVAS del mismo cliente en una venta (ADR-007). Bloquea las reservas en orden de id
+     * (404 si falta alguna, 409 si alguna no está ACTIVA), exige el mismo cliente por contacto normalizado (422),
+     * agrupa por variante, y por línea registra un VENTA_RESERVA (referencia VENTA/{id}). Todo o nada.
+     */
+    @Transactional
+    public VentaDetalleResponse registrarDesdeReservas(ConvertirReservasRequest request) {
+        List<Long> ids = request.reservaIds();
+        if (new HashSet<>(ids).size() != ids.size()) {
+            throw new SolicitudInvalidaException("Hay reservas repetidas en la solicitud.");
+        }
+        List<Reserva> reservasBloqueadas = reservas.bloquearVarias(ids);
+        Set<Long> halladas = reservasBloqueadas.stream().map(Reserva::getId).collect(Collectors.toSet());
+        for (Long id : ids) {
+            if (!halladas.contains(id)) {
+                throw new RecursoNoEncontradoException("Reserva", id);
+            }
+        }
+        for (Reserva r : reservasBloqueadas) {
+            if (!r.estaActiva()) {
+                throw new ConflictoException("La reserva " + r.numero() + " ya está " + r.getEstado() + ".");
+            }
+        }
+        if (reservasBloqueadas.stream().map(r -> contactoNormalizado(r.getClienteContacto())).distinct().count() > 1) {
+            throw new ExcepcionNegocio("Las reservas deben ser del mismo cliente.");
+        }
+
+        // Agrupa por variante (orden por id: igual que la venta directa, evita interbloqueos).
+        Map<Long, List<Reserva>> porVariante = new TreeMap<>();
+        for (Reserva r : reservasBloqueadas) {
+            porVariante.computeIfAbsent(r.getVariante().getId(), k -> new ArrayList<>()).add(r);
+        }
+        Map<Long, BigDecimal> precios = new HashMap<>();
+        for (PrecioReservaRequest p : request.precios() == null ? List.<PrecioReservaRequest>of() : request.precios()) {
+            if (!porVariante.containsKey(p.varianteId())) {
+                throw new SolicitudInvalidaException("La variante " + p.varianteId()
+                        + " no está en las reservas indicadas.");
+            }
+            if (precios.put(p.varianteId(), p.precioUnitario()) != null) {
+                throw new SolicitudInvalidaException("El precio de la variante " + p.varianteId()
+                        + " está repetido.");
+            }
+        }
+
+        Long usuarioId = usuarioActual.id();
+        Usuario vendedor = usuarios.findById(usuarioId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Usuario", usuarioId));
+        LocalDateTime ahora = LocalDateTime.now(clock);
+        Venta venta = new Venta(vendedor, ahora);
+        for (var e : porVariante.entrySet()) {
+            Variante v = e.getValue().get(0).getVariante();
+            int cantidad = e.getValue().stream().mapToInt(Reserva::getCantidad).sum();
+            agregarLinea(venta, v, cantidad, precios.get(e.getKey()));
+        }
+        ventas.saveAndFlush(venta);
+
+        for (var d : venta.getDetalles()) {
+            String numeros = porVariante.get(d.getVariante().getId()).stream().map(Reserva::numero)
+                    .collect(Collectors.joining(", ", "Reservas ", ""));
+            movimientos.registrar(new SolicitudMovimiento(d.getVariante().getId(), TipoMovimiento.VENTA_RESERVA,
+                    d.getCantidad(), null, usuarioId, "VENTA", venta.getId(), numeros));
+        }
+        reservasBloqueadas.forEach(r -> r.convertir(venta.getId(), ahora, usuarioId));
+        reservas.flush();
+        return VentaDetalleResponse.de(venta, puedeVerCosto(),
+                reservasBloqueadas.stream().map(Reserva::numero).toList());
+    }
+
+    /** Minúsculas y sin espacios, para comparar el contacto del cliente. */
+    private static String contactoNormalizado(String contacto) {
+        return contacto.replaceAll("\\s+", "").toLowerCase(Locale.ROOT);
     }
 
     /**
@@ -118,7 +209,9 @@ public class VentaService {
                 movimientos.registrar(new SolicitudMovimiento(d.getVariante().getId(), TipoMovimiento.ANULACION_VENTA,
                         d.getCantidad(), null, usuarioId, "VENTA", venta.getId(), venta.getMotivoAnulacion())));
         ventas.saveAndFlush(venta);
-        return VentaDetalleResponse.de(venta, true);
+        // Las reservas de origen siguen CONVERTIDAS: anular solo devuelve el físico (ADR-007).
+        return VentaDetalleResponse.de(venta, true,
+                reservas.findByVentaIdOrderById(id).stream().map(Reserva::numero).toList());
     }
 
     public Page<VentaResumenResponse> listar(LocalDate desde, LocalDate hasta, EstadoVenta estado,
@@ -145,7 +238,8 @@ public class VentaService {
         Map<Long, List<DevolucionResponse>> porLinea = devoluciones.porVenta(id).stream()
                 .collect(Collectors.groupingBy(d -> d.getDetalleVenta().getId(),
                         Collectors.mapping(DevolucionResponse::de, Collectors.toList())));
-        return VentaDetalleResponse.de(v, puedeVerCosto(), porLinea);
+        List<String> origen = reservas.findByVentaIdOrderById(id).stream().map(Reserva::numero).toList();
+        return VentaDetalleResponse.de(v, puedeVerCosto(), porLinea, origen);
     }
 
     /** El costo no se expone al rol VENDEDOR. */

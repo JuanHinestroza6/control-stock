@@ -1,0 +1,55 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+title Secuencia: convertir reservas en venta (POST /api/ventas/desde-reservas)
+
+actor Vendedor
+participant "Frontend\n(ReservasPage,\nModalConvertirReservas)" as Front
+participant VentaController
+participant VentaService
+participant ReservaRepository as ResRepo
+participant MovimientoService
+participant "Variante" as Variante
+participant "MovimientoRepository" as MovRepo
+participant AlertaListener
+database BD
+
+Vendedor -> Front : selecciona reservas del mismo cliente\ny confirma precios por variante
+Front -> VentaController : POST /api/ventas/desde-reservas
+note right of VentaController : @PreAuthorize ADMIN o VENDEDOR
+VentaController -> VentaService : registrarDesdeReservas(request)
+activate VentaService
+note over VentaService, BD : Una sola transacción (@Transactional)
+VentaService -> VentaService : rechaza ids repetidos (400)
+VentaService -> ResRepo : bloquearVarias(ids)
+ResRepo -> BD : SELECT ... FOR UPDATE (orden por id)
+VentaService -> VentaService : verifica existencia (404)
+
+alt alguna reserva no está ACTIVA
+  VentaService --> VentaController : ConflictoException
+  VentaController --> Front : 409 "La reserva R-000012 ya está CONVERTIDA."
+else contactos de cliente distintos
+  VentaService --> VentaController : ExcepcionNegocio
+  VentaController --> Front : 422 "Las reservas deben ser del mismo cliente."
+else reservas válidas
+  VentaService -> VentaService : agrupa por variante (cantidad sumada)\nvalida precio <= precioLista y variante activa
+  VentaService -> BD : saveAndFlush(Venta + DetalleVenta)
+  loop por cada detalle (orden por varianteId)
+    VentaService -> MovimientoService : registrar(VENTA_RESERVA, cantidad, ref VENTA/id)
+    MovimientoService -> Variante : aplicarMovimiento(-cantidad, -cantidad)
+    MovimientoService -> MovRepo : save(Movimiento.de(...))
+    MovimientoService --> MovimientoService : publica StockCambiado
+  end
+  VentaService -> ResRepo : convertir(ventaId) en cada reserva\n(estado CONVERTIDA, cerradaPor = vendedor)
+  VentaService --> VentaController : VentaDetalleResponse (con reservas R-xxxxxx)
+  deactivate VentaService
+  BD --> VentaService : COMMIT (UPDATE variante con @Version)
+  VentaController --> Front : 201 venta creada
+  BD -> AlertaListener : AFTER_COMMIT: StockCambiado
+  note right of AlertaListener : AlertaService.evaluar en transacción nueva\n(abre o cierra STOCK_BAJO / AGOTADO)
+end
+
+note over Front : Un choque de @Version o bloqueo de la base\nresponde 409 sin reintento; el usuario vuelve a confirmar
+@enduml

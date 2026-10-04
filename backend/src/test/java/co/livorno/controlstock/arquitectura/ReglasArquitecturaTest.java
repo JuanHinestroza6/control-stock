@@ -3,6 +3,7 @@ package co.livorno.controlstock.arquitectura;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.codeUnits;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 
 import co.livorno.controlstock.catalogo.modelo.Variante;
@@ -80,10 +81,35 @@ class ReglasArquitecturaTest {
             .because("el stock solo cambia a través de MovimientoService (regla de oro 1)");
 
     @ArchTest
-    static final ArchRule repositoriosDeInventarioNoActualizanEnMasa = noMethods()
-            .that().areDeclaredInClassesThat().resideInAPackage("..inventario.repositorio..")
+    static final ArchRule repositorioDelKardexNoActualizaEnMasa = noMethods()
+            .that().areDeclaredIn(co.livorno.controlstock.inventario.repositorio.MovimientoRepository.class)
             .should().beAnnotatedWith(Modifying.class)
             .because("el kardex es inmutable: sin UPDATE/DELETE masivos (regla de oro 2)");
+
+    /** Cierra el hueco de un UPDATE/DELETE masivo que toque stock o kardex desde cualquier repositorio. */
+    @ArchTest
+    static final ArchRule ningunModifyingTocaStockNiKardex = methods()
+            .that().areAnnotatedWith(Modifying.class)
+            .should(new ArchCondition<com.tngtech.archunit.core.domain.JavaMethod>("no tener un @Query que mencione"
+                    + " stock_fisico, stock_reservado, stockFisico, stockReservado o movimiento") {
+                @Override
+                public void check(com.tngtech.archunit.core.domain.JavaMethod metodo, ConditionEvents eventos) {
+                    if (!metodo.isAnnotatedWith(org.springframework.data.jpa.repository.Query.class)) {
+                        return;
+                    }
+                    String consulta = metodo.getAnnotationOfType(org.springframework.data.jpa.repository.Query.class)
+                            .value().toLowerCase(java.util.Locale.ROOT);
+                    for (String prohibido : Set.of("stock_fisico", "stock_reservado", "stockfisico",
+                            "stockreservado", "movimiento")) {
+                        if (consulta.contains(prohibido)) {
+                            eventos.add(SimpleConditionEvent.violated(metodo,
+                                    metodo.getFullName() + " es @Modifying y menciona '" + prohibido + "'"));
+                            return;
+                        }
+                    }
+                }
+            })
+            .because("el stock y el kardex solo cambian vía MovimientoService (reglas de oro 1 y 2)");
 
     @ArchTest
     static final ArchRule nadieBorraEntidadesConEntityManager = noClasses()

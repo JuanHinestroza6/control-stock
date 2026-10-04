@@ -70,6 +70,7 @@ export function BuscadorVariante({ onSeleccionar, etiqueta = 'Buscar variante', 
                   <span className={v.stockDisponible === 0 ? 'font-medium text-critico' : 'text-oxford'}>
                     Disponible: {v.stockDisponible}
                   </span>
+                  {v.stockReservado > 0 && <span className="text-oxford/70">Reservado: {v.stockReservado}</span>}
                   <span className="text-oxford/70">{formatearMoneda(v.precioVenta)}</span>
                 </span>
               </button>

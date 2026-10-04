@@ -1,0 +1,33 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+title Máquina de estados: Reserva (apartado)
+
+[*] --> ACTIVA : crear\n(movimiento RESERVA, +reservado)
+
+ACTIVA --> ACTIVA : extender(horas)\nvenceEn = ahora + horas\n(máx. creadaEn + 7 días, si no 422)
+ACTIVA --> CONVERTIDA : convertir en venta\n(VENTA_RESERVA, ventaId,\ncerradaPor = vendedor)
+ACTIVA --> CANCELADA : cancelar(motivo 5-200)\n(LIBERACION, cerradaPor = usuario)
+ACTIVA --> VENCIDA : tarea cada 15 min con venceEn <= ahora\n(LIBERACION, cerradaPor = null)
+
+CONVERTIDA --> [*]
+CANCELADA --> [*]
+VENCIDA --> [*]
+
+note right of ACTIVA
+  Toda transición bloquea la fila (PESSIMISTIC_WRITE)
+  y exige estado ACTIVA; en otro caso 409
+  "La reserva R-000012 ya está CONVERTIDA."
+  El estado manda: se puede convertir, cancelar o
+  extender aunque venceEn ya haya pasado.
+end note
+
+note bottom of CONVERTIDA
+  Anular la venta solo devuelve físico
+  (ANULACION_VENTA): la reserva sigue CONVERTIDA.
+  Tras 90 días de cerrada, nombre y contacto del
+  cliente pasan a [anonimizado] (Ley 1581).
+end note
+@enduml

@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { useResumenAlertas } from '../../hooks/useAlertas'
 import { useSesion } from '../../hooks/useSesion'
 import { etiquetaRol } from '../../lib/roles'
 import { Boton } from '../ui/Boton'
@@ -8,12 +9,14 @@ interface TopbarProps {
   onAbrirMenu: () => void
   menuAbierto: boolean
   idMenu: string
-  /** Alertas activas; el módulo de alertas aún no existe, por eso 0 por defecto. */
-  alertas?: number
 }
 
-export function Topbar({ onAbrirMenu, menuAbierto, idMenu, alertas = 0 }: TopbarProps) {
+export function Topbar({ onAbrirMenu, menuAbierto, idMenu }: TopbarProps) {
   const { usuario, cerrar } = useSesion()
+  const verAlertas = usuario !== null && usuario !== undefined && puedeVerAlertas(usuario.rol)
+  // Solo se consulta si el rol puede ver alertas (CONTABILIDAD recibiría 403).
+  const resumen = useResumenAlertas(verAlertas)
+  const alertas = resumen.data?.activas ?? 0
 
   return (
     <header className="flex h-16 shrink-0 items-center gap-3 border-b border-oxford/10 bg-fondo px-4">
@@ -39,9 +42,9 @@ export function Topbar({ onAbrirMenu, menuAbierto, idMenu, alertas = 0 }: Topbar
       />
 
       <div className="ml-auto flex items-center gap-3">
-        {usuario && puedeVerAlertas(usuario.rol) && (
-          <button
-            type="button"
+        {verAlertas && (
+          <Link
+            to="/alertas"
             aria-label={`Alertas: ${alertas} sin atender`}
             className="relative rounded-lg p-2 hover:bg-fondo-suave focus-visible:outline-2 focus-visible:outline-acento"
           >
@@ -58,7 +61,7 @@ export function Topbar({ onAbrirMenu, menuAbierto, idMenu, alertas = 0 }: Topbar
             >
               {alertas}
             </span>
-          </button>
+          </Link>
         )}
 
         {usuario && (

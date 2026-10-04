@@ -29,7 +29,8 @@ Fase 1:
 
 - Reservas: crear, cancelar, convertir en venta, vencimiento automático (`@Scheduled`).
 - Generador de datos semilla (perfil `seed`): 24 meses de historia con estacionalidad.
-- Alertas por evento + tarea nocturna (STOCK_BAJO, AGOTADO, SIN_ROTACION) (REQ-04).
+- Alertas por evento STOCK_BAJO y AGOTADO (REQ-04): hechas en la fase 3 (ADR-007). Pendiente para la fase 5: tarea
+  nocturna de re-evaluación y SIN_ROTACION.
 - Clasificación ABC y punto de reorden dinámico (tarea nocturna + recálculo manual).
 - Productos más vendidos (REQ-05).
 

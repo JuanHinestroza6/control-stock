@@ -1,6 +1,7 @@
 package co.livorno.controlstock.venta.web;
 
 import co.livorno.controlstock.venta.dto.AnularVentaRequest;
+import co.livorno.controlstock.venta.dto.ConvertirReservasRequest;
 import co.livorno.controlstock.venta.dto.DevolucionRequest;
 import co.livorno.controlstock.venta.dto.DevolucionResponse;
 import co.livorno.controlstock.venta.dto.RegistrarVentaRequest;
@@ -41,6 +42,13 @@ public class VentaController {
     @ResponseStatus(HttpStatus.CREATED)
     public VentaDetalleResponse registrar(@Valid @RequestBody RegistrarVentaRequest request) {
         return servicio.registrar(request);
+    }
+
+    @PostMapping("/desde-reservas")
+    @PreAuthorize("hasAnyRole('ADMIN','VENDEDOR')")
+    @ResponseStatus(HttpStatus.CREATED)
+    public VentaDetalleResponse convertirReservas(@Valid @RequestBody ConvertirReservasRequest request) {
+        return servicio.registrarDesdeReservas(request);
     }
 
     @PostMapping("/{id}/anular")

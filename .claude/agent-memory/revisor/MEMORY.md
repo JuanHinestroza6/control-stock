@@ -1,2 +1,2 @@
 - [Pendientes revisión Fase 0](project_fase0_pendientes.md) — casi todo cerrado en F1; solo falta prueba de actuator; V2 es migración Java
-- [Patrones recurrentes](project_patrones_recurrentes.md) — collation, IAE=500, ADR≠código, ArchUnit vacua, cast JPQL sin índice, @Size antes de strip
+- [Patrones recurrentes](project_patrones_recurrentes.md) — collation, IAE=500, ADR≠código, ArchUnit vacua, @Size antes de strip, listener sin bloqueo, datos personales

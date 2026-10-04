@@ -14,7 +14,7 @@ vi.mock('../../api/ventas')
 function venta(extra: Partial<VentaDetalleResponse> = {}): VentaDetalleResponse {
   return {
     id: 5, numero: 'V-000005', fecha: '2026-10-02T10:30:00', vendedor: 'Ana Pérez', estado: 'REGISTRADA', total: 100000, descuentoTotal: 0,
-    anuladaEn: null, anuladaPor: null, motivoAnulacion: null,
+    anuladaEn: null, anuladaPor: null, motivoAnulacion: null, reservas: [],
     lineas: [
       {
         detalleId: 50, varianteId: 11, sku: 'LIV001-S-NEG', productoNombre: 'Camiseta Oversize', talla: 'S', color: 'NEGRO', cantidad: 3,

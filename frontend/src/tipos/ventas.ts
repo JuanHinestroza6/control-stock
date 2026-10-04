@@ -74,6 +74,8 @@ export interface VentaDetalleResponse {
   anuladaPor: string | null
   motivoAnulacion: string | null
   lineas: LineaVentaResponse[]
+  /** Números R-… de las reservas de origen; vacío en ventas directas. */
+  reservas: string[]
 }
 
 /** Fechas ISO `YYYY-MM-DD`, ambas inclusivas. Orden permitido: `fecha`, `total`. */

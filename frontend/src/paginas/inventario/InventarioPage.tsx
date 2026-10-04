@@ -12,7 +12,7 @@ import { useInventario } from '../../hooks/useInventario'
 import { useSesion } from '../../hooks/useSesion'
 import { mensajeError } from '../../lib/errores'
 import { formatearMoneda } from '../../lib/formato'
-import { puedeMoverStock, puedeVerKardex } from '../../lib/permisos'
+import { puedeMoverStock, puedeReservar, puedeVerKardex } from '../../lib/permisos'
 import type { EstadoStock } from '../../tipos/catalogo'
 import type { InventarioItemResponse } from '../../tipos/inventario'
 
@@ -39,6 +39,7 @@ export function InventarioPage() {
   const { usuario } = useSesion()
   const puedeMover = puedeMoverStock(usuario?.rol)
   const verKardex = puedeVerKardex(usuario?.rol)
+  const verReservas = puedeReservar(usuario?.rol)
   const categorias = useCategorias()
 
   const [texto, setTexto] = useState('')
@@ -89,7 +90,17 @@ export function InventarioPage() {
     },
     { clave: 'categoria', encabezado: 'Categoría', celda: (v) => v.categoria.nombre, ocultarEnMovil: true },
     { clave: 'fisico', encabezado: 'Físico', celda: (v) => v.stockFisico, className: 'text-right', ocultarEnMovil: true },
-    { clave: 'reservado', encabezado: 'Reservado', celda: (v) => v.stockReservado, className: 'text-right', ocultarEnMovil: true },
+    { clave: 'reservado', encabezado: 'Reservado', celda: (v) =>
+        v.stockReservado > 0 && verReservas ? (
+          <Link to={`/reservas?varianteId=${v.varianteId}`} className={clasesLink} aria-label={`Ver apartados de ${v.sku}`}>
+            {v.stockReservado}
+          </Link>
+        ) : (
+          v.stockReservado
+        ),
+      className: 'text-right',
+      ocultarEnMovil: true,
+    },
     { clave: 'disponible', encabezado: 'Disponible', celda: (v) => v.stockDisponible, className: 'text-right' },
     { clave: 'estado', encabezado: 'Estado', celda: (v) => <BadgeStock estado={v.estadoStock} /> },
     { clave: 'precio', encabezado: 'Precio', celda: (v) => formatearMoneda(v.precioVenta), className: 'text-right', ocultarEnMovil: true },

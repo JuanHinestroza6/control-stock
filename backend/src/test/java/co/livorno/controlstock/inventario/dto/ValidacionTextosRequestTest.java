@@ -35,6 +35,17 @@ class ValidacionTextosRequestTest {
     }
 
     @Test
+    void convertirReservas_masDe20Precios_esInvalido() {
+        var precios = java.util.Collections.nCopies(21,
+                new co.livorno.controlstock.venta.dto.PrecioReservaRequest(1L, new java.math.BigDecimal("10.00")));
+        assertThat(validador.validate(
+                new co.livorno.controlstock.venta.dto.ConvertirReservasRequest(java.util.List.of(1L), precios)))
+                .isNotEmpty();
+        assertThat(validador.validate(new co.livorno.controlstock.venta.dto.ConvertirReservasRequest(
+                java.util.List.of(1L), precios.subList(0, 20)))).isEmpty();
+    }
+
+    @Test
     void textos_conCincoOMasCaracteresTrasRecortar_sonValidos() {
         assertThat(ajusteValido("  abcde ")).isTrue();
         assertThat(anularValido("  merma  ")).isTrue();

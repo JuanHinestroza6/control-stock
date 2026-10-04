@@ -68,7 +68,7 @@ class VentaControllerTest {
                 List.of());
         return new VentaDetalleResponse(42L, "V-000042", LocalDateTime.of(2026, 10, 2, 10, 0), "Ana",
                 EstadoVenta.REGISTRADA, new BigDecimal("100000.00"), new BigDecimal("19800.00"), null, null, null,
-                List.of(linea));
+                List.of(linea), List.of());
     }
 
     @Test
@@ -83,6 +83,39 @@ class VentaControllerTest {
                 .andExpect(jsonPath("$.lineas[0].sku").value("LIV001-M-NEG"))
                 .andExpect(jsonPath("$.lineas[0].costoUnitario").doesNotExist())
                 .andExpect(jsonPath("$.lineas[0].devoluciones").isEmpty());
+    }
+
+    @Test
+    void desdeReservas_vendedor_devuelve201() throws Exception {
+        when(servicio.registrarDesdeReservas(any())).thenReturn(detalle());
+
+        mvc.perform(post("/api/ventas/desde-reservas").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reservaIds\":[1,2],\"precios\":[{\"varianteId\":5,\"precioUnitario\":50000}]}")
+                        .with(authentication(como("VENDEDOR"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.numero").value("V-000042"))
+                .andExpect(jsonPath("$.reservas").isArray());
+    }
+
+    @Test
+    void desdeReservas_inventarioYContabilidad_devuelve403() throws Exception {
+        for (String rol : List.of("INVENTARIO", "CONTABILIDAD")) {
+            mvc.perform(post("/api/ventas/desde-reservas").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"reservaIds\":[1]}").with(authentication(como(rol))))
+                    .andExpect(status().isForbidden());
+        }
+        verifyNoInteractions(servicio);
+    }
+
+    @Test
+    void desdeReservas_cuerpoInvalido_devuelve400() throws Exception {
+        for (String cuerpo : List.of("{\"reservaIds\":[]}", "{}",
+                "{\"reservaIds\":[1],\"precios\":[{\"varianteId\":5,\"precioUnitario\":0}]}",
+                "{\"reservaIds\":[1],\"precios\":[{\"precioUnitario\":10}]}")) {
+            mvc.perform(post("/api/ventas/desde-reservas").contentType(MediaType.APPLICATION_JSON).content(cuerpo)
+                            .with(authentication(como("ADMIN"))))
+                    .andExpect(status().isBadRequest());
+        }
     }
 
     @Test

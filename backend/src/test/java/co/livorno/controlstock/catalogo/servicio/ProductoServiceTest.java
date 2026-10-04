@@ -38,6 +38,7 @@ class ProductoServiceTest {
     @Mock co.livorno.controlstock.catalogo.repositorio.VarianteRepository variantes;
     @Mock CategoriaRepository categorias;
     @Mock UsuarioActual usuarioActual;
+    @Mock co.livorno.controlstock.catalogo.servicio.ConsultaReservasActivas reservasActivas;
     @InjectMocks ProductoService servicio;
 
     private Categoria categoria() {
@@ -230,6 +231,23 @@ class ProductoServiceTest {
                 .isInstanceOf(ConflictoException.class)
                 .hasMessage("No se puede desactivar el producto: la variante LIV001-M-ROJ tiene 4 unidades "
                         + "en apartados activos.");
+        assertThat(p.isActivo()).isTrue();
+        assertThat(a.isActivo()).isTrue();
+        verify(productos, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void cambiarEstado_desactivarConApartadosActivos_lanza409ConCantidadesYNoCambiaNada() {
+        Producto p = producto();
+        var a = variante(p, "LIV001-M-NEG", 0);
+        when(productos.buscarConCategoria(10L)).thenReturn(Optional.of(p));
+        when(reservasActivas.primeraVarianteConApartados(10L)).thenReturn(Optional.of(
+                new ConsultaReservasActivas.VarianteConApartados(7L, "LIV001-M-ROJ", 3, 6)));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> servicio.cambiarEstado(10L, false))
+                .isInstanceOf(ConflictoException.class)
+                .hasMessage("No se puede desactivar el producto: la variante LIV001-M-ROJ tiene 3 apartados "
+                        + "activos (6 unidades).");
         assertThat(p.isActivo()).isTrue();
         assertThat(a.isActivo()).isTrue();
         verify(productos, never()).saveAndFlush(any());
