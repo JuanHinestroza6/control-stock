@@ -57,7 +57,11 @@ public class SimuladorDiario {
     static final double PROBABILIDAD_ANULACION = 0.007;
     static final double AJUSTES_POR_MES = 2.0;
     static final double PROBABILIDAD_VARIANTE_AGOTABLE = 0.05;
+    /** El descontinuado deja de reponerse 9 meses antes del fin y se desactiva 6 meses antes del fin. */
+    static final int MESES_SIN_REPOSICION = 9;
     static final int MESES_DESCONTINUADO = 6;
+    /** Días de seguridad sumados al lead time en el punto de pedido. */
+    static final int DIAS_SEGURIDAD = 7;
     static final BigDecimal ALZA_ENERO = new BigDecimal("1.05");
 
     private static final LocalTime HORA_PRECIOS = LocalTime.of(6, 0);
@@ -147,7 +151,8 @@ public class SimuladorDiario {
         private final TreeMap<LocalDate, List<Llegada>> llegadas = new TreeMap<>();
         private final TreeMap<LocalDate, List<PlanDevolucion>> devolucionesPlan = new TreeMap<>();
         private final Map<Long, BigDecimal> totalVenta = new HashMap<>();
-        private final LocalDate corteDescontinuado;
+        private final LocalDate corteReposicion;
+        private final LocalDate corteDesactivacion;
 
         private PriorityQueue<Evento> cola;
         private long orden;
@@ -156,6 +161,9 @@ public class SimuladorDiario {
 
         private long nVentas;
         private long unidadesVendidas;
+        private long lineasPedidas;
+        private long lineasEvitablesPedidas;
+        private long lineasEvitablesPerdidas;
         private long lineasPerdidas;
         private long unidadesPerdidas;
         private long anuladas;
@@ -178,7 +186,8 @@ public class SimuladorDiario {
             this.inventario = usuarios.get(Rol.INVENTARIO);
             this.admin = usuarios.get(Rol.ADMIN);
             this.variantes = catalogo.variantes();
-            this.corteDescontinuado = fin.minusMonths(MESES_DESCONTINUADO);
+            this.corteReposicion = fin.minusMonths(MESES_SIN_REPOSICION);
+            this.corteDesactivacion = fin.minusMonths(MESES_DESCONTINUADO);
             this.fisico = new int[variantes.size()];
             this.enCamino = new int[variantes.size()];
             this.agotable = new boolean[variantes.size()];
@@ -207,7 +216,8 @@ public class SimuladorDiario {
                 entityManager.clear();
                 dias++;
             }
-            return new ResultadoSimulacion(dias, nVentas, unidadesVendidas, lineasPerdidas, unidadesPerdidas,
+            return new ResultadoSimulacion(dias, nVentas, unidadesVendidas, lineasPedidas, lineasPerdidas,
+                    lineasEvitablesPedidas, lineasEvitablesPerdidas, unidadesPerdidas,
                     anuladas, nDevoluciones, noAptas, entradas, ajustes, alzas, desactivados.size(), ingreso);
         }
 
@@ -284,8 +294,16 @@ public class SimuladorDiario {
                 }
                 int idx = indicePorClave.get(new Clave(codigo, l.talla(), l.indiceColor()));
                 int vendible = Math.min(l.cantidad(), disponible(idx));
+                boolean evitable = !agotable[idx] && !l.producto().descontinuado();
+                lineasPedidas++;
+                if (evitable) {
+                    lineasEvitablesPedidas++;
+                }
                 if (vendible < l.cantidad()) {
                     lineasPerdidas++;
+                    if (evitable) {
+                        lineasEvitablesPerdidas++;
+                    }
                     unidadesPerdidas += l.cantidad() - vendible;
                 }
                 if (vendible > 0) {
@@ -403,30 +421,38 @@ public class SimuladorDiario {
         }
 
         private void reponer() {
-                        for (Map.Entry<String, List<Integer>> e : variantesPorProducto.entrySet()) {
+            for (Map.Entry<String, List<Integer>> e : variantesPorProducto.entrySet()) {
                 String codigo = e.getKey();
                 ProductoSemilla p = productoPorCodigo.get(codigo);
                 if (!activo(codigo)) {
                     continue;
                 }
-                if (p.descontinuado() && diaActual.isAfter(corteDescontinuado)) {
-                    desactivarSiAgotado(codigo, e.getValue());
-                    continue;
+                if (p.descontinuado()) {
+                    if (!diaActual.isBefore(corteDesactivacion)) {
+                        desactivar(codigo);
+                        continue;
+                    }
+                    if (diaActual.isAfter(corteReposicion)) {
+                        continue;
+                    }
                 }
                 LocalDate fechaLlegada = diaActual.plusDays(p.leadTimeDias());
                 if (fechaLlegada.isAfter(fin)) {
                     continue;
                 }
+                // Punto de pedido por variante = demanda esperada durante el lead time + 7 días de seguridad.
+                double demandaPedido = modelo.demandaEsperada(p, diaActual, p.leadTimeDias() + DIAS_SEGURIDAD);
                 int dias = DIAS_REPOSICION_MIN + azar.nextInt(DIAS_REPOSICION_MAX - DIAS_REPOSICION_MIN + 1);
+                double demandaLote = modelo.demandaEsperada(p, diaActual, dias);
                 Map<Integer, Integer> cantidades = null;
                 for (int idx : e.getValue()) {
                     VarianteCreada v = variantes.get(idx);
-                    if (agotable[idx] || disponible(idx) + enCamino[idx] > v.stockMinimo()) {
+                    double participacion = ModeloDemanda.participacionVariante(p, v.talla(), v.indiceColor());
+                    int puntoPedido = (int) Math.ceil(demandaPedido * participacion);
+                    if (agotable[idx] || disponible(idx) + enCamino[idx] > puntoPedido) {
                         continue;
                     }
-                    double demanda = modelo.demandaEsperada(p, diaActual, dias);
-                    int cantidad = Math.max(p.loteMinimo(), (int) Math.ceil(
-                            demanda * ModeloDemanda.participacionVariante(p, v.talla(), v.indiceColor())));
+                    int cantidad = Math.max(p.loteMinimo(), (int) Math.ceil(demandaLote * participacion));
                     if (cantidades == null) {
                         cantidades = new LinkedHashMap<>();
                     }
@@ -442,12 +468,8 @@ public class SimuladorDiario {
             }
         }
 
-        private void desactivarSiAgotado(String codigo, List<Integer> idxs) {
-            for (int idx : idxs) {
-                if (fisico[idx] > 0 || enCamino[idx] > 0) {
-                    return;
-                }
-            }
+        /** Desactiva el producto (y sus variantes) aunque le quede stock; sin reservas en la carga no hay bloqueo. */
+        private void desactivar(String codigo) {
             Long id = catalogo.productoIds().get(codigo);
             en(admin, () -> productos.cambiarEstado(id, false));
             desactivados.add(codigo);

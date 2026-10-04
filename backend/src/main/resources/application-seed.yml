@@ -10,5 +10,5 @@ app:
     semilla-aleatoria: 42
     meses: 24
     fecha-fin: # vacía = ayer (America/Bogota); debe ser anterior a hoy
-    tickets-dia-base: 12 # se calibra en T1 para unas 12 mil ventas
+    tickets-dia-base: 15 # calibrado: unas 12 mil ventas en 24 meses
     password: ${SEED_PASSWORD:} # obligatoria; misma política que las contraseñas (12-72 caracteres)

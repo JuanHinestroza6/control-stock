@@ -15,7 +15,7 @@ public record PropiedadesSemilla(
         @DefaultValue("42") long semillaAleatoria,
         @DefaultValue("24") int meses,
         LocalDate fechaFin,
-        @DefaultValue("12") int ticketsDiaBase,
+        @DefaultValue("15") int ticketsDiaBase,
         String password) {
 
     public PropiedadesSemilla {

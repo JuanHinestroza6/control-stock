@@ -60,7 +60,7 @@ class ConfiguracionSemillaIntegracionTest {
             assertThat(p.semillaAleatoria()).isEqualTo(42L);
             assertThat(p.meses()).isEqualTo(24);
             assertThat(p.fechaFin()).isNull();
-            assertThat(p.ticketsDiaBase()).isEqualTo(12);
+            assertThat(p.ticketsDiaBase()).isEqualTo(15);
         }
     }
 }
