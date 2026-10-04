@@ -8,7 +8,7 @@ import java.util.List;
  *
  * <p>Las 6 categorías son las de la migración V3 y se buscan por nombre. Precios en COP con terminación 900; costo entre
  * 40 % y 55 % del precio. {@code rangoDemanda} es una permutación de 1..30 mezclada entre categorías: los 6 primeros
- * (20 %) concentran ≈ 77 % de las unidades (ver {@link ModeloDemanda#EXPONENTE_ZIPF}). Estancados: LIV004, LIV026 y
+ * (20 %) concentran ≈ 78 % de las unidades (ver {@link ModeloDemanda#pesosEscalonados}). Estancados: LIV004, LIV026 y
  * LIV030. Descontinuado: LIV017 (jean skinny, pasado de moda).
  *
  * <p>Clase de datos sin Spring: el generador la usa directamente. El orden de la lista es fijo (determinismo).

@@ -24,8 +24,8 @@ import java.util.Random;
  * <pre>
  * tickets(día) ~ Poisson(λ)
  * λ(día)       = ticketsDiaBase × factorMes(mes) × factorDía(díaSemana) × 1,015^mesesDesdeInicio
- * líneas por ticket: 1 (70 %), 2 (22 %), 3 (8 %), productos distintos elegidos con pesos Zipf
- * peso(producto) = (1 / rango^s) / Σ (1 / r^s)      (s = EXPONENTE_ZIPF; estancados = 0 en los últimos 3 meses)
+ * líneas por ticket: 1 (70 %), 2 (22 %), 3 (8 %), productos distintos elegidos con pesos escalonados
+ * peso(producto) = pesosEscalonados(n)[rango − 1]   (estancados = 0 en los últimos 3 meses, el resto se renormaliza)
  * talla: S 20 %, M 35 %, L 30 %, XL 15 % (accesorios: UNICA)
  * color: el primero 50 %, el resto se reparte por igual
  * cantidad: 1 (85 %) o 2 (15 %); descuento: 15 % de las líneas, 5–20 %; hora 09:00–21:00
@@ -34,12 +34,18 @@ import java.util.Random;
 public final class ModeloDemanda {
 
     /**
-     * Exponente de Zipf {@code s}. Calibrado con 30 productos para que el 20 % superior (6 productos) concentre ≈ 77 %
-     * de las unidades simuladas en 24 meses (semillas 42, 7 y 2026: 77,0–77,7 %). Con los pesos teóricos daría 79,6 %;
-     * la diferencia viene de elegir productos distintos dentro de un mismo ticket, que aplana un poco la cabeza.
-     * Rejilla probada: s = 1,40 → 75,6 %; 1,45 → 77,7 %; 1,50 → 78,8 %; 1,60 → 81,5 % (semilla 42).
+     * Participación teórica de la cabeza (el 20 % de los rangos: 6 de 30 productos). Calibrada para que en la simulación
+     * de 24 meses el 20 % superior concentre ≈ 78 % de las unidades (ver {@link #pesosEscalonados}).
      */
-    public static final double EXPONENTE_ZIPF = 1.45;
+    public static final double CUOTA_CABEZA = 0.78;
+    /** Participación del grupo medio (el 20 % siguiente de los rangos). */
+    public static final double CUOTA_MEDIO = 0.12;
+    /** Participación de la cola (el 60 % restante de los rangos). */
+    public static final double CUOTA_COLA = 0.10;
+    /** Perfil dentro de la cabeza: lineal del primero (1,6) al último (1,0); 16 % … 10 % con 6 productos. */
+    private static final double PERFIL_CABEZA_PRIMERO = 1.6;
+    private static final double PERFIL_CABEZA_ULTIMO = 1.0;
+    private static final double FRACCION_GRUPO = 0.2;
 
     /** Estacionalidad colombiana de moda, enero..diciembre (skill datos-semilla). */
     private static final double[] FACTOR_MES = {0.8, 0.7, 0.8, 0.85, 1.0, 1.25, 1.0, 0.9, 0.95, 1.0, 1.3, 1.6};
@@ -103,7 +109,7 @@ public final class ModeloDemanda {
         this.inicioEstancamiento = fin.minusMonths(MESES_ESTANCAMIENTO).plusDays(1);
 
         int n = this.productos.size();
-        double[] zipf = pesosZipf(n, EXPONENTE_ZIPF);
+        double[] escalonados = pesosEscalonados(n);
         boolean[] rangoUsado = new boolean[n + 1];
         this.pesosBase = new double[n];
         for (int i = 0; i < n; i++) {
@@ -112,7 +118,7 @@ public final class ModeloDemanda {
                 throw new IllegalArgumentException("Los rangos de demanda deben ser 1.." + n + " sin repetir");
             }
             rangoUsado[rango] = true;
-            pesosBase[i] = zipf[rango - 1];
+            pesosBase[i] = escalonados[rango - 1];
         }
     }
 
@@ -172,24 +178,43 @@ public final class ModeloDemanda {
     }
 
     /**
-     * Pesos Zipf normalizados: {@code w_r = (1/r^s) / Σ_{j=1..n} 1/j^s}, r = 1..n. Ejemplo n = 3, s = 1:
-     * 1, 1/2, 1/3 → suma 11/6 → 6/11, 3/11, 2/11.
+     * Pesos escalonados por grupos de rango (índice 0 = rango 1), normalizados a 1:
+     * <pre>
+     * cabeza = max(1, round(0,2·n)) rangos → CUOTA_CABEZA (0,78), perfil lineal de 1,6 a 1,0
+     * medio  = round(0,2·n) siguientes     → CUOTA_MEDIO (0,12) por igual
+     * cola   = el resto                    → CUOTA_COLA (0,10) por igual
+     * </pre>
+     * Si un grupo queda vacío (catálogos pequeños) se renormaliza con los grupos presentes.
+     * Ejemplo n = 30 (6 / 6 / 18): perfil 1,6 1,48 1,36 1,24 1,12 1,0 (suma 7,8) → cabeza 0,78 × perfil / 7,8 =
+     * 16 %, 14,8 %, 13,6 %, 12,4 %, 11,2 %, 10 %; medio 0,12 / 6 = 2 % cada uno; cola 0,10 / 18 ≈ 0,556 % cada uno.
      */
-    public static double[] pesosZipf(int n, double s) {
+    public static double[] pesosEscalonados(int n) {
         if (n < 1) {
             throw new IllegalArgumentException("Se necesita al menos un producto");
         }
-        if (!(s >= 0) || Double.isInfinite(s)) {
-            throw new IllegalArgumentException("El exponente debe ser finito y no negativo");
+        int cabeza = Math.max(1, (int) Math.round(FRACCION_GRUPO * n));
+        int medio = Math.min(n - cabeza, (int) Math.round(FRACCION_GRUPO * n));
+        int cola = n - cabeza - medio;
+
+        double[] perfil = new double[cabeza];
+        double sumaPerfil = 0;
+        for (int i = 0; i < cabeza; i++) {
+            perfil[i] = cabeza == 1
+                    ? PERFIL_CABEZA_PRIMERO
+                    : PERFIL_CABEZA_PRIMERO - (PERFIL_CABEZA_PRIMERO - PERFIL_CABEZA_ULTIMO) * i / (cabeza - 1);
+            sumaPerfil += perfil[i];
         }
+        double total = CUOTA_CABEZA + (medio > 0 ? CUOTA_MEDIO : 0) + (cola > 0 ? CUOTA_COLA : 0);
+
         double[] pesos = new double[n];
-        double suma = 0;
-        for (int r = 1; r <= n; r++) {
-            pesos[r - 1] = 1.0 / Math.pow(r, s);
-            suma += pesos[r - 1];
+        for (int i = 0; i < cabeza; i++) {
+            pesos[i] = CUOTA_CABEZA * perfil[i] / sumaPerfil / total;
         }
-        for (int i = 0; i < n; i++) {
-            pesos[i] /= suma;
+        for (int i = cabeza; i < cabeza + medio; i++) {
+            pesos[i] = CUOTA_MEDIO / medio / total;
+        }
+        for (int i = cabeza + medio; i < n; i++) {
+            pesos[i] = CUOTA_COLA / cola / total;
         }
         return pesos;
     }
@@ -289,7 +314,7 @@ public final class ModeloDemanda {
         return inicioEstancamiento;
     }
 
-    /** Peso Zipf del producto ese día, renormalizado entre los productos que venden (estancados en 0). */
+    /** Peso del producto ese día, renormalizado entre los productos que venden (estancados en 0). */
     public double pesoEfectivo(ProductoSemilla producto, LocalDate dia) {
         double[] pesos = pesosDelDia(dia);
         int indice = indiceDe(producto);

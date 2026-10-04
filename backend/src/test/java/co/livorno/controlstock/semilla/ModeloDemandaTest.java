@@ -11,6 +11,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.Month;
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.List;
 import java.util.Random;
@@ -91,23 +92,51 @@ class ModeloDemandaTest {
         }
     }
 
-    // ------------------------------------------------------------------ Zipf y participación
+    // ------------------------------------------------------------------ pesos escalonados y participación
 
     @Test
-    void pesosZipf_ejemploAMano() {
-        // n = 3, s = 1: 1, 1/2, 1/3 → suma 11/6 → 6/11, 3/11, 2/11.
-        double[] w = ModeloDemanda.pesosZipf(3, 1.0);
-        assertThat(w[0]).isCloseTo(6.0 / 11, within(1e-12));
-        assertThat(w[1]).isCloseTo(3.0 / 11, within(1e-12));
-        assertThat(w[2]).isCloseTo(2.0 / 11, within(1e-12));
+    void pesosEscalonados_ejemploAMano_conTreintaProductos() {
+        // Grupos 6 / 6 / 18. Cabeza: perfil 1,6 1,48 1,36 1,24 1,12 1,0 (suma 7,8) × 0,78 / 7,8
+        //   = 0,16 0,148 0,136 0,124 0,112 0,10 (suma 0,78).
+        // Medio: 0,12 / 6 = 0,02 cada uno. Cola: 0,10 / 18 = 0,005556 cada uno. Total 1.
+        double[] w = ModeloDemanda.pesosEscalonados(30);
+        double[] cabeza = {0.16, 0.148, 0.136, 0.124, 0.112, 0.10};
+        for (int i = 0; i < 6; i++) {
+            assertThat(w[i]).as("rango %d", i + 1).isCloseTo(cabeza[i], within(1e-12));
+        }
+        for (int i = 6; i < 12; i++) {
+            assertThat(w[i]).as("rango %d", i + 1).isCloseTo(0.02, within(1e-12));
+        }
+        for (int i = 12; i < 30; i++) {
+            assertThat(w[i]).as("rango %d", i + 1).isCloseTo(0.10 / 18, within(1e-12));
+        }
+        assertThat(Arrays.stream(w).sum()).isCloseTo(1.0, within(1e-12));
+        assertThat(ModeloDemanda.participacionSuperior(w, 0.2)).isCloseTo(0.78, within(1e-12));
     }
 
     @Test
-    void pesosZipf_exponenteCero_esUniforme_yCasosInvalidos() {
-        assertThat(ModeloDemanda.pesosZipf(4, 0)).containsExactly(0.25, 0.25, 0.25, 0.25);
-        assertThat(ModeloDemanda.pesosZipf(1, 1.45)).containsExactly(1.0);
-        assertThatThrownBy(() -> ModeloDemanda.pesosZipf(0, 1)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> ModeloDemanda.pesosZipf(3, -1)).isInstanceOf(IllegalArgumentException.class);
+    void pesosEscalonados_catalogosPequenos_renormalizanLosGruposPresentes() {
+        // n = 1: solo cabeza → 1.
+        assertThat(ModeloDemanda.pesosEscalonados(1)).hasSize(1);
+        assertThat(ModeloDemanda.pesosEscalonados(1)[0]).isCloseTo(1.0, within(1e-12));
+        // n = 2: cabeza 1 (0,78), medio round(0,4) = 0, cola 1 (0,10) → 0,78 / 0,88 = 0,886364 y 0,10 / 0,88 = 0,113636.
+        double[] dos = ModeloDemanda.pesosEscalonados(2);
+        assertThat(dos[0]).isCloseTo(0.78 / 0.88, within(1e-12));
+        assertThat(dos[1]).isCloseTo(0.10 / 0.88, within(1e-12));
+        // n = 5: cabeza 1 (0,78), medio 1 (0,12), cola 3 (0,10 / 3 cada uno).
+        double[] cinco = ModeloDemanda.pesosEscalonados(5);
+        assertThat(cinco[0]).isCloseTo(0.78, within(1e-12));
+        assertThat(cinco[1]).isCloseTo(0.12, within(1e-12));
+        assertThat(cinco[4]).isCloseTo(0.10 / 3, within(1e-12));
+        // Siempre no crecientes por rango.
+        for (int n = 1; n <= 40; n++) {
+            double[] w = ModeloDemanda.pesosEscalonados(n);
+            assertThat(Arrays.stream(w).sum()).as("n=%d", n).isCloseTo(1.0, within(1e-12));
+            for (int i = 1; i < n; i++) {
+                assertThat(w[i]).as("n=%d rango %d", n, i + 1).isLessThanOrEqualTo(w[i - 1] + 1e-15);
+            }
+        }
+        assertThatThrownBy(() -> ModeloDemanda.pesosEscalonados(0)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -125,13 +154,6 @@ class ModeloDemandaTest {
                 .isCloseTo(0.2, within(1e-12));
         assertThatThrownBy(() -> ModeloDemanda.participacionSuperior(new double[] {1}, 0))
                 .isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    void zipfTeorico_delCatalogo_top20EntreSetentaYCincoYOchenta() {
-        // s = 1,45, n = 30: Σ 1/r^1,45 ≈ 2,3538; los 6 primeros suman ≈ 1,8747 → 79,6 %.
-        double[] w = ModeloDemanda.pesosZipf(CATALOGO.size(), ModeloDemanda.EXPONENTE_ZIPF);
-        assertThat(ModeloDemanda.participacionSuperior(w, 0.2)).isCloseTo(0.796, within(0.001));
     }
 
     // ------------------------------------------------------------------ factores y λ
@@ -211,9 +233,37 @@ class ModeloDemandaTest {
 
     @Test
     void pareto_top20PorCientoDeProductos_concentraAlMenos70PorCientoDeLasUnidades() {
-        // Con s = 1,45 y semilla 42 la simulación da ≈ 77,7 % (objetivo del plan: 75–80 %).
+        // Pesos teóricos de la cabeza: 78 %. Con semilla 42 la simulación da ≈ 77,6 %: elegir productos distintos
+        // dentro de un ticket aplana un poco la cabeza.
         double participacion = ModeloDemanda.participacionSuperior(sim.unidadesPorProducto, 0.2);
-        assertThat(participacion).isGreaterThanOrEqualTo(0.70).isBetween(0.75, 0.80);
+        assertThat(participacion).isGreaterThanOrEqualTo(0.70).isBetween(0.75, 0.82);
+    }
+
+    @Test
+    void cabezaPareja_ningunProductoSuperaEl18PorCientoDeLasUnidades() {
+        // Teórico: el mayor tiene 16 % (rango 1); en la simulación ≈ 15,7 %.
+        double total = sumar(sim.unidadesPorProducto);
+        double mayor = Arrays.stream(sim.unidadesPorProducto).max().orElseThrow();
+        assertThat(mayor / total).isLessThanOrEqualTo(0.18).isGreaterThan(0.10);
+    }
+
+    @Test
+    void claseAPorIngreso_tieneEntre5y7Productos() {
+        // ABC del skill sobre el ingreso simulado por producto (precio de lista × unidades): A = acumulado ≤ 80 %,
+        // el primero siempre es A. Con la semilla 42 quedan 6 productos A.
+        double[] ingresos = sim.ingresoPorProducto.clone();
+        Arrays.sort(ingresos);
+        double total = sumar(ingresos);
+        double acumulado = 0;
+        int claseA = 0;
+        for (int i = ingresos.length - 1; i >= 0; i--) {
+            acumulado += ingresos[i];
+            if (claseA > 0 && acumulado / total > 0.80) {
+                break;
+            }
+            claseA++;
+        }
+        assertThat(claseA).isBetween(5, 7);
     }
 
     @Test
@@ -290,14 +340,14 @@ class ModeloDemandaTest {
 
     @Test
     void demandaEsperadaDiaria_ejemploAMano() {
-        // Catálogo de 2 productos, s = 1,45: pesos 1 y 1/2^1,45 = 0,36602 → normalizados 0,73206 y 0,26794.
+        // Catálogo de 2 productos: cabeza 1 (0,78) y cola 1 (0,10) → 0,78 / 0,88 = 0,886364 y 0,113636.
         // Lunes 2024-01-01 (mes 0): λ = 10 × 0,8 (ene) × 0,85 (lun) × 1 = 6,8 tickets.
-        // Unidades del producto 1 = 6,8 × 1,38 × 1,15 × 0,73206 = 7,9002.
+        // Unidades del producto 1 = 6,8 × 1,38 × 1,15 × 0,886364 = 10,7916 × 0,886364 = 9,5653.
         ProductoSemilla a = producto("A01", 1, false);
         ProductoSemilla b = producto("B01", 2, false);
         ModeloDemanda m = new ModeloDemanda(List.of(a, b), INICIO, FIN, 10, new Random(1));
         assertThat(m.lambdaTickets(INICIO)).isCloseTo(6.8, within(1e-9));
-        assertThat(m.demandaEsperadaDiaria(a, INICIO)).isCloseTo(7.9002, within(1e-3));
+        assertThat(m.demandaEsperadaDiaria(a, INICIO)).isCloseTo(9.5653, within(1e-3));
         assertThat(m.demandaEsperada(a, INICIO, 0)).isZero();
         assertThat(m.demandaEsperada(a, INICIO, 2)).isCloseTo(
                 m.demandaEsperadaDiaria(a, INICIO) + m.demandaEsperadaDiaria(a, INICIO.plusDays(1)), within(1e-9));
@@ -417,6 +467,7 @@ class ModeloDemandaTest {
     private static final class Simulacion {
         final double[] unidadesPorProducto = new double[CATALOGO.size()];
         final double[] unidadesEstancamiento = new double[CATALOGO.size()];
+        final double[] ingresoPorProducto = new double[CATALOGO.size()];
         final double[][] unidadesPorMes = new double[2][13];
         final double[] lineasPorTalla = new double[Talla.values().length];
         final double[] ticketsPorLineas = new double[4];
@@ -461,6 +512,7 @@ class ModeloDemandaTest {
                 int i = CATALOGO.indexOf(l.producto());
                 lineas++;
                 unidadesPorProducto[i] += l.cantidad();
+                ingresoPorProducto[i] += l.cantidad() * l.producto().precioVenta().doubleValue();
                 if (!d.isBefore(m.inicioEstancamiento())) {
                     unidadesEstancamiento[i] += l.cantidad();  // unidades en los últimos 3 meses
                 }

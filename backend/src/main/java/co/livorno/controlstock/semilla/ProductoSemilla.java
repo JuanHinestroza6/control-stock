@@ -17,7 +17,7 @@ import java.util.Objects;
  * @param colores       2 a 4 colores en mayúsculas; el primero es el más vendido (50 %)
  * @param leadTimeDias  tiempo de reposición, 10–30 días
  * @param loteMinimo    lote mínimo de compra por variante
- * @param rangoDemanda  posición en el ranking de demanda (1 = más vendido); define el peso Zipf
+ * @param rangoDemanda  posición en el ranking de demanda (1 = más vendido); define el peso escalonado
  * @param estancado     demanda nula en los últimos 3 meses de la historia (para SIN_ROTACION)
  * @param descontinuado deja de reponerse hace 6 meses, se agota y se desactiva (lo maneja el generador)
  */
