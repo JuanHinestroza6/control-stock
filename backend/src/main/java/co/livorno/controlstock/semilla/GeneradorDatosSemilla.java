@@ -3,7 +3,11 @@ package co.livorno.controlstock.semilla;
 import co.livorno.controlstock.comun.seguridad.UsuarioAutenticado;
 import co.livorno.controlstock.usuario.modelo.Rol;
 import jakarta.persistence.EntityManager;
+import co.livorno.controlstock.inventario.servicio.AlertaService;
 import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.List;
+import org.springframework.jdbc.core.JdbcTemplate;
 import java.time.LocalTime;
 import java.util.Map;
 import java.util.Random;
@@ -34,12 +38,16 @@ public class GeneradorDatosSemilla {
     private final ComoUsuario comoUsuario;
     private final TransactionTemplate transaccion;
     private final EntityManager entityManager;
+    private final AlertaService alertaService;
+    private final VerificadorConsistencia verificador;
+    private final JdbcTemplate jdbc;
 
     public GeneradorDatosSemilla(PropiedadesSemilla propiedades, ProteccionesSemilla protecciones,
                                  UsuariosDemo usuariosDemo, CreadorCatalogo creadorCatalogo, SimuladorDiario simulador,
                                  RelojSimulado reloj,
                                  ComoUsuario comoUsuario, TransactionTemplate transaccion,
-                                 EntityManager entityManager) {
+                                 EntityManager entityManager, AlertaService alertaService,
+                                 VerificadorConsistencia verificador, JdbcTemplate jdbc) {
         this.propiedades = propiedades;
         this.protecciones = protecciones;
         this.usuariosDemo = usuariosDemo;
@@ -49,6 +57,9 @@ public class GeneradorDatosSemilla {
         this.comoUsuario = comoUsuario;
         this.transaccion = transaccion;
         this.entityManager = entityManager;
+        this.alertaService = alertaService;
+        this.verificador = verificador;
+        this.jdbc = jdbc;
     }
 
     /**
@@ -60,11 +71,35 @@ public class GeneradorDatosSemilla {
         LocalDate hoy = LocalDate.now(reloj);
         LocalDate fin = propiedades.fechaFin() != null ? propiedades.fechaFin() : hoy.minusDays(1);
         protecciones.validarFechaFin(fin, hoy);
+        long t0 = System.currentTimeMillis();
+        ResumenSemilla resumen;
         try {
-            return transaccion.execute(estado -> cargar(fin));
+            resumen = transaccion.execute(estado -> cargar(fin));
         } finally {
             reloj.volverAlSistema();
         }
+        if (resumen == null || !resumen.generado()) {
+            return resumen;
+        }
+        return cerrar(resumen, t0);
+    }
+
+    /**
+     * Cierre con el reloj real y la carga ya confirmada: las alertas se evalúan en transacción propia
+     * ({@code AlertaService.evaluar} usa REQUIRES_NEW), variante por variante en orden de id.
+     */
+    private ResumenSemilla cerrar(ResumenSemilla resumen, long t0) {
+        List<Long> ids = jdbc.queryForList("select id from variante order by id", Long.class);
+        ids.forEach(alertaService::evaluar);
+        verificador.verificarAlertas();
+        Map<String, Long> porTipo = new HashMap<>();
+        jdbc.query("select tipo, count(*) as n from alerta where estado = 'ACTIVA' group by tipo",
+                rs -> {
+                    porTipo.put(rs.getString("tipo"), rs.getLong("n"));
+                });
+        Long activas = jdbc.queryForObject("select count(*) from reserva where estado = 'ACTIVA'", Long.class);
+        return resumen.conCierre(activas == null ? 0 : activas, porTipo.getOrDefault("AGOTADO", 0L),
+                porTipo.getOrDefault("STOCK_BAJO", 0L), System.currentTimeMillis() - t0);
     }
 
     private ResumenSemilla cargar(LocalDate fin) {
@@ -95,9 +130,8 @@ public class GeneradorDatosSemilla {
         ResultadoSimulacion simulacion = simulador.simular(creado, modelo, usuarios, inicio, fin, aleatorioCostos,
                 new Random(propiedades.semillaAleatoria() + 2));
 
-        log.info("Datos semilla: {} productos, {} variantes, {} unidades iniciales ({} a {}); {}.",
-                creado.productoIds().size(), creado.variantes().size(), unidades, inicio, fin, simulacion);
+        verificador.verificarCarga(inicio, fin);
         return new ResumenSemilla(true, inicio, fin, usuarios.size(), creado.productoIds().size(),
-                creado.variantes().size(), unidades, simulacion);
+                creado.variantes().size(), unidades, simulacion, 0, 0, 0, 0);
     }
 }

@@ -5,13 +5,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import co.livorno.controlstock.TestcontainersConfiguration;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /** B4 (ADR-008): simulación diaria con volumen reducido (3 meses, enero incluido). Cada prueba hace rollback. */
@@ -22,7 +23,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
         "app.semilla.ejecutar=false", "app.semilla.salir-al-terminar=false", "app.semilla.meses=3",
         "app.semilla.tickets-dia-base=6", "app.semilla.fecha-fin=2026-02-15",
         "app.semilla.password=ClaveDemo-2026-ok"})
-@Transactional
+
 class SimulacionIntegracionTest {
 
     private static final String INICIO = "2025-11-16 00:00:00";
@@ -32,6 +33,12 @@ class SimulacionIntegracionTest {
     GeneradorDatosSemilla generador;
     @Autowired
     JdbcTemplate jdbc;
+
+    @BeforeEach
+    @AfterEach
+    void limpiar() {
+        LimpiezaSemilla.limpiar(jdbc);
+    }
 
     private long contar(String sql) {
         Long n = jdbc.queryForObject(sql, Long.class);
@@ -59,9 +66,29 @@ class SimulacionIntegracionTest {
         assertThat(contar("""
                 select count(*) from variante v where v.stock_fisico <>
                 (select coalesce(sum(m.fisico_despues - m.fisico_antes), 0) from movimiento m where m.variante_id = v.id)
-                or v.stock_reservado <> 0 or v.stock_fisico < 0""")).isZero();
+                or v.stock_reservado <> (select coalesce(sum(r.cantidad), 0) from reserva r
+                where r.variante_id = v.id and r.estado = 'ACTIVA') or v.stock_fisico < 0""")).isZero();
         assertThat(contar("select count(*) from movimiento where fisico_despues < 0 or reservado_despues < 0"))
                 .isZero();
+
+        // reservas: hay en cada estado, números del resumen, convertidas con venta, vencidas del sistema
+        for (String estado : new String[] {"ACTIVA", "CONVERTIDA", "CANCELADA", "VENCIDA"}) {
+            assertThat(contar("select count(*) from reserva where estado = '" + estado + "'"))
+                    .as(estado).isPositive();
+        }
+        assertThat(contar("select count(*) from reserva where estado = 'CONVERTIDA'"))
+                .isEqualTo(r.reservasConvertidas());
+        assertThat(contar("select count(*) from reserva")).isEqualTo(r.reservasCreadas());
+        assertThat(contar("select count(*) from reserva where estado = 'CONVERTIDA' and venta_id is null"))
+                .isZero();
+        assertThat(contar("select count(*) from reserva where estado = 'VENCIDA' and cerrada_por is not null"))
+                .isZero();
+        assertThat(contar("select count(*) from reserva where estado = 'ACTIVA' and vence_en <= '2026-02-15 23:59:59'"))
+                .isZero();
+
+        // alertas evaluadas al cierre: coinciden con el stock (el verificador ya lo comprobó) y hay activas
+        assertThat(resumen.alertasAgotado() + resumen.alertasStockBajo())
+                .isEqualTo(contar("select count(*) from alerta where estado = 'ACTIVA'"));
 
         // kardex encadenado por variante y fechas no decrecientes por id
         assertThat(contar("""

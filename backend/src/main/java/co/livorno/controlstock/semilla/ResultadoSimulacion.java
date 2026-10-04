@@ -10,7 +10,8 @@ public record ResultadoSimulacion(int dias, long ventas, long unidadesVendidas, 
                                   long lineasPerdidas, long lineasEvitablesPedidas, long lineasEvitablesPerdidas,
                                   long unidadesPerdidas, long anuladas, long devoluciones, long devolucionesNoAptas,
                                   long entradas, long ajustes, int alzasDePrecio, int productosDesactivados,
-                                  BigDecimal ingreso) {
+                                  BigDecimal ingreso, long reservasCreadas, long reservasConvertidas,
+                                  long reservasCanceladas, long reservasVencidas) {
 
     /** % de líneas perdidas sin contar las variantes que se dejan agotar a propósito ni el descontinuado. */
     public double porcentajePerdidasEvitables() {

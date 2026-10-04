@@ -7,13 +7,14 @@ import co.livorno.controlstock.TestcontainersConfiguration;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /** B3 (ADR-008): usuarios demo, catálogo y entrada inicial con los servicios reales. Cada prueba hace rollback. */
@@ -23,7 +24,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest(properties = {
         "app.semilla.ejecutar=false", "app.semilla.salir-al-terminar=false", "app.semilla.meses=3", "app.semilla.tickets-dia-base=2",
         "app.semilla.fecha-fin=2025-12-31", "app.semilla.password=ClaveDemo-2026-ok"})
-@Transactional
+
 class GeneradorCatalogoIntegracionTest {
 
     @Autowired
@@ -32,6 +33,12 @@ class GeneradorCatalogoIntegracionTest {
     JdbcTemplate jdbc;
     @Autowired
     RelojSimulado reloj;
+
+    @BeforeEach
+    @AfterEach
+    void limpiar() {
+        LimpiezaSemilla.limpiar(jdbc);
+    }
 
     private long contar(String sql) {
         Long n = jdbc.queryForObject(sql, Long.class);
@@ -53,7 +60,6 @@ class GeneradorCatalogoIntegracionTest {
         assertThat(contar("select count(*) from producto")).isEqualTo(30);
         assertThat(contar("select count(*) from variante")).isEqualTo(resumen.variantes()).isGreaterThan(200);
         assertThat(contar("select count(*) from variante where stock_minimo < 2")).isZero();
-        assertThat(contar("select count(*) from variante where stock_reservado <> 0")).isZero();
 
         // kardex: una ENTRADA inicial por variante con costo, fechada en el día 0 a las 08:00
         String inicial = "from movimiento where observacion = 'Stock inicial'";
@@ -106,6 +112,7 @@ class GeneradorCatalogoIntegracionTest {
     void generar_conProductosSinVentas_abortaPorDatosParciales() {
         generador.generar();
         jdbc.update("delete from devolucion");
+        jdbc.update("delete from reserva");
         jdbc.update("delete from detalle_venta");
         jdbc.update("delete from venta");
 

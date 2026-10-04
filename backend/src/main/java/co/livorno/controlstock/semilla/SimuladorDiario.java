@@ -6,6 +6,13 @@ import co.livorno.controlstock.catalogo.modelo.Talla;
 import co.livorno.controlstock.catalogo.servicio.ProductoService;
 import co.livorno.controlstock.comun.seguridad.UsuarioAutenticado;
 import co.livorno.controlstock.inventario.dto.AjusteRequest;
+import co.livorno.controlstock.inventario.dto.CancelarReservaRequest;
+import co.livorno.controlstock.inventario.dto.CrearReservaRequest;
+import co.livorno.controlstock.inventario.dto.LineaReservaRequest;
+import co.livorno.controlstock.inventario.dto.ReservaResponse;
+import co.livorno.controlstock.inventario.servicio.ReservaService;
+import co.livorno.controlstock.venta.dto.ConvertirReservasRequest;
+import java.time.LocalDateTime;
 import co.livorno.controlstock.inventario.dto.EntradaRequest;
 import co.livorno.controlstock.inventario.dto.LineaEntradaRequest;
 import co.livorno.controlstock.inventario.modelo.TipoMovimiento;
@@ -64,6 +71,23 @@ public class SimuladorDiario {
     static final int DIAS_SEGURIDAD = 7;
     static final BigDecimal ALZA_ENERO = new BigDecimal("1.05");
 
+    static final int DIAS_RESERVAS = 30;
+    static final double SOLICITUDES_POR_DIA = 2.5;
+    static final double SOLICITUDES_ULTIMAS_48H = 5.0;
+    static final double PROBABILIDAD_DOS_LINEAS = 0.20;
+    /** Destino de una solicitud: 55/15/20 normalizado a 90 (el resto son las ACTIVAS de las últimas 48 h). */
+    static final double CORTE_CONVERTIDA = 55.0 / 90;
+    static final double CORTE_CANCELADA = 70.0 / 90;
+    static final int VIGENCIA_NORMAL_HORAS = 48;
+
+    private static final List<String> NOMBRES = List.of("Camila", "Valentina", "Sofia", "Mariana", "Daniela",
+            "Juliana", "Laura", "Andrea", "Carolina", "Manuela", "Santiago", "Mateo", "Sebastian", "Daniel", "Andres",
+            "Felipe", "Juan David", "Camilo");
+    private static final List<String> APELLIDOS = List.of("Restrepo", "Gomez", "Rodriguez", "Zapata", "Echeverri",
+            "Velez", "Ospina", "Montoya", "Arango", "Londono", "Henao", "Cardona", "Ramirez", "Giraldo");
+    private static final List<String> MOTIVOS_CANCELACION = List.of("Cliente no respondió", "Cliente desistió",
+            "Cliente pidió otra talla", "No pagó en el plazo acordado");
+
     private static final LocalTime HORA_PRECIOS = LocalTime.of(6, 0);
     private static final LocalTime HORA_REPOSICION = LocalTime.of(7, 0);
     private static final LocalTime HORA_LLEGADA = LocalTime.of(8, 0);
@@ -79,6 +103,7 @@ public class SimuladorDiario {
             "Conteo físico: faltante", "Merma por mancha en la prenda");
 
     private final VentaService ventas;
+    private final ReservaService reservaService;
     private final DevolucionService devoluciones;
     private final OperacionInventarioService operaciones;
     private final ProductoService productos;
@@ -87,11 +112,12 @@ public class SimuladorDiario {
     private final EntityManager entityManager;
     private final JdbcTemplate jdbc;
 
-    public SimuladorDiario(VentaService ventas, DevolucionService devoluciones,
+    public SimuladorDiario(VentaService ventas, ReservaService reservaService, DevolucionService devoluciones,
                            OperacionInventarioService operaciones, ProductoService productos,
                            ComoUsuario comoUsuario, RelojSimulado reloj, EntityManager entityManager,
                            JdbcTemplate jdbc) {
         this.ventas = ventas;
+        this.reservaService = reservaService;
         this.devoluciones = devoluciones;
         this.operaciones = operaciones;
         this.productos = productos;
@@ -124,6 +150,12 @@ public class SimuladorDiario {
                                   String motivo, boolean apta) {
     }
 
+    private record Futuro(LocalTime hora, Runnable accion) {
+    }
+
+    private record ReservaCreada(Long id, int idx, int cantidad) {
+    }
+
     private record Evento(LocalTime hora, long orden, Runnable accion) {
     }
 
@@ -145,11 +177,13 @@ public class SimuladorDiario {
         private final Map<String, ProductoSemilla> productoPorCodigo = new LinkedHashMap<>();
         private final int[] fisico;
         private final int[] enCamino;
+        private final int[] reservado;
         private final boolean[] agotable;
         private final Map<String, BigDecimal> precioVenta = new HashMap<>();
         private final Set<String> desactivados = new HashSet<>();
         private final TreeMap<LocalDate, List<Llegada>> llegadas = new TreeMap<>();
         private final TreeMap<LocalDate, List<PlanDevolucion>> devolucionesPlan = new TreeMap<>();
+        private final TreeMap<LocalDate, List<Futuro>> futuros = new TreeMap<>();
         private final Map<Long, BigDecimal> totalVenta = new HashMap<>();
         private final LocalDate corteReposicion;
         private final LocalDate corteDesactivacion;
@@ -159,6 +193,10 @@ public class SimuladorDiario {
         private LocalDate diaActual;
         private LocalTime horaActual;
 
+        private long reservasCreadas;
+        private long reservasConvertidas;
+        private long reservasCanceladas;
+        private long reservasVencidas;
         private long nVentas;
         private long unidadesVendidas;
         private long lineasPedidas;
@@ -190,6 +228,7 @@ public class SimuladorDiario {
             this.corteDesactivacion = fin.minusMonths(MESES_DESCONTINUADO);
             this.fisico = new int[variantes.size()];
             this.enCamino = new int[variantes.size()];
+            this.reservado = new int[variantes.size()];
             this.agotable = new boolean[variantes.size()];
 
             Map<Long, Integer> stockInicial = new HashMap<>();
@@ -218,7 +257,8 @@ public class SimuladorDiario {
             }
             return new ResultadoSimulacion(dias, nVentas, unidadesVendidas, lineasPedidas, lineasPerdidas,
                     lineasEvitablesPedidas, lineasEvitablesPerdidas, unidadesPerdidas,
-                    anuladas, nDevoluciones, noAptas, entradas, ajustes, alzas, desactivados.size(), ingreso);
+                    anuladas, nDevoluciones, noAptas, entradas, ajustes, alzas, desactivados.size(), ingreso,
+                    reservasCreadas, reservasConvertidas, reservasCanceladas, reservasVencidas);
         }
 
         private void simularDia(LocalDate dia) {
@@ -249,6 +289,21 @@ public class SimuladorDiario {
             for (ModeloDemanda.Ticket t : modelo.ticketsDelDia(dia)) {
                 encolar(t.hora(), () -> vender(t));
             }
+            List<Futuro> futurosHoy = futuros.remove(dia);
+            if (futurosHoy != null) {
+                for (Futuro f : futurosHoy) {
+                    encolar(f.hora(), f.accion());
+                }
+            }
+            if (!dia.isBefore(fin.minusDays(DIAS_RESERVAS - 1))) {
+                boolean ultimas48h = !dia.isBefore(fin.minusDays(1));
+                int solicitudes = ModeloDemanda.poisson(ultimas48h ? SOLICITUDES_ULTIMAS_48H : SOLICITUDES_POR_DIA,
+                        azar);
+                for (int i = 0; i < solicitudes; i++) {
+                    LocalTime hora = LocalTime.of(9, 0).plusMinutes(azar.nextInt(12 * 60));
+                    encolar(hora, () -> solicitarReserva(ultimas48h));
+                }
+            }
             if (azar.nextDouble() < AJUSTES_POR_MES / 30.0) {
                 LocalTime hora = LocalTime.of(10, 0).plusMinutes(azar.nextInt(9 * 60));
                 int idx = azar.nextInt(variantes.size());
@@ -273,10 +328,106 @@ public class SimuladorDiario {
             comoUsuario.ejecutar(usuario, accion);
         }
 
+        // ------------------------------------------------------------------ reservas
+
+        private void agendar(LocalDateTime momento, Runnable accion) {
+            if (momento.toLocalDate().equals(diaActual)) {
+                encolar(momento.toLocalTime(), accion);
+            } else {
+                futuros.computeIfAbsent(momento.toLocalDate(), k -> new ArrayList<>())
+                        .add(new Futuro(momento.toLocalTime(), accion));
+            }
+        }
+
+        private void solicitarReserva(boolean ultimas48h) {
+            int lineas = azar.nextDouble() < PROBABILIDAD_DOS_LINEAS ? 2 : 1;
+            List<Integer> elegidas = new ArrayList<>();
+            List<LineaReservaRequest> pedidas = new ArrayList<>();
+            for (int i = 0; i < lineas; i++) {
+                int cantidad = azar.nextDouble() < 0.8 ? 1 : 2;
+                for (int intento = 0; intento < 20; intento++) {
+                    int idx = azar.nextInt(variantes.size());
+                    if (elegidas.contains(idx) || !activo(variantes.get(idx).producto().codigo())
+                            || disponible(idx) < cantidad) {
+                        continue;
+                    }
+                    elegidas.add(idx);
+                    pedidas.add(new LineaReservaRequest(variantes.get(idx).id(), cantidad));
+                    break;
+                }
+            }
+            int vigencia = ultimas48h ? 72 + azar.nextInt(97) : VIGENCIA_NORMAL_HORAS;
+            double destino = azar.nextDouble();
+            String nombre = NOMBRES.get(azar.nextInt(NOMBRES.size())) + " "
+                    + APELLIDOS.get(azar.nextInt(APELLIDOS.size()));
+            String contacto = azar.nextBoolean() ? "3" + String.format("%09d", azar.nextInt(1_000_000_000))
+                    : "@" + nombre.toLowerCase(java.util.Locale.ROOT).replace(' ', '_') + azar.nextInt(100);
+            int minutosConvertir = 60 + azar.nextInt(46 * 60);
+            int minutosCancelar = 60 + azar.nextInt(39 * 60);
+            int minutosVencer = azar.nextInt(16);
+            String motivo = MOTIVOS_CANCELACION.get(azar.nextInt(MOTIVOS_CANCELACION.size()));
+            if (pedidas.isEmpty()) {
+                return;
+            }
+            List<ReservaResponse> creadas = new ArrayList<>();
+            en(inventario, () -> creadas.addAll(reservaService.crear(
+                    new CrearReservaRequest(nombre, contacto, vigencia, pedidas))));
+            List<ReservaCreada> datos = new ArrayList<>();
+            for (ReservaResponse r : creadas) {
+                int idx = indiceDeVariante(r.varianteId());
+                reservado[idx] += r.cantidad();
+                datos.add(new ReservaCreada(r.id(), idx, r.cantidad()));
+            }
+            reservasCreadas += datos.size();
+            if (ultimas48h) {
+                return;  // quedan ACTIVAS
+            }
+            LocalDateTime creada = diaActual.atTime(horaActual);
+            if (destino < CORTE_CONVERTIDA) {
+                agendar(creada.plusMinutes(minutosConvertir), () -> convertirReservas(datos));
+            } else if (destino < CORTE_CANCELADA) {
+                agendar(creada.plusMinutes(minutosCancelar), () -> cancelarReservas(datos, motivo));
+            } else {
+                agendar(creada.plusHours(vigencia).plusMinutes(minutosVencer), () -> vencerReservas(datos));
+            }
+        }
+
+        private void convertirReservas(List<ReservaCreada> datos) {
+            VentaDetalleResponse[] venta = new VentaDetalleResponse[1];
+            List<Long> ids = datos.stream().map(ReservaCreada::id).toList();
+            en(vendedor, () -> venta[0] = ventas.registrarDesdeReservas(new ConvertirReservasRequest(ids, null)));
+            for (ReservaCreada d : datos) {
+                reservado[d.idx()] -= d.cantidad();
+                fisico[d.idx()] -= d.cantidad();
+                unidadesVendidas += d.cantidad();
+            }
+            nVentas++;
+            ingreso = ingreso.add(venta[0].total());
+            totalVenta.put(venta[0].id(), venta[0].total());
+            reservasConvertidas += datos.size();
+        }
+
+        private void cancelarReservas(List<ReservaCreada> datos, String motivo) {
+            for (ReservaCreada d : datos) {
+                en(inventario, () -> reservaService.cancelar(d.id(), new CancelarReservaRequest(motivo)));
+                reservado[d.idx()] -= d.cantidad();
+                reservasCanceladas++;
+            }
+        }
+
+        private void vencerReservas(List<ReservaCreada> datos) {
+            reloj.avanzarA(diaActual.atTime(horaActual));
+            for (ReservaCreada d : datos) {
+                reservaService.vencer(d.id(), LocalDateTime.now(reloj));
+                reservado[d.idx()] -= d.cantidad();
+                reservasVencidas++;
+            }
+        }
+
         // ------------------------------------------------------------------ operaciones
 
         private int disponible(int idx) {
-            return fisico[idx];  // B4 no reserva: disponible = físico (las reservas llegan en B5)
+            return fisico[idx] - reservado[idx];
         }
 
         private boolean activo(String codigo) {
