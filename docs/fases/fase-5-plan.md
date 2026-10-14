@@ -440,6 +440,9 @@ SIN_ROTACION (se reabre cada noche); columnas σ/z/nivel de servicio en la pesta
 - Ventana de 90 días y estacionalidad: el ROP va un poco rezagado al entrar a diciembre; demanda censurada por agotados
   subestima d̄. Ambos se atacan con el pronóstico (fase 6).
 - Poisson ignora la sobredispersión (ventas de 2 unidades) en la cola; se acepta para μL < 5.
+- El nivel de servicio se cumple con revisión continua (la alerta se evalúa tras cada movimiento; Monte Carlo de A2 por
+  evento). Con revisión diaria o ventas de 2+ unidades en variantes de alta rotación, el stock puede cruzar el ROP
+  entre revisiones y el servicio real baja unos puntos (prototipo diario, λ = 3: A 0,924, B 0,861, C 0,737).
 - La meta 10–15 % no se alcanza en la fase 5 (D4): se mide y se explica; se cierra en la fase 6.
 - La re-evaluación nocturna reabre AGOTADO/STOCK_BAJO atendidas a mano si la condición sigue (equivale a un movimiento).
 - Acoplamiento por SQL de analitica con tablas de venta → modelo de lectura documentado; las pruebas de integración
