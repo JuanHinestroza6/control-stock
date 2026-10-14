@@ -11,6 +11,7 @@ import { InicioPage } from './paginas/inicio/InicioPage'
 import { InventarioPage } from './paginas/inventario/InventarioPage'
 import { KardexPage } from './paginas/inventario/KardexPage'
 import { AlertasPage } from './paginas/alertas/AlertasPage'
+import { AnaliticaPage } from './paginas/analitica/AnaliticaPage'
 import { ReservaNuevaPage } from './paginas/reservas/ReservaNuevaPage'
 import { ReservasPage } from './paginas/reservas/ReservasPage'
 import { CategoriasPage } from './paginas/productos/CategoriasPage'
@@ -22,7 +23,7 @@ import { VentaDetallePage } from './paginas/ventas/VentaDetallePage'
 import { VentaNuevaPage } from './paginas/ventas/VentaNuevaPage'
 import { VentasPage } from './paginas/ventas/VentasPage'
 
-const CON_PAGINA = ['productos', 'inventario', 'ventas', 'reservas', 'alertas', 'usuarios']
+const CON_PAGINA = ['productos', 'inventario', 'ventas', 'reservas', 'alertas', 'analitica', 'usuarios']
 
 export default function App() {
   return (
@@ -58,6 +59,7 @@ export default function App() {
             <Route path="/reservas/nueva" element={<ReservaNuevaPage />} />
             <Route path="/alertas" element={<AlertasPage />} />
           </Route>
+          <Route path="/analitica" element={<AnaliticaPage />} />
           <Route element={<RutaProtegida roles={['ADMIN']} />}>
             <Route path="/usuarios" element={<UsuariosPage />} />
           </Route>

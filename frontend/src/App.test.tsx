@@ -17,7 +17,7 @@ describe('App', () => {
   })
 
   it('un módulo sin construir muestra Próximamente', () => {
-    renderizarApp(<App />, { ruta: '/analitica', rol: 'VENDEDOR' })
+    renderizarApp(<App />, { ruta: '/compras', rol: 'ADMIN' })
     expect(screen.getByRole('heading', { name: 'Próximamente' })).toBeInTheDocument()
   })
 
