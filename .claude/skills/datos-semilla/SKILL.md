@@ -6,14 +6,18 @@ description: Especificación del generador de datos de demostración de Control 
 # Generador de datos semilla
 
 Objetivo: que la analítica (ABC, ROP, Holt-Winters) muestre resultados creíbles en la sustentación.
-Implementación: `comun/semilla/GeneradorDatosSemilla` (`CommandLineRunner` con `@Profile("seed")`), idempotente
-(si ya hay ventas, no hace nada) y reproducible (`new Random(42)`).
+Implementación (ADR-008): módulo `semilla` (`co.livorno.controlstock.semilla`, todo con `@Profile("seed")`; ningún otro
+módulo depende de él). `GeneradorDatosSemilla` hace la carga y `EjecutorSemilla` (`CommandLineRunner`) la lanza, imprime
+el resumen y termina la aplicación. Idempotente (si ya hay ventas, no hace nada; si hay productos o movimientos sin
+ventas, aborta) y reproducible (`new Random(42)` y `app.semilla.fecha-fin` fija).
 
 ## Regla crítica
 
 Las ventas, devoluciones, entradas y reservas se crean a través de los servicios reales (`MovimientoService`, `VentaService`),
 NO con inserts directos. Así el kardex y el stock quedan consistentes y el generador también sirve como prueba de integración.
-Para fechar en el pasado, los servicios aceptan un `Clock` inyectable; el generador usa un reloj ajustable.
+Para fechar en el pasado, los servicios usan el `Clock` inyectado; en el perfil `seed` el bean `RelojSimulado`
+(`@Primary`, solo avanza, vuelve al reloj del sistema al terminar) lo reemplaza. Los servicios leen el usuario del
+contexto de seguridad: el generador lo fija por operación (VENDEDOR vende, INVENTARIO ingresa/ajusta/reserva, ADMIN anula).
 
 ## Catálogo
 
@@ -43,9 +47,14 @@ unidades(día, producto) ~ Poisson(λ)
 - Entradas: cuando el disponible de una variante cae bajo un umbral, se programa una ENTRADA tras su lead time por 1–2 meses de demanda. Algunas variantes se dejan agotar a propósito.
 - Devoluciones: ~4% de las ventas, dentro de los 15 días siguientes, 80% aptas para venta.
 - Reservas: en los últimos 30 días, ~10 activas, algunas vencidas y otras convertidas.
-- Usuarios demo: uno por rol (`admin@livorno.co`, `inventario@livorno.co`, `ventas@livorno.co`, `contabilidad@livorno.co`) con contraseña desde variable de entorno `SEED_PASSWORD`.
+- Usuarios demo: uno por rol (`admin@livorno.co`, `inventario@livorno.co`, `ventas@livorno.co`, `contabilidad@livorno.co`) con contraseña desde variable de entorno `SEED_PASSWORD` (obligatoria), sin cambio de contraseña obligatorio.
 
 ## Rendimiento
 
-Insertar en lotes (`hibernate.jdbc.batch_size=50`), transacción por mes simulado. Meta: menos de 2 minutos.
-Al final imprime un resumen: productos, variantes, ventas, movimientos, ingreso total.
+Una sola transacción para toda la carga (todo o nada) con `flush()` + `clear()` por día simulado; el generador guarda
+solo ids entre días. Las entidades usan `GenerationType.IDENTITY`, así que Hibernate no agrupa los INSERT
+(`batch_size` solo ayuda en los UPDATE): el ahorro viene de la transacción única y de apagar el listener de alertas
+(`app.alertas.por-evento=false` en `seed`); al final se evalúan las alertas de todas las variantes con el reloj real.
+Meta: menos de 2 minutos (si se pasa, bajar el volumen de tickets diarios).
+Al final verifica la consistencia (stock = suma del kardex, reservado = suma de reservas ACTIVAS, nada negativo) e
+imprime un resumen: productos, variantes, ventas, ventas perdidas, movimientos, ingreso total, reservas por estado, alertas.

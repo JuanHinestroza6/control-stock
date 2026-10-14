@@ -4,6 +4,7 @@ import co.livorno.controlstock.catalogo.evento.UmbralCambiado;
 import co.livorno.controlstock.inventario.evento.StockCambiado;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -14,6 +15,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
  */
 @Slf4j
 @Component
+@ConditionalOnProperty(name = "app.alertas.por-evento", havingValue = "true", matchIfMissing = true)
 @RequiredArgsConstructor
 public class AlertaListener {
 

@@ -36,5 +36,13 @@ Fase 3 (rama fase-3-apartados, 2026-10-02), sin críticos:
 9. Listeners AFTER_COMMIT + REQUIRES_NEW que leen el agregado sin bloquearlo (AlertaService.evaluar): dos evaluaciones
    concurrentes de la misma variante pueden dejar una alerta obsoleta o AGOTADO y STOCK_BAJO activas a la vez. Pedir
    bloqueo de la fila de la variante al evaluar y prueba con dos hilos.
+Fase 4 (rama fase-4-datos-semilla, 2026-10-04), sin críticos:
+11. Guardas por nombre de perfil que no existe en el repo (`acceptsProfiles("prod")` sin application-prod.yml): protección
+    vacua, misma familia que el 6. Pedir lista de permitidos (dev|test) en vez de lista de prohibidos.
+12. Estado global mutable (`Clock` @Primary ajustable) cambiado dentro de un CommandLineRunner: Tomcat ya escucha
+    durante la carga. Pedir `spring.main.web-application-type: none` en perfiles de tarea batch.
+13. Records `@ConfigurationProperties` con un secreto (`password`) sin `toString()` propio. Sin ArchUnit que obligue
+    `@Profile("seed")` en cada bean del módulo semilla.
+
 10. Datos personales (Ley 1581) copiados a tablas inmutables (motivo de cancelación en la observación del kardex) y sin
     plan de supresión/anonimización de `reserva.cliente_*` (columnas updatable=false).
