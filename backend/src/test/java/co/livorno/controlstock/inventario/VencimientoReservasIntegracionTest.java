@@ -69,6 +69,7 @@ class VencimientoReservasIntegracionTest {
         SecurityContextHolder.clearContext();
         jdbc.update("DELETE FROM movimiento WHERE variante_id = ?", varianteId);
         jdbc.update("DELETE FROM alerta WHERE variante_id = ?", varianteId);
+        jdbc.update("DELETE FROM analitica_variante WHERE variante_id = ?", varianteId);
         jdbc.update("DELETE FROM reserva WHERE variante_id = ?", varianteId);
         jdbc.update("DELETE FROM variante WHERE id = ?", varianteId);
         jdbc.update("DELETE FROM producto WHERE id = ?", productoId);

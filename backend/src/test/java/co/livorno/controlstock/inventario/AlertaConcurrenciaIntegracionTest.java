@@ -43,6 +43,7 @@ class AlertaConcurrenciaIntegracionTest {
         if (variante != null) {
             jdbc.update("DELETE FROM movimiento WHERE variante_id = ?", variante);
             jdbc.update("DELETE FROM alerta WHERE variante_id = ?", variante);
+            jdbc.update("DELETE FROM analitica_variante WHERE variante_id = ?", variante);
             jdbc.update("DELETE FROM variante WHERE id = ?", variante);
             jdbc.update("DELETE FROM producto WHERE id = ?", producto);
         }

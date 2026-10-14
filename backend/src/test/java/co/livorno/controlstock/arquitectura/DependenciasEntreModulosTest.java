@@ -43,6 +43,12 @@ class DependenciasEntreModulosTest {
             .because("el generador de datos de demostración depende de los módulos, nunca al revés (ADR-008)");
 
     @ArchTest
+    static final ArchRule nadieFueraDeSemillaDependeDeAnalitica = noClasses()
+            .that().resideOutsideOfPackages("co.livorno.controlstock.semilla..", "co.livorno.controlstock.analitica..")
+            .should().dependOnClassesThat().resideInAPackage("co.livorno.controlstock.analitica..")
+            .because("analitica es un modelo de lectura que está arriba de todo; solo la semilla la invoca (ADR-009)");
+
+    @ArchTest
     static final ArchRule componentesDeSemillaLlevanPerfilSeed = classes()
             .that(new DescribedPredicate<JavaClass>("de semilla anotadas con @Component, @Configuration o @Service") {
                 @Override

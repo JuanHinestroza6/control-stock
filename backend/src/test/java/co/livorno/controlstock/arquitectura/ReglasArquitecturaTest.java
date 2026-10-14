@@ -111,6 +111,35 @@ class ReglasArquitecturaTest {
             })
             .because("el stock y el kardex solo cambian vía MovimientoService (reglas de oro 1 y 2)");
 
+    /** ROP y clase ABC solo se escriben con la sentencia dirigida de analitica.repositorio (ADR-009). */
+    @ArchTest
+    static final ArchRule modifyingDeRopYClaseSoloEnAnaliticaRepositorio = methods()
+            .that().areAnnotatedWith(Modifying.class)
+            .and(new DescribedPredicate<com.tngtech.archunit.core.domain.JavaMethod>(
+                    "mencionan punto_reorden, clase_abc, puntoReorden o claseAbc") {
+                @Override
+                public boolean test(com.tngtech.archunit.core.domain.JavaMethod metodo) {
+                    if (!metodo.isAnnotatedWith(org.springframework.data.jpa.repository.Query.class)) {
+                        return false;
+                    }
+                    String consulta = metodo.getAnnotationOfType(org.springframework.data.jpa.repository.Query.class)
+                            .value().toLowerCase(java.util.Locale.ROOT);
+                    return Set.of("punto_reorden", "clase_abc", "puntoreorden", "claseabc").stream()
+                            .anyMatch(consulta::contains);
+                }
+            })
+            .should().beDeclaredInClassesThat().resideInAPackage("co.livorno.controlstock.analitica.repositorio")
+            .allowEmptyShould(true)
+            .because("el ROP y la clase ABC solo los escribe la analítica, sin pasar por @Version (ADR-009)");
+
+    /** Si se renombra el método, la regla anterior pasaría en vacío: esta exige que el UPDATE siga existiendo. */
+    @ArchTest
+    static final ArchRule analiticaRepositorioSiEscribeRopYClase = methods()
+            .that().areDeclaredIn(co.livorno.controlstock.analitica.repositorio.AnaliticaVarianteRepository.class)
+            .and().areAnnotatedWith(Modifying.class)
+            .should().haveNameMatching("aplicarAVariante|limpiarInactivas")
+            .because("AnaliticaVarianteRepository es el único escritor de punto_reorden y clase_abc (ADR-009)");
+
     @ArchTest
     static final ArchRule nadieBorraEntidadesConEntityManager = noClasses()
             .should().callMethodWhere(DescribedPredicate.describe("EntityManager.remove o Session.remove/delete",

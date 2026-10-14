@@ -99,6 +99,7 @@ class ReservaConcurrenciaIntegracionTest {
                     Long.class, v);
             jdbc.update("DELETE FROM movimiento WHERE variante_id = ?", v);
             jdbc.update("DELETE FROM alerta WHERE variante_id = ?", v);
+            jdbc.update("DELETE FROM analitica_variante WHERE variante_id = ?", v);
             jdbc.update("DELETE FROM reserva WHERE variante_id = ?", v);
             for (Long ventaId : ventas) {
                 jdbc.update("DELETE FROM detalle_venta WHERE venta_id = ?", ventaId);

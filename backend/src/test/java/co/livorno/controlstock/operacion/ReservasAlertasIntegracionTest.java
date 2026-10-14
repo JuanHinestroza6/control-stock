@@ -91,6 +91,7 @@ class ReservasAlertasIntegracionTest {
                     + variantes, Long.class);
             jdbc.update("DELETE FROM movimiento WHERE variante_id IN " + variantes);
             jdbc.update("DELETE FROM alerta WHERE variante_id IN " + variantes);
+            jdbc.update("DELETE FROM analitica_variante WHERE variante_id IN " + variantes);
             jdbc.update("DELETE FROM reserva WHERE variante_id IN " + variantes); // antes que venta (FK venta_id)
             for (Long ventaId : ventas) {
                 jdbc.update("DELETE FROM detalle_venta WHERE venta_id = ?", ventaId);
