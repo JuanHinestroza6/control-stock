@@ -2,6 +2,8 @@
 
 - Estado: aceptada
 - Fecha: 2026-10-02
+- Modificada por: ADR-009 — SIN_ROTACION por producto, las tres alertas excluyentes (AGOTADO > SIN_ROTACION >
+  STOCK_BAJO), re-evaluación nocturna y cierre de alertas al desactivar.
 
 ## Contexto
 La Fase 3 implementa los apartados que los clientes hacen por Instagram, TikTok y WhatsApp: crear, cancelar, convertir en
