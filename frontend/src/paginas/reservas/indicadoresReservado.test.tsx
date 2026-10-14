@@ -21,7 +21,7 @@ vi.mock('../../api/ventas')
 const item: InventarioItemResponse = {
   varianteId: 11, sku: 'LIV001-S-NEG', productoId: 1, productoCodigo: 'LIV001', productoNombre: 'Camiseta Oversize',
   categoria: { id: 1, nombre: 'Camisetas' }, talla: 'S', color: 'NEGRO', stockFisico: 10, stockReservado: 3, stockDisponible: 7,
-  stockMinimo: 3, puntoReorden: null, estadoStock: 'OK', precioVenta: 50000, activo: true,
+  stockMinimo: 3, puntoReorden: null, claseAbc: null, estadoStock: 'OK', precioVenta: 50000, activo: true,
 }
 const pagina = { content: [item], page: { size: 20, number: 0, totalElements: 1, totalPages: 1 } }
 

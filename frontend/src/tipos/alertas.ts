@@ -26,6 +26,7 @@ export interface ResumenAlertasResponse {
   activas: number
   agotado: number
   stockBajo: number
+  sinRotacion: number
 }
 
 export interface FiltrosAlertas extends ParametrosPagina {

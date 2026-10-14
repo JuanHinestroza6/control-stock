@@ -9,6 +9,8 @@ import {
   puedeVender,
   puedeVerCostos,
   puedeVerKardex,
+  puedeRecalcularAnalitica,
+  puedeVerAnaliticaCompleta,
 } from './permisos'
 
 describe('puedeEditarCatalogo', () => {
@@ -51,5 +53,15 @@ describe('permisos de la fase 3', () => {
   })
   it('puedeAtenderAlertas', () => {
     expect(roles.map(puedeAtenderAlertas)).toEqual([true, true, false, false, false])
+  })
+})
+
+describe('permisos de la fase 5', () => {
+  const roles = ['ADMIN', 'INVENTARIO', 'VENDEDOR', 'CONTABILIDAD', undefined] as const
+  it('puedeVerAnaliticaCompleta', () => {
+    expect(roles.map(puedeVerAnaliticaCompleta)).toEqual([true, true, false, true, false])
+  })
+  it('puedeRecalcularAnalitica', () => {
+    expect(roles.map(puedeRecalcularAnalitica)).toEqual([true, false, false, false, false])
   })
 })

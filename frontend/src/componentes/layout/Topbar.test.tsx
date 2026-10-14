@@ -13,7 +13,7 @@ function montar(rol: Rol) {
 
 beforeEach(() => {
   vi.resetAllMocks()
-  vi.mocked(api.obtenerResumenAlertas).mockResolvedValue({ activas: 3, agotado: 1, stockBajo: 2 })
+  vi.mocked(api.obtenerResumenAlertas).mockResolvedValue({ activas: 3, agotado: 1, stockBajo: 2, sinRotacion: 0 })
 })
 
 describe('Topbar', () => {

@@ -25,7 +25,7 @@ function item(id: number, extra: Partial<InventarioItemResponse> = {}): Inventar
     stockReservado: 2,
     stockDisponible: 8,
     stockMinimo: 3,
-    puntoReorden: null,
+    puntoReorden: null, claseAbc: null,
     estadoStock: 'OK',
     precioVenta: 59900,
     activo: true,
