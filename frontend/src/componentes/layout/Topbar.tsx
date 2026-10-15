@@ -46,6 +46,7 @@ export function Topbar({ onAbrirMenu, menuAbierto, idMenu }: TopbarProps) {
           <Link
             to="/alertas"
             aria-label={`Alertas: ${alertas} sin atender`}
+            title={`Agotado: ${resumen.data?.agotado ?? 0} · Stock bajo: ${resumen.data?.stockBajo ?? 0} · Sin rotación: ${resumen.data?.sinRotacion ?? 0}`}
             className="relative rounded-lg p-2 hover:bg-fondo-suave focus-visible:outline-2 focus-visible:outline-acento"
           >
             <svg aria-hidden="true" viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth="2">

@@ -22,6 +22,8 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import co.livorno.controlstock.catalogo.evento.VarianteDesactivada;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -44,6 +46,7 @@ public class ProductoService {
     private final CategoriaRepository categorias;
     private final UsuarioActual usuarioActual;
     private final ConsultaReservasActivas reservasActivas;
+    private final ApplicationEventPublisher eventos;
 
     public Page<ProductoResumenResponse> listar(String q, Long categoriaId, Boolean activo, Pageable pageable) {
         Ordenamiento.validar(pageable, ORDEN_PERMITIDO);
@@ -107,6 +110,10 @@ public class ProductoService {
                 });
                 deLaFamilia.forEach(Variante::desactivar);
                 producto.desactivar();
+                guardar(producto, CONFLICTO_ACTUALIZAR);
+                // Tras el commit, el listener de alertas cierra las alertas ACTIVAS de cada variante.
+                deLaFamilia.forEach(v -> eventos.publishEvent(new VarianteDesactivada(v.getId())));
+                return detalle(producto);
             }
             guardar(producto, CONFLICTO_ACTUALIZAR);
         }

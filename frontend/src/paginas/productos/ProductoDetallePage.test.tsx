@@ -167,6 +167,7 @@ describe('ProductoDetallePage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Editar stock mínimo de LIV005-M-NEG1' }))
     const campo = screen.getByRole('textbox', { name: 'Stock mínimo' })
     expect(campo).toHaveValue('3')
+    expect(screen.getByText(/el stock mínimo solo se usa si no hay ROP/)).toBeInTheDocument()
     await userEvent.clear(campo)
     await userEvent.type(campo, '-2')
     await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))

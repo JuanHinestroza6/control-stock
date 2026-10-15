@@ -4,6 +4,7 @@ import jakarta.validation.ConstraintViolationException;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.data.core.PropertyReferenceException;
@@ -53,6 +54,14 @@ public class ManejadorGlobalExcepciones extends ResponseEntityExceptionHandler {
                 "El cuerpo de la solicitud no es válido o está mal formado."));
     }
 
+    @Override
+    protected ResponseEntity<Object> handleTypeMismatch(TypeMismatchException ex, HttpHeaders headers,
+            HttpStatusCode status, WebRequest request) {
+        String campo = ex.getPropertyName() != null ? ex.getPropertyName() : "parametro";
+        return ResponseEntity.badRequest()
+                .body(validacionProblema(List.of(new ErrorCampo(campo, "El valor indicado no es válido."))));
+    }
+
     @ExceptionHandler(ConstraintViolationException.class)
     public ProblemDetail violaciones(ConstraintViolationException ex) {
         List<ErrorCampo> errores = ex.getConstraintViolations().stream()
@@ -98,6 +107,9 @@ public class ManejadorGlobalExcepciones extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(SolicitudInvalidaException.class)
     public ProblemDetail solicitudInvalida(SolicitudInvalidaException ex) {
+        if (ex.getCampo() != null) {
+            return validacionProblema(List.of(new ErrorCampo(ex.getCampo(), ex.getMessage())));
+        }
         return problema(HttpStatus.BAD_REQUEST, "Solicitud inválida", ex.getMessage());
     }
 

@@ -45,6 +45,10 @@ export function ModalStockMinimo({ variante, guardando, error, onGuardar, onCanc
           </p>
         )}
         <Campo etiqueta="Stock mínimo" inputMode="numeric" value={texto} onChange={(e) => setTexto(e.target.value)} error={errorCampo} />
+        <p className="text-sm text-oxford/70">
+          Con punto de reorden calculado, el stock mínimo solo se usa si no hay ROP.
+          {variante.puntoReorden !== null && ` Punto de reorden actual: ${variante.puntoReorden}.`}
+        </p>
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Boton variante="secundario" disabled={guardando} onClick={onCancelar}>
             Cancelar

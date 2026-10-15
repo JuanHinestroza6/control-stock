@@ -16,7 +16,7 @@ function variante(id: number, extra: Partial<InventarioItemResponse> = {}): Inve
     stockReservado: 0,
     stockDisponible: 10,
     stockMinimo: 1,
-    puntoReorden: null,
+    puntoReorden: null, claseAbc: null,
     estadoStock: 'OK',
     precioVenta: 50000,
     activo: true,

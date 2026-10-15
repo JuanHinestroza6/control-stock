@@ -12,6 +12,7 @@ import com.tngtech.archunit.core.domain.JavaAccess;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaCodeUnit;
 import com.tngtech.archunit.core.domain.JavaFieldAccess;
+import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
@@ -110,6 +111,67 @@ class ReglasArquitecturaTest {
                 }
             })
             .because("el stock y el kardex solo cambian vía MovimientoService (reglas de oro 1 y 2)");
+
+    /** ROP y clase ABC solo se escriben con la sentencia dirigida de analitica.repositorio (ADR-009). */
+    @ArchTest
+    static final ArchRule modifyingDeRopYClaseSoloEnAnaliticaRepositorio = methods()
+            .that().areAnnotatedWith(Modifying.class)
+            .and(new DescribedPredicate<com.tngtech.archunit.core.domain.JavaMethod>(
+                    "mencionan punto_reorden, clase_abc, puntoReorden o claseAbc") {
+                @Override
+                public boolean test(com.tngtech.archunit.core.domain.JavaMethod metodo) {
+                    if (!metodo.isAnnotatedWith(org.springframework.data.jpa.repository.Query.class)) {
+                        return false;
+                    }
+                    String consulta = metodo.getAnnotationOfType(org.springframework.data.jpa.repository.Query.class)
+                            .value().toLowerCase(java.util.Locale.ROOT);
+                    return Set.of("punto_reorden", "clase_abc", "puntoreorden", "claseabc").stream()
+                            .anyMatch(consulta::contains);
+                }
+            })
+            .should().beDeclaredInClassesThat().resideInAPackage("co.livorno.controlstock.analitica.repositorio")
+            .allowEmptyShould(true)
+            .because("el ROP y la clase ABC solo los escribe la analítica, sin pasar por @Version (ADR-009)");
+
+    /** Si se renombra el método, la regla anterior pasaría en vacío: esta exige que el UPDATE siga existiendo. */
+    @ArchTest
+    static final ArchRule analiticaRepositorioSiEscribeRopYClase = methods()
+            .that().areDeclaredIn(co.livorno.controlstock.analitica.repositorio.AnaliticaVarianteRepository.class)
+            .and().areAnnotatedWith(Modifying.class)
+            .should().haveName("aplicarAVariante")
+            .because("AnaliticaVarianteRepository es el único escritor de punto_reorden y clase_abc (ADR-009)");
+
+    /** Clases de solo lectura autorizadas a usar JDBC directo (el tipo JDBC no se inyecta en ninguna otra). */
+    private static final String[] CLASES_JDBC_DE_LECTURA = {
+        "co.livorno.controlstock.analitica.repositorio.ConsultasVentaAnalitica",
+        "co.livorno.controlstock.analitica.repositorio.ConsultasEstadoAlertas"};
+
+    private static final Set<String> TIPOS_JDBC = Set.of("org.springframework.jdbc.core.JdbcTemplate",
+            "org.springframework.jdbc.core.JdbcOperations",
+            "org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate",
+            "org.springframework.jdbc.core.namedparam.NamedParameterJdbcOperations",
+            "org.springframework.jdbc.core.simple.JdbcClient");
+
+    /**
+     * JDBC directo evita JPA y por tanto cualquier regla sobre entidades: solo lo usan las consultas de lectura de la
+     * analítica y el módulo semilla (verifica y consulta, nunca escribe; ver la regla siguiente).
+     */
+    @ArchTest
+    static final ArchRule jdbcDirectoSoloEnClasesDeLectura = noClasses()
+            .that().doNotHaveFullyQualifiedName(CLASES_JDBC_DE_LECTURA[0])
+            .and().doNotHaveFullyQualifiedName(CLASES_JDBC_DE_LECTURA[1])
+            .and().resideOutsideOfPackage("co.livorno.controlstock.semilla..")
+            .should().dependOnClassesThat(DescribedPredicate.describe("son JdbcTemplate, NamedParameterJdbcTemplate"
+                    + " o JdbcClient", (JavaClass c) -> TIPOS_JDBC.contains(c.getName())))
+            .because("un UPDATE por JDBC saltaría las reglas de stock, kardex y ROP/clase (reglas de oro 1 y 2, ADR-009)");
+
+    /** Ni siquiera las clases autorizadas escriben: sin update, batchUpdate ni execute sobre JDBC. */
+    @ArchTest
+    static final ArchRule jdbcDirectoNuncaEscribeEnProduccion = noClasses()
+            .should().callMethodWhere(DescribedPredicate.describe("JdbcTemplate.update/batchUpdate/execute",
+                    (JavaMethodCall c) -> TIPOS_JDBC.stream().anyMatch(t -> c.getTarget().getOwner().getName().equals(t))
+                            && Set.of("update", "batchUpdate", "execute").contains(c.getName())))
+            .because("el JDBC directo es solo de lectura; las escrituras pasan por servicios y repositorios JPA");
 
     @ArchTest
     static final ArchRule nadieBorraEntidadesConEntityManager = noClasses()

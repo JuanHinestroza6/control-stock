@@ -194,26 +194,70 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. Desde la Fas
   `cerradaPor`). Convertir: ADMIN y VENDEDOR (crea una venta).
 - Un AJUSTE_NEGATIVO no puede consumir unidades reservadas (requiere `cantidad ≤ disponible`): primero se cancela la reserva.
 
-## Alertas (ADR-007)
+## Alertas (ADR-007, ADR-009)
 
 | Tipo | Condición | Fase |
 |---|---|---|
 | AGOTADO | `disponible == 0` | 3 (por evento) |
+| SIN_ROTACION | el **producto** no tiene ventas no anuladas en 60 días, existe hace ≥ 60 días y la variante tiene `disponible > 0` | 5 (por evento y nocturna) |
 | STOCK_BAJO | `0 < disponible ≤ umbral` (`puntoReorden`, o `stockMinimo` si no hay ROP calculado) | 3 (por evento) |
-| SIN_ROTACION | sin ventas en 60 días y `físico > 0` (se calcula en la tarea nocturna) | 5 |
 
-- **AGOTADO y STOCK_BAJO son excluyentes** (coinciden con `Variante.estadoStock()`): al pasar de BAJO a AGOTADO se cierra
-  la de STOCK_BAJO y se abre la de AGOTADO, y viceversa; al volver a OK se cierran ambas. Cerrar = ATENDIDA automática con
-  `atendidaPor` null.
+- **Las tres son excluyentes**, con prioridad **AGOTADO > SIN_ROTACION > STOCK_BAJO** (ADR-009): una variante tiene como
+  máximo una alerta ACTIVA. Al cambiar el tipo vigente se cierra la anterior y se abre la nueva; si no aplica ninguna, se
+  cierran todas. Cerrar = ATENDIDA automática con `atendidaPor` null. AGOTADO y STOCK_BAJO coinciden con
+  `Variante.estadoStock()`; SIN_ROTACION puede reemplazar a BAJO (el estado de stock sigue diciendo BAJO).
+- **SIN_ROTACION** (ADR-009): la condición es por producto (una venta VENTA o VENTA_RESERVA del kardex sin
+  ANULACION_VENTA de la misma referencia cuenta como rotación) y la alerta se abre en cada variante con `disponible > 0`.
+  Una venta de cualquier variante cierra la SIN_ROTACION de todas las del producto. **Episodio** = desde
+  `max(última venta, creación del producto) + 60 días`: atendida a mano no se reabre dentro del mismo episodio. Días
+  configurables (`app.alertas.sin-rotacion-dias`, 60).
 - Se evalúan con un `@TransactionalEventListener(AFTER_COMMIT)` sobre `StockCambiado` y sobre `UmbralCambiado` (publicado al
   editar `stockMinimo`), en una transacción nueva (`REQUIRES_NEW`). Un fallo del listener se registra en el log y nunca
-  llega al usuario (la operación ya se confirmó). Variantes inactivas no generan alertas y no aparecen en el listado.
+  llega al usuario (la operación ya se confirmó). Variantes inactivas no generan alertas y no aparecen en el listado;
+  desactivar una variante (o su producto) cierra todas sus alertas ACTIVAS.
 - Una sola alerta ACTIVA por variante y tipo, garantizada además por un índice único en la base.
-- Atender a mano una alerta cuya condición sigue vigente la cierra; el siguiente movimiento de esa variante vuelve a
-  abrirla.
-- La re-evaluación nocturna de todas las variantes y SIN_ROTACION llegan en la Fase 5.
+- Atender a mano una AGOTADO o STOCK_BAJO cuya condición sigue vigente la cierra; el siguiente movimiento de esa variante
+  o la re-evaluación nocturna vuelve a abrirla.
+- **Re-evaluación nocturna** (Fase 5): la ejecución analítica re-evalúa todas las variantes (ver "Analítica"). Calcular el
+  ROP no publica `UmbralCambiado`: la re-evaluación completa lo cubre.
+- **Métrica de alertas** (ADR-009): cada ejecución analítica guarda el porcentaje de variantes activas con AGOTADO o
+  STOCK_BAJO (SIN_ROTACION aparte). Línea base de la Fase 4 con `stockMinimo`: 141 de 299 (≈ 47 %). La meta de ~10–15 %
+  se alcanza en la Fase 6, cuando STOCK_BAJO use la posición de inventario (disponible + pedidos aprobados en camino).
 - El listener se puede apagar con `app.alertas.por-evento=false` (por defecto `true`). Solo el perfil `seed` lo apaga; el
-  generador evalúa todas las variantes al terminar (ver "Datos semilla").
+  generador ejecuta la analítica completa al terminar (ver "Datos semilla" y "Analítica").
+
+## Analítica (ADR-009)
+
+- **Ventas que cuentan**: solo REGISTRADA; las ANULADAS se excluyen de ABC, ROP, más vendidos y SIN_ROTACION.
+  - *Demanda comercial* (ABC, más vendidos): unidades netas = vendidas − devueltas (todas), en la fecha de la venta;
+    ingreso neto = Σ (cantidad − devuelta) × `precioUnitario`.
+  - *Demanda de inventario* (ROP): por día, vendidas (fecha de la venta, incluidas las convertidas de reservas) −
+    devueltas **aptas** (fecha de la devolución), recortada a 0. Las reservas ACTIVAS no son demanda.
+  - La demanda observada está censurada por los agotados; se corrige con el pronóstico (Fase 6).
+- **Clasificación ABC por variante**: ingreso neto de los **últimos 12 meses** (`[corte − 365 d, corte)`, corte = hoy,
+  excluye el día en curso). Orden por ingreso descendente (desempate por id); cortes sobre el acumulado: A ≤ 80 %, B ≤ 95 %,
+  C el resto; la primera siempre es A; sin ingreso → C. Universo: variantes activas de productos activos; las inactivas
+  quedan con `claseAbc` null.
+- **Punto de reorden por variante** (ROP híbrido, sin piso): ventana de 90 días de demanda de inventario (días sin ventas
+  = 0). Nivel de servicio por clase: A 95 % (z 1,65), B 90 % (z 1,28), C 80 % (z 0,84); sin clase → C. `L = leadTimeDias`.
+  - Menos de 30 días de historia → `puntoReorden` null (umbral = `stockMinimo`), método SIN_HISTORIA.
+  - Demanda media 0 → ROP 0 (solo AGOTADO), método SIN_DEMANDA.
+  - `μL = d̄ × L ≥ 5` → `ROP = ceil(μL + z × s × √L)`, método NORMAL.
+  - `μL < 5` → menor `r` con `P(Poisson(μL) ≤ r) ≥` nivel de servicio, método POISSON.
+  - `stockMinimo` es solo el respaldo cuando no hay ROP (no es piso); `loteMinimo` no interviene (Fase 6, sugerencia).
+- **Escritura** (regla de oro 1 intacta): `puntoReorden` y `claseAbc` no se actualizan desde la entidad
+  (`updatable = false`); solo los escribe un UPDATE dirigido desde `analitica.repositorio`, por variante en orden de id,
+  sin tocar `version` ni `actualizadoEn` (el cálculo no provoca 409 a las ventas). Nunca toca stock.
+- **Instantánea** `analitica_variante` (insumos del último cálculo por variante, para explicar el ROP) y **registro**
+  `ejecucion_analitica` (origen NOCTURNA, MANUAL o SEMILLA; estado EN_CURSO, EXITOSA o FALLIDA; conteos y métrica).
+- **Ejecución**: cada noche a las 02:00 America/Bogota (`app.analitica.cron`; apagada en pruebas y en `seed`) y con
+  "Recalcular" (solo ADMIN, síncrono). Pasos: ABC + ROP en una sola transacción (todo o nada) → re-evaluación de las
+  alertas de todas las variantes, una transacción por variante (corre aunque falle el paso anterior) → registro. Una
+  ejecución a la vez: un recálculo manual con otro en curso → 409; la nocturna se omite.
+- **Más vendidos** (REQ-05): ranking top-N (1–50, por defecto 10) por producto o variante, por unidades o ingreso neto,
+  rango de fechas inclusivo (por defecto los últimos 30 días, máximo 731) y categoría opcional. Sin costos ni margen.
+- **Roles**: más vendidos, los cuatro roles; ABC, reorden y última ejecución: ADMIN, INVENTARIO y CONTABILIDAD;
+  recalcular: solo ADMIN. La clase ABC se muestra también en inventario a todos (no revela costos).
 
 ## Datos semilla (ADR-008)
 
@@ -243,6 +287,8 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. Desde la Fas
   vigencia de 72 a 168 h; conviene regenerar la víspera de la sustentación.
 - **Verificación al terminar**: stock = suma del kardex por variante, reservado = suma de reservas ACTIVAS, ningún stock
   negativo; si falla, la carga se revierte.
+- **Analítica al cerrar** (ADR-009): tras el commit de la carga se ejecuta la analítica completa con el reloj real (origen
+  SEMILLA): la demo arranca con clase ABC, ROP y alertas coherentes.
 
 ## Roles y permisos
 
@@ -268,6 +314,9 @@ usuario autenticado porque el VENDEDOR la usa para buscar al vender. Anular vent
 Notas de la matriz (Fase 3): convertir reservas crea una venta, por eso INVENTARIO no convierte aunque gestione reservas.
 Atender alertas: ADMIN e INVENTARIO; VENDEDOR solo las ve (incluida la campana).
 
+Notas de la matriz (Fase 5): en Analítica, "Sí" del ADMIN incluye recalcular; INVENTARIO y CONTABILIDAD ven ABC, reorden y
+la última ejecución; VENDEDOR solo ve más vendidos (sin costos). La clase ABC se muestra en inventario a todos los roles.
+
 ## Trazabilidad con el documento PPI
 
 | Requisito PPI | Módulo |
@@ -276,7 +325,7 @@ Atender alertas: ADMIN e INVENTARIO; VENDEDOR solo las ve (incluida la campana).
 | REQ-02 Registrar automáticamente operaciones de stock (CU-03) | inventario |
 | REQ-03 Reportes de rentabilidad | reporte |
 | REQ-04 Emitir alertas de nivel mínimo de stock (CU-10) | inventario (alertas) + analitica (ROP) |
-| REQ-05 Productos más vendidos | analitica |
+| REQ-05 Identificar Productos de Mayor Venta (CU-08) | analitica |
 | REQ-06 Controlar el acceso y roles de usuario (CU-02) | auth, usuario |
 | REQ-07 Reportes contables | reporte |
 | REQ-08 Gestionar el registro de devoluciones (CU-09) | venta |
@@ -285,7 +334,7 @@ Atender alertas: ADMIN e INVENTARIO; VENDEDOR solo las ve (incluida la campana).
 | REQ-11 Gestión de productos (CU-11) | catalogo |
 | REQ-12 Registrar y gestionar usuarios (CU-12) | usuario |
 | REQ-13 Gestionar apartados (CU-14, nuevo) | inventario (reservas), venta (conversión) |
-| Nuevo: Clasificación ABC | analitica |
+| REQ-14 Clasificación ABC (CU-15, nuevo) | analitica |
 
 Nota: en el documento PPI, REQ-08 y REQ-09 tienen nombre y descripción cruzados; corregir en la próxima versión.
 
@@ -293,8 +342,8 @@ Nota: en el documento PPI, REQ-08 y REQ-09 tienen nombre y descripción cruzados
 
 - `REQ-xx`: requisitos funcionales (tabla anterior). `RNF-xx`: requisitos no funcionales del documento Word, que allí
   aparecen numerados como REQ-01..REQ-05; aquí se renombran a RNF-01..RNF-05 para no chocar con los funcionales.
-- `CU-xx`: casos de uso. Nuevos, no presentes en el Word: CU-13 "Iniciar sesión" (fase 0, ligado a RNF-02) y CU-14
-  "Gestionar apartados" (fase 3, REQ-13).
+- `CU-xx`: casos de uso. Nuevos, no presentes en el Word: CU-13 "Iniciar sesión" (fase 0, ligado a RNF-02), CU-14
+  "Gestionar apartados" (fase 3, REQ-13) y CU-15 "Clasificar productos (ABC)" (fase 5, REQ-14).
 - `NEC-xx`: necesidades del Word, con dos dígitos (NEC-010 del Word es NEC-10). Nueva: NEC-11 "Apartar prendas para
   clientes que reservan por redes sociales" (REQ-13).
 

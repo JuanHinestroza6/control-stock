@@ -58,7 +58,7 @@ class ReservasAlertasIntegracionTest {
     private static final Set<String> CLAVES_ALERTA = Set.of("id", "tipo", "estado", "varianteId", "sku",
             "productoNombre", "talla", "color", "stockDisponible", "umbral", "creadaEn", "revisadaEn", "atendidaEn",
             "atendidaPor");
-    private static final Set<String> CLAVES_RESUMEN = Set.of("activas", "agotado", "stockBajo");
+    private static final Set<String> CLAVES_RESUMEN = Set.of("activas", "agotado", "stockBajo", "sinRotacion");
     private static final Set<String> CLAVES_VENTA = Set.of("id", "numero", "fecha", "vendedor", "estado", "total",
             "descuentoTotal", "anuladaEn", "anuladaPor", "motivoAnulacion", "lineas", "reservas");
     private static final Set<String> CLAVES_LINEA = Set.of("detalleId", "varianteId", "sku", "productoNombre", "talla",
@@ -91,6 +91,7 @@ class ReservasAlertasIntegracionTest {
                     + variantes, Long.class);
             jdbc.update("DELETE FROM movimiento WHERE variante_id IN " + variantes);
             jdbc.update("DELETE FROM alerta WHERE variante_id IN " + variantes);
+            jdbc.update("DELETE FROM analitica_variante WHERE variante_id IN " + variantes);
             jdbc.update("DELETE FROM reserva WHERE variante_id IN " + variantes); // antes que venta (FK venta_id)
             for (Long ventaId : ventas) {
                 jdbc.update("DELETE FROM detalle_venta WHERE venta_id = ?", ventaId);

@@ -58,12 +58,15 @@ public class Variante extends EntidadAuditable {
     @Column(name = "stock_minimo", nullable = false)
     private int stockMinimo;
 
-    /** Lo calculará el módulo de analítica. */
-    @Column(name = "punto_reorden")
+    /**
+     * Lo calcula el módulo de analítica. {@code updatable = false}: ninguna entidad cargada (una venta en curso) puede
+     * pisarlo con un valor viejo; solo lo escribe {@code AnaliticaVarianteRepository} con un UPDATE dirigido (ADR-009).
+     */
+    @Column(name = "punto_reorden", updatable = false)
     private Integer puntoReorden;
 
-    /** 'A', 'B' o 'C'; lo calculará el módulo de analítica. */
-    @Column(name = "clase_abc", columnDefinition = "char(1)")
+    /** 'A', 'B' o 'C'; igual que {@link #puntoReorden}, solo la escribe la analítica con un UPDATE dirigido. */
+    @Column(name = "clase_abc", columnDefinition = "char(1)", updatable = false)
     private Character claseAbc;
 
     @Column(nullable = false)

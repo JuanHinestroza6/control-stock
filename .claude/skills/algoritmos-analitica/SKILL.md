@@ -8,32 +8,47 @@ description: Fórmulas, pseudocódigo y casos borde de los algoritmos analítico
 Todo vive en `analitica.calculo` como funciones puras con pruebas a mano. Los servicios (`AbcService`, `ReordenService`,
 `PronosticoService`, `PlanCompraService`) solo consultan datos y llaman a estas funciones.
 
-## 1. Demanda
+## 1. Demanda (ADR-009)
 
-- Demanda neta diaria por variante = unidades vendidas − unidades devueltas aptas, por día.
-- Ventana: últimos 90 días. Los días sin ventas cuentan como 0 (rellenar la serie, error frecuente).
-- `dPromedio` = media de la serie; `dDesviacion` = desviación estándar muestral.
+Solo ventas REGISTRADA (las ANULADAS nunca cuentan). Hay dos definiciones, una por propósito:
+- **Comercial** (ABC, más vendidos): unidades netas = vendidas − devueltas (todas), atribuidas a la fecha de la venta;
+  ingreso neto = Σ (cantidad − devuelta) × precioUnitario.
+- **Inventario** (ROP): por día, vendidas (fecha de la venta, incluidas VENTA_RESERVA) − devueltas **aptas** (fecha de la
+  devolución), recortada a 0. Una devolución no apta no vuelve al estante: es consumo. Las reservas ACTIVAS no son demanda.
+- Ventana del ROP: últimos 90 días, `[corte − 90 d, corte)` con corte = hoy (excluye el día en curso).
+  `n = min(90, días desde la creación de la variante)`. Los días sin ventas cuentan como 0 (rellenar la serie, error
+  frecuente).
+- `dPromedio` = Σ serie / n; `dDesviacion` = desviación estándar muestral (n = 1 → 0).
+- La demanda observada está censurada por los agotados (ventas perdidas); lo corrige el pronóstico de la Fase 6.
 
-## 2. Clasificación ABC (por ingresos de los últimos 90 días)
+## 2. Clasificación ABC (por variante, ingreso neto de los últimos 12 meses)
 
-1. Ingreso por variante = Σ cantidad × precioUnitario de sus ventas.
-2. Ordenar de mayor a menor, calcular porcentaje acumulado.
-3. A: acumulado ≤ 80%. B: ≤ 95%. C: el resto. Variantes sin ventas → C.
-4. El primer ítem siempre es A aunque por sí solo supere el 80%.
+1. Universo: variantes activas de productos activos. Ventana `[corte − 365 d, corte)` (un ciclo estacional completo:
+   diciembre ×1,6 no voltea las clases).
+2. Ordenar por ingreso neto descendente, desempate por id de variante; acumulado en BigDecimal escala 6 HALF_UP.
+3. A: acumulado ≤ 80 %. B: ≤ 95 %. C: el resto. Ingreso 0 → C; total 0 → todas C. Inactivas → clase null.
+4. El primer ítem siempre es A aunque por sí solo supere el 80 %.
 
-Recalcular en la tarea nocturna (`@Scheduled(cron = "0 0 2 * * *", zone = "America/Bogota")`) y bajo demanda (ADMIN).
+Ejemplo de prueba: 500, 200, 150, 100, 50 → acumulados 0,50 / 0,70 / 0,85 / 0,95 / 1,00 → A, A, B, B, C.
 
-## 3. Stock de seguridad y punto de reorden
+Recalcular en la ejecución nocturna (`app.analitica.cron = "0 0 2 * * *"`, zona America/Bogota) y bajo demanda (ADMIN).
+
+## 3. Stock de seguridad y punto de reorden (ROP híbrido, sin piso)
 
 ```
-Z = 1.65 (clase A, 95%) | 1.28 (B, 90%) | 0.84 (C, 80%)
+Clase A z=1,65 p=0,95 | B z=1,28 p=0,90 | C z=0,84 p=0,80 ; sin clase → C
 L = leadTimeDias del producto
-SS  = Z × dDesviacion × √L
-ROP = ceil(dPromedio × L + SS)
+n < 30 días de historia  → ROP = null (umbral = stockMinimo)          método SIN_HISTORIA
+dPromedio == 0           → ROP = 0 (solo AGOTADO; SIN_ROTACION cubre)  método SIN_DEMANDA
+μL = dPromedio × L
+μL ≥ 5 → SS = z × dDesviacion × √L ; ROP = ceil(μL + SS)              método NORMAL
+μL < 5 → ROP = mín r con P(Poisson(μL) ≤ r) ≥ p ; SS = ROP − μL        método POISSON (demanda intermitente)
 ```
-- Si hay menos de 30 días con historia → no calcular, usar `stockMinimo` manual.
-- Si `dPromedio == 0` → ROP = 0 (no alertar por stock bajo; la alerta SIN_ROTACION cubre el caso).
-- ROP nunca menor que `stockMinimo` si este fue configurado: `ROP = max(ROP, stockMinimo)`.
+- **Sin piso**: `stockMinimo` es solo el respaldo cuando `puntoReorden` es null (dominio). No usar `max(ROP, stockMinimo)`.
+- `loteMinimo` no interviene en el ROP (se usa en la sugerencia de compra).
+- Poisson: suma acumulada iterativa `término_k = término_{k−1} × λ / k` (λ < 5, sin problemas numéricos).
+- Ejemplos a mano: d̄=2, s=1, L=16, A → μL=32, SS=6,6, ROP=39. μL=0,46, C → ROP=1. μL=0,14, C → ROP=0. μL=2, A → ROP=5.
+- Escritura: UPDATE dirigido desde `analitica.repositorio`, sin tocar `version` (ver dominio, "Analítica").
 
 ## 4. Pronóstico (por PRODUCTO, mensual)
 

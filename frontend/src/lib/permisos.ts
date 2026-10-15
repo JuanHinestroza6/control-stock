@@ -44,3 +44,13 @@ export function puedeAtenderAlertas(rol: Rol | undefined): boolean {
 export function puedeVerCostos(rol: Rol | undefined): boolean {
   return rol !== undefined && rol !== 'VENDEDOR'
 }
+
+/** ABC, punto de reorden y última ejecución: ADMIN, INVENTARIO y CONTABILIDAD (VENDEDOR solo "Más vendidos"). */
+export function puedeVerAnaliticaCompleta(rol: Rol | undefined): boolean {
+  return rol === 'ADMIN' || rol === 'INVENTARIO' || rol === 'CONTABILIDAD'
+}
+
+/** Recalcular la analítica: solo ADMIN. */
+export function puedeRecalcularAnalitica(rol: Rol | undefined): boolean {
+  return rol === 'ADMIN'
+}

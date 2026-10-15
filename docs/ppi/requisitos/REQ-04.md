@@ -1,7 +1,8 @@
 # REQ-04 — Emitir Alertas de Nivel Mínimo de Stock (FO-ERS)
 
-> Estado a la fecha: implementado parcialmente en la Fase 3 (backend y frontend), rama `fase-3-apartados`.
-> Alcance de esta fase: alertas STOCK_BAJO y AGOTADO por evento. SIN_ROTACION y la re-evaluación nocturna corresponden a la Fase 5.
+> Estado a la fecha: implementado en la Fase 3 (alertas AGOTADO y STOCK_BAJO por evento) y ampliado en la Fase 5
+> (punto de reorden dinámico como umbral, SIN_ROTACION y re-evaluación nocturna), rama `fase-5-analitica`. Decisiones en
+> ADR-007 y ADR-009. Pendiente para la Fase 6: STOCK_BAJO por posición de inventario (decisión D4).
 
 | Campo | Contenido |
 |---|---|
@@ -13,7 +14,7 @@
 | **Caso de uso** | CU-10 |
 | **Relacionados** | REQ-01 (estado de stock); REQ-02 (movimientos que disparan la evaluación); REQ-13 (apartados modifican el disponible) |
 | **Prioridad** | Media |
-| **Módulos** | `inventario` (`AlertaService`, `AlertaListener`, `AlertaController`), `catalogo` (evento `UmbralCambiado`); frontend: `paginas/alertas`, campana en `componentes/layout/Topbar`, `hooks/useAlertas` |
+| **Módulos** | `inventario` (`AlertaService`, `AlertaListener`, `AlertaController`), `catalogo` (evento `UmbralCambiado`), `analitica` (cálculo del punto de reorden y ejecución nocturna); frontend: `paginas/alertas`, campana en `componentes/layout/Topbar`, `hooks/useAlertas`, `paginas/analitica` (pestaña Reorden) |
 
 ## Descripción
 
@@ -25,7 +26,7 @@ defecto, `stockMinimo`. Las reglas constan en ADR-007 y en `docs/dominio.md` (se
 
 - **Tipos**: `AGOTADO` (`disponible == 0`) y `STOCK_BAJO` (`0 < disponible ≤ umbral`). Son **excluyentes** y coinciden con
   `Variante.estadoStock()`: al pasar de BAJO a AGOTADO se cierra la de STOCK_BAJO y se abre la de AGOTADO, y viceversa;
-  al volver a OK se cierran ambas. El tipo `SIN_ROTACION` existe en la enumeración pero no se genera todavía.
+  al volver a OK se cierran ambas. (En la Fase 5 se incorpora `SIN_ROTACION`, con prioridad entre ambas; ver abajo.)
 - **Evaluación por evento**: un `@TransactionalEventListener(AFTER_COMMIT)` atiende `StockCambiado` (tras cada movimiento)
   y `UmbralCambiado` (al editar `stockMinimo`) y llama a `AlertaService.evaluar` en una transacción nueva
   (`REQUIRES_NEW`), bloqueando la variante. Un fallo se registra en el log y nunca llega al usuario.
@@ -35,13 +36,62 @@ defecto, `stockMinimo`. Las reglas constan en ADR-007 y en `docs/dominio.md` (se
   deja de cumplirse (`atendidaPor` nulo). Atender una alerta ya atendida responde 409.
 - **Campana**: contador de alertas activas en la barra superior, visible a ADMIN, INVENTARIO y VENDEDOR.
 
-### Endpoints
+## Alcance implementado (Fase 5)
+
+- **Punto de reorden (ROP) dinámico como umbral.** Cada variante activa recibe un ROP calculado con 90 días de demanda de
+  inventario (ventas menos devoluciones aptas; los días sin ventas cuentan como 0) y su tiempo de reposición `L`
+  (`leadTimeDias`). Fórmula híbrida:
+  - `μL = d̄ × L ≥ 5`: `ROP = ceil(μL + z × s × √L)` (método NORMAL).
+  - `μL < 5`: menor `r` con `P(Poisson(μL) ≤ r)` mayor o igual que el nivel de servicio (método POISSON), apropiado
+    para la demanda intermitente de la cola del catálogo.
+  - Demanda media 0: ROP 0, solo AGOTADO (SIN_DEMANDA). Menos de 30 días de historia: ROP nulo y el umbral vuelve a
+    `stockMinimo` (SIN_HISTORIA).
+  - **Niveles de servicio por clase ABC** (REQ-14): A 95 % (z = 1,65), B 90 % (z = 1,28), C 80 % (z = 0,84).
+  - `stockMinimo` es solo el respaldo cuando no hay ROP (no es piso); `loteMinimo` no interviene.
+- **SIN_ROTACION por producto.** Se abre cuando el producto no tiene ventas no anuladas en 60 días (configurable) y existe
+  hace 60 días o más; la alerta se crea en cada variante con `disponible > 0`. Una venta de cualquier variante cierra la
+  SIN_ROTACION de todas las del producto. Atendida a mano no se reabre dentro del mismo **episodio** (desde
+  `max(última venta, creación del producto) + 60 días`).
+- **Prioridad AGOTADO > SIN_ROTACION > STOCK_BAJO.** Las tres son excluyentes: una variante tiene como máximo una alerta
+  ACTIVA; al cambiar el tipo vigente se cierra la anterior (ATENDIDA automática) y se abre la nueva. Por esto el tipo de la
+  alerta ya no coincide siempre con `estadoStock()`: SIN_ROTACION puede reemplazar a BAJO.
+- **Re-evaluación nocturna.** Cada ejecución analítica (02:00 America/Bogota o "Recalcular" del ADMIN) re-evalúa las
+  alertas de todas las variantes, una transacción por variante; reabre las atendidas a mano cuya condición sigue vigente.
+- **Cierre al desactivar.** Desactivar una variante o su producto cierra todas sus alertas ACTIVAS (corrige una omisión
+  de la Fase 3).
+- **Métrica de alertas.** Cada ejecución guarda el porcentaje de variantes activas con AGOTADO o STOCK_BAJO
+  (SIN_ROTACION aparte).
+- **Interfaz.** Pestaña Reorden en Analítica (método, nivel de servicio, umbral efectivo y su fuente; filtro "solo en
+  alerta"; ayuda con la fórmula), columnas Clase y Umbral en inventario, tipo SIN_ROTACION en la página de alertas y
+  desglose (agotado, stock bajo, sin rotación) en la campana.
+
+### Resultados de la prueba T2 (2026-10-15, semilla de 24 meses)
+
+| Indicador | Resultado |
+|---|---|
+| Variantes activas analizadas / con ROP calculado | 291 / 291 |
+| ROP por método | NORMAL 26; POISSON 201; SIN_DEMANDA 64; SIN_HISTORIA 0 |
+| Alertas ACTIVAS | AGOTADO 27; STOCK_BAJO 73; SIN_ROTACION 18 (LIV004: 7, LIV026: 8, LIV030: 3) |
+| Variantes en alerta de stock (AGOTADO o STOCK_BAJO) | 100 de 291 = **34,4 %** (línea base de la Fase 4 con `stockMinimo`: 141 de 299, cerca de 47 %) |
+| Por clase | A 41,8 %; B 43,0 %; C 23,8 % |
+| Duración de la ejecución analítica | 4.951 ms (semilla); recálculo manual 4.844 ms en la primera corrida (meta < 5 s) |
+
+Desglose por clase y método (variantes / en alerta de stock): A-NORMAL 26/10; A-POISSON 53/23; B-POISSON 76/37;
+B-SIN_DEMANDA 10/0; C-POISSON 72/18; C-SIN_DEMANDA 54/12.
+
+**Decisión D4 (ADR-009).** La meta de 10 % a 15 % de variantes en alerta no se alcanza en la Fase 5: una alerta
+"disponible ≤ ROP" sigue activa durante el tiempo de reposición aunque la mercancía ya se haya pedido. La Fase 6 evaluará
+STOCK_BAJO con la posición de inventario (disponible más pedidos aprobados en camino).
+
+### Endpoints de alertas y reorden
 
 | Método y ruta | Rol |
 |---|---|
 | `GET /api/alertas?estado&tipo&page&size` | ADMIN, INVENTARIO, VENDEDOR |
 | `GET /api/alertas/resumen` | ADMIN, INVENTARIO, VENDEDOR |
 | `POST /api/alertas/{id}/atender` | ADMIN, INVENTARIO |
+| `GET /api/analitica/reorden` (Fase 5) | ADMIN, INVENTARIO, CONTABILIDAD |
+| `POST /api/analitica/recalcular` (Fase 5, re-evalúa todas las alertas) | ADMIN |
 
 ### Flujo de alerta por stock bajo
 
@@ -71,11 +121,20 @@ defecto, `stockMinimo`. Las reglas constan en ADR-007 y en `docs/dominio.md` (se
 | CA-7 | Solo ADMIN e INVENTARIO atienden; VENDEDOR consulta; otros roles reciben 403 | Cumplido | `AlertaControllerTest`, `ReservasAlertasIntegracionTest` |
 | CA-8 | El resumen separa activas, agotadas y de stock bajo | Cumplido | `AlertaServiceTest`, `AlertaControllerTest` |
 | CA-9 | La campana muestra el contador y enlaza a `/alertas`; la página filtra y atiende según el rol | Cumplido | `Topbar.test.tsx`, `AlertasPage.test.tsx` |
-| CA-10 | SIN_ROTACION y re-evaluación nocturna | Pendiente (Fase 5) | — |
+| CA-10 | SIN_ROTACION por producto: se abre con 60 días sin ventas en variantes con disponible, no con productos de menos de 60 días, y una venta de cualquier variante la cierra en todas | Cumplido (Fase 5) | `SinRotacionIntegracionTest`, `SinRotacionConcurrenciaIntegracionTest`, `AlertaServiceTest` |
+| CA-11 | Prioridad AGOTADO > SIN_ROTACION > STOCK_BAJO, una sola alerta ACTIVA por variante y sin reapertura en el mismo episodio | Cumplido (Fase 5) | `SinRotacionIntegracionTest`, `AlertaServiceTest` |
+| CA-12 | Las ventas anuladas no cuentan como rotación; las ventas de reservas convertidas sí | Cumplido (Fase 5) | `SinRotacionIntegracionTest`, `AnaliticaFlujoIntegracionTest` |
+| CA-13 | Desactivar una variante o su producto cierra sus alertas ACTIVAS | Cumplido (Fase 5) | `SinRotacionIntegracionTest`, `AlertaServiceTest` |
+| CA-14 | ROP híbrido normal/Poisson por clase, con SIN_HISTORIA y SIN_DEMANDA, y nivel de servicio verificado por simulación | Cumplido (Fase 5) | `CalculadoraReordenTest`, `CalculadoraReordenMonteCarloTest`, `DistribucionPoissonTest`, `SerieDemandaTest` |
+| CA-15 | La re-evaluación nocturna y el recálculo manual re-evalúan todas las variantes, guardan la métrica y un fallo en una variante no detiene al resto | Cumplido (Fase 5) | `EjecucionAnaliticaServiceIntegracionTest`, `AnaliticaNocturnaTareaTest`, `AnaliticaFlujoIntegracionTest` |
+| CA-16 | La consulta de reorden entrega método, umbral efectivo y su fuente, y filtra por alerta, clase y método | Cumplido (Fase 5) | `AnaliticaConsultasIntegracionTest`, `AnaliticaControllerConsultasTest` |
+| CA-17 | La interfaz muestra SIN_ROTACION, el desglose de la campana, Clase y Umbral en inventario y la pestaña Reorden | Cumplido (Fase 5) | `AlertasPage.test.tsx`, `Topbar.test.tsx`, `InventarioPage.test.tsx`, `PestanaReorden.test.tsx` |
+| CA-18 | Meta de 10 % a 15 % de variantes en alerta de stock | Pendiente (Fase 6; Fase 5 mide 34,4 %) | `EjecucionAnaliticaServiceIntegracionTest` (métrica), `SemillaIntegracionTest` |
 
 ## Observaciones
 
 - Stakeholder, necesidad, caso de uso y prioridad no se registran aquí: deben tomarse del Word y no se asumen.
 - Inconsistencias del Word: REQ-08 y REQ-09 con nombre y descripción cruzados; NEC-010 debería ser NEC-10.
-- El umbral dinámico (ROP calculado) llega con la analítica (Fase 5); mientras tanto se usa `stockMinimo`.
-- Diagramas: `diagramas/secuencia-convertir-reservas.puml` (muestra el evento `StockCambiado` que dispara la evaluación).
+- El umbral dinámico (ROP calculado) llega con la Fase 5; sin ROP calculado se usa `stockMinimo`. En la Fase 6 el STOCK_BAJO usará la posición de inventario.
+- Riesgos residuales aceptados (ADR-009): una variante ocupada por una venta durante todos los reintentos conserva su ROP hasta la siguiente ejecución; ventana de milisegundos en la apertura de SIN_ROTACION.
+- Diagramas: no hay aún diagramas de la Fase 5 (casos de uso con CU-08 y CU-15, paquetes con `analitica`). `diagramas/secuencia-convertir-reservas.puml` (muestra el evento `StockCambiado` que dispara la evaluación).

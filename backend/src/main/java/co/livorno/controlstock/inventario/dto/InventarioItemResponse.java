@@ -6,7 +6,7 @@ import co.livorno.controlstock.catalogo.modelo.Talla;
 import co.livorno.controlstock.catalogo.modelo.Variante;
 import java.math.BigDecimal;
 
-/** Fila del inventario actual. Sin costos: lo ven todos los roles autenticados. */
+/** Fila del inventario actual. Sin costos: lo ven todos los roles autenticados (la clase ABC no revela costos, R11). */
 public record InventarioItemResponse(
         Long varianteId,
         String sku,
@@ -21,6 +21,7 @@ public record InventarioItemResponse(
         int stockDisponible,
         int stockMinimo,
         Integer puntoReorden,
+        String claseAbc,
         EstadoStock estadoStock,
         BigDecimal precioVenta,
         boolean activo) {
@@ -30,6 +31,7 @@ public record InventarioItemResponse(
                 v.getProducto().getCodigo(), v.getProducto().getNombre(),
                 CategoriaRef.de(v.getProducto().getCategoria()), v.getTalla(), v.getColor(), v.getStockFisico(),
                 v.getStockReservado(), v.getStockDisponible(), v.getStockMinimo(), v.getPuntoReorden(),
+                v.getClaseAbc() != null ? v.getClaseAbc().toString() : null,
                 v.estadoStock(), v.getProducto().getPrecioVenta(), v.isActivo());
     }
 }

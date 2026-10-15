@@ -3,10 +3,13 @@ package co.livorno.controlstock.semilla;
 import co.livorno.controlstock.comun.seguridad.UsuarioAutenticado;
 import co.livorno.controlstock.usuario.modelo.Rol;
 import jakarta.persistence.EntityManager;
-import co.livorno.controlstock.inventario.servicio.AlertaService;
+import co.livorno.controlstock.analitica.modelo.EjecucionAnalitica;
+import co.livorno.controlstock.analitica.modelo.EstadoEjecucion;
+import co.livorno.controlstock.analitica.modelo.OrigenEjecucion;
+import co.livorno.controlstock.analitica.servicio.EjecucionAnaliticaService;
 import java.time.LocalDate;
 import java.util.HashMap;
-import java.util.List;
+import java.util.TreeMap;
 import org.springframework.jdbc.core.JdbcTemplate;
 import java.time.LocalTime;
 import java.util.Map;
@@ -19,13 +22,16 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Orquesta la carga de datos de demostración (ADR-008) en una sola transacción: protecciones, usuarios demo, catálogo
- * y entrada inicial. La simulación diaria y el cierre llegan en B4/B5. Todo el stock pasa por los servicios reales.
+ * entrada inicial, simulación diaria y, al confirmar, el cierre analítico. Todo el stock pasa por los servicios reales.
  */
 @Component
 @Profile("seed")
 public class GeneradorDatosSemilla {
 
     private static final Logger log = LoggerFactory.getLogger(GeneradorDatosSemilla.class);
+    static final String MENSAJE_RECUPERACION = "La carga de datos quedó confirmada, pero la analítica de cierre falló. "
+            + "No repitas la carga (diría 'ya hay datos'): arranca la aplicación con el perfil dev e inicia sesión como "
+            + "ADMIN para ejecutar 'Recalcular' en Analítica (POST /api/analitica/recalcular).";
     static final LocalTime HORA_CATALOGO = LocalTime.of(7, 0);
     static final LocalTime HORA_ENTRADA_INICIAL = LocalTime.of(8, 0);
 
@@ -38,7 +44,7 @@ public class GeneradorDatosSemilla {
     private final ComoUsuario comoUsuario;
     private final TransactionTemplate transaccion;
     private final EntityManager entityManager;
-    private final AlertaService alertaService;
+    private final EjecucionAnaliticaService ejecucionAnalitica;
     private final VerificadorConsistencia verificador;
     private final JdbcTemplate jdbc;
 
@@ -46,7 +52,7 @@ public class GeneradorDatosSemilla {
                                  UsuariosDemo usuariosDemo, CreadorCatalogo creadorCatalogo, SimuladorDiario simulador,
                                  RelojSimulado reloj,
                                  ComoUsuario comoUsuario, TransactionTemplate transaccion,
-                                 EntityManager entityManager, AlertaService alertaService,
+                                 EntityManager entityManager, EjecucionAnaliticaService ejecucionAnalitica,
                                  VerificadorConsistencia verificador, JdbcTemplate jdbc) {
         this.propiedades = propiedades;
         this.protecciones = protecciones;
@@ -57,7 +63,7 @@ public class GeneradorDatosSemilla {
         this.comoUsuario = comoUsuario;
         this.transaccion = transaccion;
         this.entityManager = entityManager;
-        this.alertaService = alertaService;
+        this.ejecucionAnalitica = ejecucionAnalitica;
         this.verificador = verificador;
         this.jdbc = jdbc;
     }
@@ -82,34 +88,53 @@ public class GeneradorDatosSemilla {
             return null;
         }
         if (!resumen.generado()) {
-            // Recupera el fallo posterior al commit: re-evalúa alertas de forma idempotente.
-            reevaluarAlertas();
             return resumen;
         }
         return cerrar(resumen, t0);
     }
 
     /**
-     * Cierre con el reloj real y la carga ya confirmada: las alertas se evalúan en transacción propia
-     * ({@code AlertaService.evaluar} usa REQUIRES_NEW), variante por variante en orden de id.
+     * Cierre con la carga ya confirmada y el reloj en el del sistema: ejecuta la orquestación analítica completa
+     * (origen SEMILLA: ABC, ROP y re-evaluación de todas las alertas) y verifica el resultado. Si falla, la carga
+     * sigue confirmada: se lanza {@link SemillaAbortadaException} (el ejecutor termina con código 1) explicando cómo
+     * recuperarse sin repetir la carga.
      */
     private ResumenSemilla cerrar(ResumenSemilla resumen, long t0) {
-        reevaluarAlertas();
+        EjecucionAnalitica ejecucion;
+        try {
+            ejecucion = ejecucionAnalitica.ejecutar(OrigenEjecucion.SEMILLA, null);
+        } catch (RuntimeException e) {
+            log.error("La analítica de cierre no se pudo ejecutar: {}", e.getMessage(), e);
+            throw new SemillaAbortadaException(MENSAJE_RECUPERACION + " Causa: " + e.getMessage());
+        }
+        if (ejecucion.getEstado() != EstadoEjecucion.EXITOSA) {
+            log.error("La analítica de cierre terminó {}: {}", ejecucion.getEstado(), ejecucion.getMensaje());
+            throw new SemillaAbortadaException(MENSAJE_RECUPERACION + " Estado: " + ejecucion.getEstado() + ". "
+                    + ejecucion.getMensaje());
+        }
+        try {
+            verificador.verificarAnalitica();
+        } catch (SemillaAbortadaException e) {
+            throw new SemillaAbortadaException(MENSAJE_RECUPERACION + " " + e.getMessage());
+        }
+
         Map<String, Long> porTipo = new HashMap<>();
         jdbc.query("select tipo, count(*) as n from alerta where estado = 'ACTIVA' group by tipo",
                 rs -> {
                     porTipo.put(rs.getString("tipo"), rs.getLong("n"));
                 });
+        Map<String, Long> porMetodo = new TreeMap<>();
+        jdbc.query("select metodo_reorden, count(*) as n from analitica_variante group by metodo_reorden",
+                rs -> {
+                    porMetodo.put(rs.getString(1), rs.getLong(2));
+                });
         Long activas = jdbc.queryForObject("select count(*) from reserva where estado = 'ACTIVA'", Long.class);
+        var analitica = new ResumenSemilla.CierreAnalitica(ejecucion.getClaseA(), ejecucion.getClaseB(),
+                ejecucion.getClaseC(), ejecucion.getConPuntoReorden(), porMetodo, ejecucion.getVariantesActivas(),
+                ejecucion.getEnAlertaStock(), ejecucion.getPorcentajeAlertaStock(),
+                porTipo.getOrDefault("SIN_ROTACION", 0L), ejecucion.getDuracionMs());
         return resumen.conCierre(activas == null ? 0 : activas, porTipo.getOrDefault("AGOTADO", 0L),
-                porTipo.getOrDefault("STOCK_BAJO", 0L), System.currentTimeMillis() - t0);
-    }
-
-    /** Evalúa las alertas de todas las variantes (idempotente) y verifica que coincidan con el stock. */
-    void reevaluarAlertas() {
-        List<Long> ids = jdbc.queryForList("select id from variante order by id", Long.class);
-        ids.forEach(alertaService::evaluar);
-        verificador.verificarAlertas();
+                porTipo.getOrDefault("STOCK_BAJO", 0L), System.currentTimeMillis() - t0, analitica);
     }
 
     private ResumenSemilla cargar(LocalDate fin) {
@@ -142,6 +167,6 @@ public class GeneradorDatosSemilla {
 
         verificador.verificarCarga(inicio, fin);
         return new ResumenSemilla(true, inicio, fin, usuarios.size(), creado.productoIds().size(),
-                creado.variantes().size(), unidades, simulacion, 0, 0, 0, 0);
+                creado.variantes().size(), unidades, simulacion, 0, 0, 0, 0, null);
     }
 }

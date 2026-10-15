@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import co.livorno.controlstock.inventario.servicio.AlertaService;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -19,9 +20,11 @@ import org.springframework.stereotype.Component;
 public class VerificadorConsistencia {
 
     private final JdbcTemplate jdbc;
+    private final AlertaService alertas;
 
-    public VerificadorConsistencia(JdbcTemplate jdbc) {
+    public VerificadorConsistencia(JdbcTemplate jdbc, AlertaService alertas) {
         this.jdbc = jdbc;
+        this.alertas = alertas;
     }
 
     /** Invariantes de stock, kardex, ventas, devoluciones, reservas y usuarios. Dentro de la transacción de la carga. */
@@ -104,21 +107,51 @@ public class VerificadorConsistencia {
     }
 
     /**
-     * Tras evaluar las alertas: para cada variante activa la alerta ACTIVA coincide con el estado de stock (AGOTADO si
-     * disponible = 0; STOCK_BAJO si disponible <= umbral) y no hay alertas ACTIVAS de variantes inactivas.
+     * Tras la analítica de cierre: alertas coherentes con el stock ({@link #verificarAlertas()}), toda variante
+     * activa de producto activo con clase ABC y toda una con 30 días o más de historia con punto de reorden.
+     */
+    public void verificarAnalitica() {
+        verificarAlertas();
+        Long sinClase = jdbc.queryForObject("""
+                select count(*) from variante v join producto p on p.id = v.producto_id
+                where v.activo = 1 and p.activo = 1 and v.clase_abc is null""", Long.class);
+        Long sinRop = jdbc.queryForObject("""
+                select count(*) from variante v join analitica_variante a on a.variante_id = v.id
+                where a.dias_historia >= 30 and v.punto_reorden is null""", Long.class);
+        Long sinInstantanea = jdbc.queryForObject("""
+                select count(*) from variante v join producto p on p.id = v.producto_id
+                where v.activo = 1 and p.activo = 1
+                and not exists (select 1 from analitica_variante a where a.variante_id = v.id)""", Long.class);
+        if (n(sinClase) > 0 || n(sinRop) > 0 || n(sinInstantanea) > 0) {
+            throw new SemillaAbortadaException("Analítica incoherente: " + n(sinClase) + " variantes activas sin clase, "
+                    + n(sinRop) + " con 30 días o más de historia sin punto de reorden, " + n(sinInstantanea)
+                    + " sin instantánea.");
+        }
+    }
+
+    private static long n(Long valor) {
+        return valor == null ? 0 : valor;
+    }
+
+    /**
+     * Tras evaluar las alertas: para cada variante activa la alerta ACTIVA coincide con {@code tipoEsperado} (AGOTADO,
+     * SIN_ROTACION, STOCK_BAJO o ninguna) y no hay alertas ACTIVAS de variantes inactivas.
      */
     public void verificarAlertas() {
-        Long incoherentes = jdbc.queryForObject("""
-                select count(*) from variante v
-                left join alerta a on a.variante_id = v.id and a.estado = 'ACTIVA'
-                where v.activo = 1 and coalesce(a.tipo, 'OK') <>
-                  case when v.stock_fisico - v.stock_reservado <= 0 then 'AGOTADO'
-                       when v.stock_fisico - v.stock_reservado <= coalesce(v.punto_reorden, v.stock_minimo)
-                         then 'STOCK_BAJO' else 'OK' end""", Long.class);
+        Map<Long, String> activas = new java.util.HashMap<>();
+        jdbc.query("select variante_id, tipo from alerta where estado = 'ACTIVA'",
+                rs -> { activas.put(rs.getLong(1), rs.getString(2)); });
+        long incoherentes = 0;
+        for (Long id : jdbc.queryForList("select id from variante where activo = 1 order by id", Long.class)) {
+            var esperado = alertas.tipoEsperado(id);
+            if (!java.util.Objects.equals(activas.get(id), esperado == null ? null : esperado.name())) {
+                incoherentes++;
+            }
+        }
         Long deInactivas = jdbc.queryForObject("""
                 select count(*) from alerta a join variante v on v.id = a.variante_id
                 where a.estado = 'ACTIVA' and v.activo = 0""", Long.class);
-        if ((incoherentes != null && incoherentes > 0) || (deInactivas != null && deInactivas > 0)) {
+        if (incoherentes > 0 || (deInactivas != null && deInactivas > 0)) {
             throw new SemillaAbortadaException("Alertas incoherentes con el stock: " + incoherentes
                     + " variantes activas, " + deInactivas + " alertas de variantes inactivas.");
         }

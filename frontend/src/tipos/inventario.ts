@@ -1,3 +1,4 @@
+import type { ClaseAbc } from './analitica'
 import type { CategoriaRef, EstadoStock, Talla } from './catalogo'
 import type { Pagina, ParametrosPagina } from './paginacion'
 
@@ -28,6 +29,7 @@ export interface InventarioItemResponse {
   stockDisponible: number
   stockMinimo: number
   puntoReorden: number | null
+  claseAbc: ClaseAbc | null
   estadoStock: EstadoStock
   precioVenta: number
   activo: boolean

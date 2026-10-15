@@ -35,9 +35,19 @@ class GeneradorCatalogoIntegracionTest {
     RelojSimulado reloj;
 
     @BeforeEach
-    @AfterEach
-    void limpiar() {
+    void prepararBaseYReloj() {
         LimpiezaSemilla.limpiar(jdbc);
+        LimpiezaSemilla.fijarCierreTrasFin(reloj, LocalDate.of(2025, 12, 31));
+    }
+
+    /** Un solo @AfterEach: el reloj real se restablece siempre, aunque la limpieza falle. */
+    @AfterEach
+    void limpiarYRestablecerReloj() {
+        try {
+            LimpiezaSemilla.limpiar(jdbc);
+        } finally {
+            LimpiezaSemilla.restablecerReloj(reloj);
+        }
     }
 
     private long contar(String sql) {

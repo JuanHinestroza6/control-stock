@@ -36,4 +36,26 @@ public interface VarianteRepository extends JpaRepository<Variante, Long> {
             group by v.producto.id
             """)
     List<TotalesProducto> totalesPorProducto(@Param("productoIds") Collection<Long> productoIds);
+
+    /** Universo de la analítica: variantes activas de productos activos, con lead time y fecha de creación, por id. */
+    @Query("""
+            select new co.livorno.controlstock.catalogo.repositorio.VarianteAnalizable(
+                v.id, v.producto.leadTimeDias, v.creadoEn)
+            from Variante v
+            where v.activo = true and v.producto.activo = true
+            order by v.id
+            """)
+    List<VarianteAnalizable> activasConProducto();
+
+    /**
+     * ROP y clase vigentes de todas las variantes, por id. Lectura simple (sin bloqueos): la analítica decide qué
+     * UPDATE dirigidos hacen falta, incluida la limpieza de las inactivas (ADR-009, R1).
+     */
+    @Query("""
+            select new co.livorno.controlstock.catalogo.repositorio.AnaliticaActualVariante(
+                v.id, v.puntoReorden, v.claseAbc)
+            from Variante v
+            order by v.id
+            """)
+    List<AnaliticaActualVariante> analiticaActual();
 }

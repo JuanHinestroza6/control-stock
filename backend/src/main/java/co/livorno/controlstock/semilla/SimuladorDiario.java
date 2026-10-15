@@ -72,6 +72,11 @@ public class SimuladorDiario {
     static final BigDecimal ALZA_ENERO = new BigDecimal("1.05");
 
     static final int DIAS_RESERVAS = 30;
+    /** Minutos mínimos y rango de espera hasta convertir una reserva (60 + [0, 46 h)). */
+    private static final int MINUTOS_CONVERSION_MINIMO = 60;
+    private static final int MINUTOS_CONVERSION_RANGO = 46 * 60;
+    /** Vida máxima de una reserva hasta convertirse en venta: es la ventana en la que aún puede generar un VENTA_RESERVA. */
+    static final int MINUTOS_MAXIMOS_HASTA_CONVERSION = MINUTOS_CONVERSION_MINIMO + MINUTOS_CONVERSION_RANGO - 1;
     static final double SOLICITUDES_POR_DIA = 2.5;
     static final double SOLICITUDES_ULTIMAS_48H = 5.0;
     static final double PROBABILIDAD_DOS_LINEAS = 0.20;
@@ -356,7 +361,13 @@ public class SimuladorDiario {
                         continue;
                     }
                     elegidas.add(idx);
-                    pedidas.add(new LineaReservaRequest(variantes.get(idx).id(), cantidad));
+                    // Los estancados no se reservan si el tramo sin ventas empieza antes de que la reserva pueda convertirse.
+                    // Se sortea igual y se descarta la línea: la secuencia aleatoria de los demás no cambia.
+                    LocalDate ultimoDiaPosible = diaActual.atTime(horaActual)
+                            .plusMinutes(MINUTOS_MAXIMOS_HASTA_CONVERSION).toLocalDate();
+                    if (!modelo.estaEstancado(variantes.get(idx).producto(), ultimoDiaPosible)) {
+                        pedidas.add(new LineaReservaRequest(variantes.get(idx).id(), cantidad));
+                    }
                     break;
                 }
             }
@@ -366,7 +377,7 @@ public class SimuladorDiario {
                     + APELLIDOS.get(azar.nextInt(APELLIDOS.size()));
             String contacto = azar.nextBoolean() ? "3" + String.format("%09d", azar.nextInt(1_000_000_000))
                     : "@" + nombre.toLowerCase(java.util.Locale.ROOT).replace(' ', '_') + azar.nextInt(100);
-            int minutosConvertir = 60 + azar.nextInt(46 * 60);
+            int minutosConvertir = MINUTOS_CONVERSION_MINIMO + azar.nextInt(MINUTOS_CONVERSION_RANGO);
             int minutosCancelar = 60 + azar.nextInt(39 * 60);
             int minutosVencer = azar.nextInt(16);
             String motivo = MOTIVOS_CANCELACION.get(azar.nextInt(MOTIVOS_CANCELACION.size()));

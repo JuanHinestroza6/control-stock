@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
 @Profile("seed")
 public class RelojSimulado extends Clock {
 
-    private final Clock sistema = Clock.system(ConfiguracionTiempo.ZONA);
+    private volatile Clock sistema = Clock.system(ConfiguracionTiempo.ZONA);
     private volatile LocalDateTime simulado;
 
     /** Fija la hora simulada; no puede ser anterior a la simulada actual. */
@@ -33,6 +33,15 @@ public class RelojSimulado extends Clock {
                     "El reloj simulado no puede retroceder: actual " + actual + ", solicitado " + momento + ".");
         }
         simulado = momento;
+    }
+
+    /**
+     * Solo pruebas: reemplaza el reloj del sistema al que se vuelve tras la carga (p. ej. uno fijo en
+     * {@code fecha-fin + 1}, para que la analítica de cierre vea la historia cerca del corte). Con {@code null}
+     * restablece el reloj real.
+     */
+    void sustituirRelojDelSistema(Clock reloj) {
+        sistema = reloj == null ? Clock.system(ConfiguracionTiempo.ZONA) : reloj;
     }
 
     /** Vuelve al reloj del sistema. */

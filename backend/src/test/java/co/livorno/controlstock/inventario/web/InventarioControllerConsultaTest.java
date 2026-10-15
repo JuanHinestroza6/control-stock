@@ -59,7 +59,7 @@ class InventarioControllerConsultaTest {
     void listar_vendedor_devuelve200ConElContratoSinCostos() throws Exception {
         // dado
         var item = new InventarioItemResponse(7L, "LIV001-M-NEG", 3L, "LIV001", "Camiseta",
-                new CategoriaRef(2L, "Camisetas"), Talla.M, "NEGRO", 5, 3, 2, 2, null, EstadoStock.BAJO,
+                new CategoriaRef(2L, "Camisetas"), Talla.M, "NEGRO", 5, 3, 2, 2, null, "B", EstadoStock.BAJO,
                 new BigDecimal("59900.00"), true);
         when(servicio.listar(eq("liv"), eq(2L), eq(EstadoStock.BAJO), eq(true), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(item)));
@@ -72,6 +72,7 @@ class InventarioControllerConsultaTest {
                 .andExpect(jsonPath("$.content[0].varianteId").value(7))
                 .andExpect(jsonPath("$.content[0].stockDisponible").value(2))
                 .andExpect(jsonPath("$.content[0].estadoStock").value("BAJO"))
+                .andExpect(jsonPath("$.content[0].claseAbc").value("B"))
                 .andExpect(jsonPath("$.content[0].categoria.nombre").value("Camisetas"))
                 .andExpect(jsonPath("$.content[0].puntoReorden").doesNotExist())
                 .andExpect(jsonPath("$.content[0].precioCompra").doesNotExist())

@@ -66,3 +66,17 @@ app:
     anonimizacion: # Ley 1581: supresión de datos del cliente de reservas cerradas
       cron: "0 30 2 * * *" # 02:30 America/Bogota
       dias: 90 # retención tras cerrar la reserva
+  alertas:
+    sin-rotacion-dias: 60 # SIN_ROTACION: producto sin ventas no anuladas en estos dias (ADR-009)
+  analitica: # ABC y punto de reorden (ADR-009)
+    cron: "0 0 2 * * *" # 02:00 America/Bogota, antes de la anonimizacion de las 02:30
+    ventana-abc-dias: 365 # ventana movil del ABC (ingreso neto)
+    ventana-demanda-dias: 90 # ventana de la demanda diaria para el ROP
+    corte-a: 0.80
+    corte-b: 0.95
+    historia-minima-dias: 30 # con menos historia no hay ROP (umbral = stockMinimo)
+    umbral-poisson: 5 # demanda esperada en el lead time por debajo de la cual se usa Poisson
+    clases:
+      a: {nivel-servicio: 0.95, z: 1.65}
+      b: {nivel-servicio: 0.90, z: 1.28}
+      c: {nivel-servicio: 0.80, z: 0.84}
