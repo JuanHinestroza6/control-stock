@@ -39,6 +39,7 @@ class ProductoServiceTest {
     @Mock CategoriaRepository categorias;
     @Mock UsuarioActual usuarioActual;
     @Mock co.livorno.controlstock.catalogo.servicio.ConsultaReservasActivas reservasActivas;
+    @Mock org.springframework.context.ApplicationEventPublisher eventos;
     @InjectMocks ProductoService servicio;
 
     private Categoria categoria() {

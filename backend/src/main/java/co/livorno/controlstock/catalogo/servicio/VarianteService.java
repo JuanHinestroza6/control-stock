@@ -8,6 +8,7 @@ import co.livorno.controlstock.catalogo.dto.GenerarVariantesResponse.Motivo;
 import co.livorno.controlstock.catalogo.dto.GenerarVariantesResponse.Omitida;
 import co.livorno.controlstock.catalogo.dto.VarianteResponse;
 import co.livorno.controlstock.catalogo.evento.UmbralCambiado;
+import co.livorno.controlstock.catalogo.evento.VarianteDesactivada;
 import co.livorno.controlstock.catalogo.modelo.Producto;
 import co.livorno.controlstock.catalogo.modelo.Talla;
 import co.livorno.controlstock.catalogo.modelo.Variante;
@@ -143,6 +144,9 @@ public class VarianteService {
                 v.desactivar();
             }
             variantes.saveAndFlush(v);
+            if (!activo) {
+                eventos.publishEvent(new VarianteDesactivada(v.getId())); // cierra sus alertas ACTIVAS tras el commit
+            }
             if (reactivada) {
                 eventos.publishEvent(new UmbralCambiado(v.getId())); // reevalúa las alertas de la variante reactivada
             }

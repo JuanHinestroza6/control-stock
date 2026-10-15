@@ -75,7 +75,7 @@ class AlertaControllerTest {
 
     @Test
     void resumen_inventario_devuelve200() throws Exception {
-        when(servicio.resumen()).thenReturn(new ResumenAlertasResponse(3, 1, 2));
+        when(servicio.resumen()).thenReturn(new ResumenAlertasResponse(3, 1, 2, 0));
 
         mvc.perform(get("/api/alertas/resumen").with(authentication(como("INVENTARIO"))))
                 .andExpect(status().isOk())

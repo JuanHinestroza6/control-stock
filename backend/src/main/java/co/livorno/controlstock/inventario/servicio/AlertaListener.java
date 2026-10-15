@@ -1,6 +1,7 @@
 package co.livorno.controlstock.inventario.servicio;
 
 import co.livorno.controlstock.catalogo.evento.UmbralCambiado;
+import co.livorno.controlstock.catalogo.evento.VarianteDesactivada;
 import co.livorno.controlstock.inventario.evento.StockCambiado;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +29,11 @@ public class AlertaListener {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void alCambiarUmbral(UmbralCambiado evento) {
+        evaluar(evento.varianteId());
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void alDesactivarVariante(VarianteDesactivada evento) {
         evaluar(evento.varianteId());
     }
 

@@ -86,9 +86,9 @@ class SimulacionIntegracionTest {
         assertThat(contar("select count(*) from reserva where estado = 'ACTIVA' and vence_en <= '2026-02-15 23:59:59'"))
                 .isZero();
 
-        // alertas evaluadas al cierre: coinciden con el stock (el verificador ya lo comprobó) y hay activas
+        // alertas evaluadas al cierre (SIN_ROTACION se incorpora al resumen en B8): coinciden con el stock (el verificador ya lo comprobó) y hay activas
         assertThat(resumen.alertasAgotado() + resumen.alertasStockBajo())
-                .isEqualTo(contar("select count(*) from alerta where estado = 'ACTIVA'"));
+                .isEqualTo(contar("select count(*) from alerta where estado = 'ACTIVA' and tipo in ('AGOTADO', 'STOCK_BAJO')"));
 
         // kardex encadenado por variante y fechas no decrecientes por id
         assertThat(contar("""

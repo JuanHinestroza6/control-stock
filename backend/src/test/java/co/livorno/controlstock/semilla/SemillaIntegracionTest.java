@@ -110,13 +110,8 @@ class SemillaIntegracionTest {
     void alertas_activaCoincideConElTipoVigenteDeCadaVarianteActiva() {
         generador.generar();
 
-        // por variante activa: tipo de la alerta ACTIVA == tipo vigente por stock (AGOTADO / STOCK_BAJO / ninguna)
-        assertThat(contar("""
-                select count(*) from variante v left join alerta a on a.variante_id = v.id and a.estado = 'ACTIVA'
-                where v.activo = 1 and coalesce(a.tipo, 'OK') <>
-                  case when v.stock_fisico - v.stock_reservado <= 0 then 'AGOTADO'
-                       when v.stock_fisico - v.stock_reservado <= coalesce(v.punto_reorden, v.stock_minimo)
-                         then 'STOCK_BAJO' else 'OK' end""")).isZero();
+        // por variante activa: tipo de la alerta ACTIVA == tipoEsperado (AGOTADO / SIN_ROTACION / STOCK_BAJO / ninguna)
+        verificador.verificarAlertas();
         // a lo sumo una ACTIVA por variante y tipo, y ninguna de variantes inactivas
         assertThat(contar("""
                 select count(*) from (select variante_id, tipo from alerta where estado = 'ACTIVA'

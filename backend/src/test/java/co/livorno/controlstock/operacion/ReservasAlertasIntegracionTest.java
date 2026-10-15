@@ -58,7 +58,7 @@ class ReservasAlertasIntegracionTest {
     private static final Set<String> CLAVES_ALERTA = Set.of("id", "tipo", "estado", "varianteId", "sku",
             "productoNombre", "talla", "color", "stockDisponible", "umbral", "creadaEn", "revisadaEn", "atendidaEn",
             "atendidaPor");
-    private static final Set<String> CLAVES_RESUMEN = Set.of("activas", "agotado", "stockBajo");
+    private static final Set<String> CLAVES_RESUMEN = Set.of("activas", "agotado", "stockBajo", "sinRotacion");
     private static final Set<String> CLAVES_VENTA = Set.of("id", "numero", "fecha", "vendedor", "estado", "total",
             "descuentoTotal", "anuladaEn", "anuladaPor", "motivoAnulacion", "lineas", "reservas");
     private static final Set<String> CLAVES_LINEA = Set.of("detalleId", "varianteId", "sku", "productoNombre", "talla",

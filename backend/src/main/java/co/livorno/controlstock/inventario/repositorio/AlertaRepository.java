@@ -66,4 +66,25 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
             """)
     int cerrarActiva(@Param("varianteId") Long varianteId, @Param("tipo") TipoAlerta tipo,
             @Param("ahora") LocalDateTime ahora);
+
+    /** Cierra automáticamente las SIN_ROTACION ACTIVAS de todas las variantes del producto (hubo una venta). */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update Alerta a set a.estado = co.livorno.controlstock.inventario.modelo.EstadoAlerta.ATENDIDA,
+                a.atendidaEn = :ahora, a.atendidaPor = null
+            where a.tipo = co.livorno.controlstock.inventario.modelo.TipoAlerta.SIN_ROTACION
+              and a.estado = co.livorno.controlstock.inventario.modelo.EstadoAlerta.ACTIVA
+              and a.variante.id in (select v.id from Variante v where v.producto.id = :productoId)
+            """)
+    int cerrarSinRotacionDeProducto(@Param("productoId") Long productoId, @Param("ahora") LocalDateTime ahora);
+
+    /** Hay una SIN_ROTACION de la variante atendida a mano (usuario) en o después de {@code desde}. */
+    @Query("""
+            select count(a) > 0 from Alerta a
+            where a.variante.id = :varianteId
+              and a.tipo = co.livorno.controlstock.inventario.modelo.TipoAlerta.SIN_ROTACION
+              and a.estado = co.livorno.controlstock.inventario.modelo.EstadoAlerta.ATENDIDA
+              and a.atendidaPor is not null and a.atendidaEn >= :desde
+            """)
+    boolean existeSinRotacionAtendidaAMano(@Param("varianteId") Long varianteId, @Param("desde") LocalDateTime desde);
 }

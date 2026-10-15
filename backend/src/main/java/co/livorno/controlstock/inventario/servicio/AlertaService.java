@@ -1,6 +1,9 @@
 package co.livorno.controlstock.inventario.servicio;
 
+import co.livorno.controlstock.catalogo.modelo.Producto;
 import co.livorno.controlstock.catalogo.modelo.Variante;
+import co.livorno.controlstock.inventario.repositorio.MovimientoRepository;
+import org.springframework.beans.factory.annotation.Value;
 import co.livorno.controlstock.catalogo.repositorio.VarianteRepository;
 import co.livorno.controlstock.inventario.modelo.TipoAlerta;
 import co.livorno.controlstock.inventario.repositorio.AlertaRepository;
@@ -20,23 +23,34 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Evalúa las alertas de stock de una variante. AGOTADO y STOCK_BAJO son excluyentes, igual que
- * {@code Variante.estadoStock()}: AGOTADO si disponible = 0; STOCK_BAJO si 0 &lt; disponible &le; umbral.
+ * Evalúa las alertas de una variante. AGOTADO, SIN_ROTACION y STOCK_BAJO son excluyentes con esa prioridad: AGOTADO si
+ * disponible = 0; SIN_ROTACION si el producto no vende hace N días (ADR-009); STOCK_BAJO si disponible &le; umbral.
  */
 @Service
-@RequiredArgsConstructor
 public class AlertaService {
 
     private final VarianteRepository variantes;
     private final AlertaRepository alertas;
     private final Clock clock;
     private final UsuarioRepository usuarios;
+    private final MovimientoRepository movimientos;
+    private final int diasSinRotacion;
+
+    public AlertaService(VarianteRepository variantes, AlertaRepository alertas, Clock clock,
+            UsuarioRepository usuarios, MovimientoRepository movimientos,
+            @Value("${app.alertas.sin-rotacion-dias:60}") int diasSinRotacion) {
+        this.variantes = variantes;
+        this.alertas = alertas;
+        this.clock = clock;
+        this.usuarios = usuarios;
+        this.movimientos = movimientos;
+        this.diasSinRotacion = diasSinRotacion;
+    }
 
     public static final Set<String> ORDEN_PERMITIDO = Set.of("creadaEn", "revisadaEn", "id");
 
@@ -55,6 +69,7 @@ public class AlertaService {
     public ResumenAlertasResponse resumen() {
         long agotado = 0;
         long bajo = 0;
+        long sinRotacion = 0;
         long total = 0;
         for (Object[] fila : alertas.contarActivasPorTipo()) {
             long n = (Long) fila[1];
@@ -63,9 +78,11 @@ public class AlertaService {
                 agotado = n;
             } else if (fila[0] == TipoAlerta.STOCK_BAJO) {
                 bajo = n;
+            } else if (fila[0] == TipoAlerta.SIN_ROTACION) {
+                sinRotacion = n;
             }
         }
-        return new ResumenAlertasResponse(total, agotado, bajo);
+        return new ResumenAlertasResponse(total, agotado, bajo, sinRotacion);
     }
 
     /** 404 si no existe; 409 si ya estaba ATENDIDA. Bloquea la fila para que dos atenciones no se pisen. */
@@ -79,7 +96,8 @@ public class AlertaService {
 
     /**
      * Corre en su propia transacción porque se invoca desde un listener AFTER_COMMIT (Spring solo admite REQUIRES_NEW
-     * o NOT_SUPPORTED ahí). Idempotente: reevaluar sin cambios solo refresca {@code revisadaEn}.
+     * o NOT_SUPPORTED ahí). Idempotente: reevaluar sin cambios solo refresca {@code revisadaEn}. También lo usa la
+     * re-evaluación nocturna (una transacción por variante).
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void evaluar(Long varianteId) {
@@ -89,21 +107,75 @@ public class AlertaService {
             return;
         }
         LocalDateTime ahora = LocalDateTime.now(clock);
-        TipoAlerta vigente = tipoVigente(v);
+        Producto producto = v.getProducto();
+        boolean activa = v.isActivo() && producto.isActivo();
 
-        for (TipoAlerta tipo : new TipoAlerta[] {TipoAlerta.AGOTADO, TipoAlerta.STOCK_BAJO}) {
+        // Una venta reciente del producto cierra la SIN_ROTACION de todas sus variantes (también al anular una venta
+        // se recalcula: la anulada ya no cuenta).
+        boolean ventaReciente = activa && ventaReciente(producto, ahora);
+        if (ventaReciente) {
+            alertas.cerrarSinRotacionDeProducto(producto.getId(), ahora);
+        }
+        TipoAlerta vigente = activa ? calcularTipo(v, producto, ahora, ventaReciente) : null;
+
+        for (TipoAlerta tipo : TipoAlerta.values()) {
             if (tipo != vigente) {
                 alertas.cerrarActiva(varianteId, tipo, ahora);
             }
         }
-        // Una variante inactiva no genera alertas nuevas (sí se cierran las que dejaron de aplicar).
-        if (vigente != null && v.isActivo()) {
+        // Variante o producto inactivo: vigente es null, así que se cierran todas las ACTIVAS y no se abre ninguna.
+        if (vigente != null) {
             alertas.abrirOActualizar(varianteId, vigente.name(), ahora);
         }
     }
 
-    /** null = stock OK. */
-    static TipoAlerta tipoVigente(Variante v) {
+    /**
+     * Tipo de alerta que debería estar ACTIVA hoy para la variante (null = ninguna), sin modificar nada. Lo usan el
+     * verificador de la semilla y las pruebas.
+     */
+    @Transactional(readOnly = true)
+    public TipoAlerta tipoEsperado(Long varianteId) {
+        Variante v = variantes.findById(varianteId).orElse(null);
+        if (v == null) {
+            return null;
+        }
+        Producto producto = v.getProducto();
+        if (!v.isActivo() || !producto.isActivo()) {
+            return null;
+        }
+        LocalDateTime ahora = LocalDateTime.now(clock);
+        return calcularTipo(v, producto, ahora, ventaReciente(producto, ahora));
+    }
+
+    private boolean ventaReciente(Producto producto, LocalDateTime ahora) {
+        return movimientos.ultimaVentaNetaDesde(producto.getId(), ahora.minusDays(diasSinRotacion)) != null;
+    }
+
+    /** Prioridad AGOTADO &gt; SIN_ROTACION &gt; STOCK_BAJO (excluyentes). Variante y producto ya verificados activos. */
+    private TipoAlerta calcularTipo(Variante v, Producto producto, LocalDateTime ahora, boolean ventaReciente) {
+        if (v.getStockDisponible() <= 0) {
+            return TipoAlerta.AGOTADO;
+        }
+        if (!ventaReciente && sinRotacionAbrible(v, producto, ahora)) {
+            return TipoAlerta.SIN_ROTACION;
+        }
+        return tipoStock(v);
+    }
+
+    /** El producto existe hace al menos N días y la SIN_ROTACION no fue atendida a mano en este episodio. */
+    private boolean sinRotacionAbrible(Variante v, Producto producto, LocalDateTime ahora) {
+        LocalDateTime creado = producto.getCreadoEn();
+        if (creado == null || creado.isAfter(ahora.minusDays(diasSinRotacion))) {
+            return false;
+        }
+        // Episodio: desde (última venta o creación del producto) + N días. Atendida a mano dentro de él, no se reabre.
+        LocalDateTime ultimaVenta = movimientos.ultimaVentaNeta(producto.getId());
+        LocalDateTime base = ultimaVenta != null && ultimaVenta.isAfter(creado) ? ultimaVenta : creado;
+        return !alertas.existeSinRotacionAtendidaAMano(v.getId(), base.plusDays(diasSinRotacion));
+    }
+
+    /** AGOTADO / STOCK_BAJO / null según el stock solamente (igual que {@code Variante.estadoStock()}). */
+    static TipoAlerta tipoStock(Variante v) {
         int disponible = v.getStockDisponible();
         if (disponible <= 0) {
             return TipoAlerta.AGOTADO;

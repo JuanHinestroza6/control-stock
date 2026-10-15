@@ -61,4 +61,35 @@ public interface MovimientoRepository extends Repository<Movimiento, Long> {
         return tipo == null ? consultarTodos(varianteId, desde, hasta, pageable)
                 : consultarPorTipo(tipo, varianteId, desde, hasta, pageable);
     }
+
+    /**
+     * Fecha de la última venta no anulada del producto con {@code fecha >= desde} (null si no hay). Una venta
+     * (VENTA o VENTA_RESERVA) está anulada si existe ANULACION_VENTA con la misma referencia y variante. Usa
+     * idx_movimiento_variante_tipo_fecha.
+     */
+    @Query("""
+            select max(m.fecha) from Movimiento m
+            where m.variante.producto.id = :productoId
+              and m.tipo in (co.livorno.controlstock.inventario.modelo.TipoMovimiento.VENTA,
+                             co.livorno.controlstock.inventario.modelo.TipoMovimiento.VENTA_RESERVA)
+              and m.fecha >= :desde
+              and not exists (select 1 from Movimiento a
+                              where a.tipo = co.livorno.controlstock.inventario.modelo.TipoMovimiento.ANULACION_VENTA
+                                and a.variante = m.variante and a.referenciaTipo = m.referenciaTipo
+                                and a.referenciaId = m.referenciaId)
+            """)
+    LocalDateTime ultimaVentaNetaDesde(@Param("productoId") Long productoId, @Param("desde") LocalDateTime desde);
+
+    /** Igual que {@link #ultimaVentaNetaDesde} sin límite inferior (todo el historial). */
+    @Query("""
+            select max(m.fecha) from Movimiento m
+            where m.variante.producto.id = :productoId
+              and m.tipo in (co.livorno.controlstock.inventario.modelo.TipoMovimiento.VENTA,
+                             co.livorno.controlstock.inventario.modelo.TipoMovimiento.VENTA_RESERVA)
+              and not exists (select 1 from Movimiento a
+                              where a.tipo = co.livorno.controlstock.inventario.modelo.TipoMovimiento.ANULACION_VENTA
+                                and a.variante = m.variante and a.referenciaTipo = m.referenciaTipo
+                                and a.referenciaId = m.referenciaId)
+            """)
+    LocalDateTime ultimaVentaNeta(@Param("productoId") Long productoId);
 }

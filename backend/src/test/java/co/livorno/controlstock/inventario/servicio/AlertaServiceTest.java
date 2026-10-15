@@ -41,17 +41,26 @@ class AlertaServiceTest {
     @Mock VarianteRepository variantes;
     @Mock AlertaRepository alertas;
     @Mock co.livorno.controlstock.usuario.repositorio.UsuarioRepository usuarios;
+    @Mock co.livorno.controlstock.inventario.repositorio.MovimientoRepository movimientos;
 
     AlertaService servicio;
 
     @BeforeEach
     void preparar() {
-        servicio = new AlertaService(variantes, alertas, RELOJ, usuarios);
+        servicio = new AlertaService(variantes, alertas, RELOJ, usuarios, movimientos, 60);
+    }
+
+    /** Producto creado ayer (menos de 60 días: nunca SIN_ROTACION). */
+    private static co.livorno.controlstock.catalogo.modelo.Producto producto() {
+        var p = new co.livorno.controlstock.catalogo.modelo.Producto("LIV001", "Camiseta", null,
+                java.math.BigDecimal.ONE, java.math.BigDecimal.TEN, null, null);
+        org.springframework.test.util.ReflectionTestUtils.setField(p, "creadoEn", AHORA.minusDays(1));
+        return p;
     }
 
     /** Variante con stock mínimo 5, físico y reservado dados. */
     private Variante variante(int fisico, int reservado) {
-        Variante v = new Variante(null, "LIV001-M-NEG", Talla.M, "NEGRO", 5);
+        Variante v = new Variante(producto(), "LIV001-M-NEG", Talla.M, "NEGRO", 5);
         v.aplicarMovimiento(fisico, reservado);
         when(variantes.bloquearPorId(ID)).thenReturn(Optional.of(v));
         return v;
@@ -108,8 +117,68 @@ class AlertaServiceTest {
 
         servicio.evaluar(ID);
 
-        verify(alertas).cerrarActiva(ID, TipoAlerta.STOCK_BAJO, AHORA);
+        for (TipoAlerta tipo : TipoAlerta.values()) {
+            verify(alertas).cerrarActiva(ID, tipo, AHORA);
+        }
         verify(alertas, never()).abrirOActualizar(any(), any(), any());
+    }
+
+    @Test
+    void evaluar_productoInactivo_cierraTodasLasAlertasYNoAbreNinguna() {
+        Variante v = variante(0, 0);
+        v.getProducto().desactivar();
+
+        servicio.evaluar(ID);
+
+        for (TipoAlerta tipo : TipoAlerta.values()) {
+            verify(alertas).cerrarActiva(ID, tipo, AHORA);
+        }
+        verify(alertas, never()).abrirOActualizar(any(), any(), any());
+    }
+
+    @Test
+    void evaluar_ventaReciente_cierraSinRotacionDeTodoElProducto() {
+        Variante v = variante(20, 0);
+        when(movimientos.ultimaVentaNetaDesde(any(), any())).thenReturn(AHORA.minusDays(3));
+
+        servicio.evaluar(ID);
+
+        verify(alertas).cerrarSinRotacionDeProducto(v.getProducto().getId(), AHORA);
+    }
+
+    @Test
+    void evaluar_productoViejoSinVentas_abreSinRotacionYGanaSobreStockBajo() {
+        Variante v = variante(8, 3); // disponible 5 = stockMinimo: sería STOCK_BAJO
+        org.springframework.test.util.ReflectionTestUtils.setField(v.getProducto(), "creadoEn", AHORA.minusDays(90));
+
+        servicio.evaluar(ID);
+
+        verify(alertas).abrirOActualizar(ID, "SIN_ROTACION", AHORA);
+        verify(alertas).cerrarActiva(ID, TipoAlerta.STOCK_BAJO, AHORA);
+    }
+
+    @Test
+    void evaluar_productoViejoSinVentasYAgotado_agotadoGana() {
+        Variante v = variante(0, 0);
+        org.springframework.test.util.ReflectionTestUtils.setField(v.getProducto(), "creadoEn", AHORA.minusDays(90));
+
+        servicio.evaluar(ID);
+
+        verify(alertas).abrirOActualizar(ID, "AGOTADO", AHORA);
+        verify(alertas, never()).abrirOActualizar(eq(ID), eq("SIN_ROTACION"), any());
+    }
+
+    @Test
+    void evaluar_sinRotacionAtendidaAManoEnElEpisodio_noSeReabre() {
+        Variante v = variante(20, 0);
+        org.springframework.test.util.ReflectionTestUtils.setField(v.getProducto(), "creadoEn", AHORA.minusDays(90));
+        when(alertas.existeSinRotacionAtendidaAMano(any(), any())).thenReturn(true);
+
+        servicio.evaluar(ID);
+
+        verify(alertas, never()).abrirOActualizar(any(), any(), any());
+        // el inicio del episodio es creadoEn + 60 días cuando no hay ventas
+        verify(alertas).existeSinRotacionAtendidaAMano(v.getId(), AHORA.minusDays(30));
     }
 
     @Test
@@ -122,10 +191,10 @@ class AlertaServiceTest {
     }
 
     @Test
-    void tipoVigente_sinUmbralYSinStock_esAgotado() {
+    void tipoStock_sinUmbralYSinStock_esAgotado() {
         Variante v = new Variante(null, "X", Talla.M, "NEGRO", 0);
 
-        assertThat(AlertaService.tipoVigente(v)).isEqualTo(TipoAlerta.AGOTADO);
+        assertThat(AlertaService.tipoStock(v)).isEqualTo(TipoAlerta.AGOTADO);
     }
 
     @Test
@@ -165,11 +234,13 @@ class AlertaServiceTest {
     @Test
     void resumen_sumaActivasYSeparaPorTipo() {
         when(alertas.contarActivasPorTipo()).thenReturn(java.util.List.of(
-                new Object[] {TipoAlerta.AGOTADO, 2L}, new Object[] {TipoAlerta.STOCK_BAJO, 5L}));
+                new Object[] {TipoAlerta.AGOTADO, 2L}, new Object[] {TipoAlerta.STOCK_BAJO, 5L},
+                new Object[] {TipoAlerta.SIN_ROTACION, 3L}));
 
         var r = servicio.resumen();
 
-        assertThat(r.activas()).isEqualTo(7);
+        assertThat(r.activas()).isEqualTo(10);
+        assertThat(r.sinRotacion()).isEqualTo(3);
         assertThat(r.agotado()).isEqualTo(2);
         assertThat(r.stockBajo()).isEqualTo(5);
     }
