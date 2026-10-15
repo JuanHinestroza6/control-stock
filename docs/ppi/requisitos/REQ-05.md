@@ -51,6 +51,10 @@ reposición. El ranking se calcula con consultas agregadas de solo lectura sobre
   ventas o categoría sin ventas → lista vacía con totales en cero; sin sesión → 401.
 - **Poscondición**: ninguna; la consulta no modifica datos.
 
+## Diagrama
+
+- Casos de uso de CU-08: [`diagramas/casos-uso-cu08-mas-vendidos.puml`](../diagramas/casos-uso-cu08-mas-vendidos.puml)
+
 ## Criterios de aceptación
 
 | # | Criterio | Estado | Pruebas |

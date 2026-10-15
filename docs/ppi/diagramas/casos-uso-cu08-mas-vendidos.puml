@@ -1,0 +1,55 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+left to right direction
+title Diagrama de casos de uso - CU-08 Identificar productos más vendidos (REQ-05, Fase 5)
+
+actor "Usuario autenticado" as Usuario
+actor "Administrador\n(ADMIN)" as Admin
+actor "Encargado de inventario\n(INVENTARIO)" as Inventario
+actor "Vendedor\n(VENDEDOR)" as Vendedor
+actor "Contabilidad\n(CONTABILIDAD)" as Contabilidad
+actor "Base de datos" as BD <<sistema>>
+
+Usuario <|-- Admin
+Usuario <|-- Inventario
+Usuario <|-- Vendedor
+Usuario <|-- Contabilidad
+
+rectangle "Identificar productos de mayor venta (REQ-05)" {
+  usecase "CU-08 Identificar productos\nmás vendidos\n(GET /api/analitica/mas-vendidos)" as UC_Consultar
+  usecase "Analizar ventas netas\n(excluye anuladas,\nresta devoluciones)" as UC_Analizar
+  usecase "Mostrar resultados\n(unidades, ingreso neto,\nparticipación y totales)" as UC_Mostrar
+  usecase "Filtrar por periodo, categoría,\ncriterio o agrupación" as UC_Filtrar
+  usecase "Informar que no hay resultados\n(periodo o categoría sin ventas)" as UC_SinDatos
+}
+
+' Los cuatro roles consultan los más vendidos (la respuesta no contiene costos); se modela con el actor general.
+Usuario --> UC_Consultar
+UC_Consultar .> UC_Analizar : <<include>>
+UC_Consultar .> UC_Mostrar : <<include>>
+UC_Filtrar .> UC_Consultar : <<extend>>
+UC_SinDatos .> UC_Analizar : <<extend>>
+UC_Analizar --> BD
+
+note bottom of UC_Filtrar
+  Punto de extensión del Word: filtros de fecha o categoría.
+  Implementado además con criterio (unidades o ingreso neto),
+  agrupación (producto o variante) y límite (1 a 50).
+  Por defecto: últimos 30 días; rango máximo de 731 días (si no, 400).
+end note
+note bottom of UC_Analizar
+  Solo ventas REGISTRADA; unidades netas = vendidas - devueltas;
+  ingreso neto = suma de (cantidad - devuelta) x precioUnitario.
+end note
+note right of UC_SinDatos
+  Camino alternativo del Word: no se trata como error;
+  el sistema responde lista vacía con totales en cero.
+end note
+note right of UC_Consultar
+  Sin sesión: 401. Roles: ADMIN, INVENTARIO,
+  VENDEDOR y CONTABILIDAD (sin costos ni margen).
+end note
+@enduml
