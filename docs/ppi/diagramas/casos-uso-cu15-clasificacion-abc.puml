@@ -1,0 +1,66 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+left to right direction
+title Diagrama de casos de uso - CU-15 Clasificar productos (ABC) y ejecución analítica (REQ-14, REQ-04, Fase 5)
+
+actor "Administrador\n(ADMIN)" as Admin
+actor "Encargado de inventario\n(INVENTARIO)" as Inventario
+actor "Contabilidad\n(CONTABILIDAD)" as Contabilidad
+actor "Tarea nocturna\n(02:00 America/Bogota)" as Tarea <<sistema>>
+
+rectangle "Clasificación ABC y punto de reorden (REQ-14, REQ-04)" {
+  usecase "CU-15 Clasificar productos (ABC)\nRecalcular la analítica\n(POST /api/analitica/recalcular)" as UC_Recalcular
+  usecase "Ejecutar la analítica\n(ejecución EN_CURSO, EXITOSA o FALLIDA)" as UC_Ejecutar
+  usecase "Clasificar variantes en A, B y C\n(ingreso neto de 12 meses)" as UC_Abc
+  usecase "Calcular el punto de reorden\n(normal, Poisson, sin demanda o sin historia)" as UC_Rop
+  usecase "Re-evaluar las alertas de todas\nlas variantes (incluida SIN_ROTACION)" as UC_Alertas
+  usecase "Registrar la ejecución y\nla métrica de alertas" as UC_Registro
+  usecase "Rechazar: ya hay una\nejecución en curso (409)" as UC_Conflicto
+  usecase "Consultar la clasificación ABC\n(GET /api/analitica/abc y /abc/resumen)" as UC_ConsultarAbc
+  usecase "Consultar el punto de reorden\n(GET /api/analitica/reorden)" as UC_ConsultarRop
+  usecase "Consultar la última ejecución\n(GET /api/analitica/ejecuciones/ultima)" as UC_Ultima
+}
+
+Admin --> UC_Recalcular
+Admin --> UC_ConsultarAbc
+Admin --> UC_ConsultarRop
+Admin --> UC_Ultima
+Inventario --> UC_ConsultarAbc
+Inventario --> UC_ConsultarRop
+Inventario --> UC_Ultima
+Contabilidad --> UC_ConsultarAbc
+Contabilidad --> UC_ConsultarRop
+Contabilidad --> UC_Ultima
+Tarea --> UC_Ejecutar
+
+UC_Recalcular .> UC_Ejecutar : <<include>>
+UC_Ejecutar .> UC_Abc : <<include>>
+UC_Ejecutar .> UC_Rop : <<include>>
+UC_Ejecutar .> UC_Alertas : <<include>>
+UC_Ejecutar .> UC_Registro : <<include>>
+UC_Conflicto .> UC_Ejecutar : <<extend>>
+UC_ConsultarRop .> UC_ConsultarAbc : <<extend>>
+
+note bottom of UC_Abc
+  El cálculo de la clasificación y del punto de reorden
+  es una sola transacción (todo o nada). Si falla, la ejecución
+  queda FALLIDA, se conservan los valores previos y las
+  alertas se re-evalúan igualmente.
+end note
+note right of UC_Conflicto
+  Recalcular con otra ejecución en curso: 409.
+  La tarea nocturna, en ese caso, se omite.
+end note
+note right of UC_Recalcular
+  Solo ADMIN (síncrono). VENDEDOR: 403.
+  Punto de extensión del requisito: consultar el
+  punto de reorden por variante (REQ-04).
+end note
+note bottom of UC_ConsultarAbc
+  Lecturas: ADMIN, INVENTARIO y CONTABILIDAD.
+  La clase también se muestra en inventario a todos los roles.
+end note
+@enduml
