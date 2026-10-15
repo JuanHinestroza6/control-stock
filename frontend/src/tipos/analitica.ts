@@ -91,24 +91,26 @@ export interface EjecucionAnaliticaResponse {
   estado: EstadoEjecucion
   fechaCorte: string
   duracionMs: number | null
-  variantesAnalizadas: number
-  claseA: number
-  claseB: number
-  claseC: number
-  conPuntoReorden: number
-  alertasEvaluadas: number
-  alertasFallidas: number
-  variantesActivas: number
-  enAlertaStock: number
-  porcentajeAlertaStock: number
-  sinRotacionActivas: number
+  /** Los conteos llegan en null mientras está EN_CURSO; si el cálculo falló, solo traen la métrica de alertas. */
+  variantesAnalizadas: number | null
+  claseA: number | null
+  claseB: number | null
+  claseC: number | null
+  conPuntoReorden: number | null
+  alertasEvaluadas: number | null
+  alertasFallidas: number | null
+  variantesActivas: number | null
+  enAlertaStock: number | null
+  porcentajeAlertaStock: number | null
+  sinRotacionActivas: number | null
   mensaje: string | null
 }
 
 export interface ResumenAbcResponse {
   ejecucion: EjecucionAnaliticaResponse | null
-  ventanaDesde: string
-  ventanaHasta: string
+  /** null si nunca hubo una ejecución exitosa. */
+  ventanaDesde: string | null
+  ventanaHasta: string | null
   totalIngreso: number
   clases: ResumenClaseAbc[]
 }

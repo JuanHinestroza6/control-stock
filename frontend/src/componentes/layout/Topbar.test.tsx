@@ -13,14 +13,15 @@ function montar(rol: Rol) {
 
 beforeEach(() => {
   vi.resetAllMocks()
-  vi.mocked(api.obtenerResumenAlertas).mockResolvedValue({ activas: 3, agotado: 1, stockBajo: 2, sinRotacion: 0 })
+  vi.mocked(api.obtenerResumenAlertas).mockResolvedValue({ activas: 6, agotado: 1, stockBajo: 2, sinRotacion: 3 })
 })
 
 describe('Topbar', () => {
   it.each<Rol>(['ADMIN', 'INVENTARIO', 'VENDEDOR'])('%s ve la campana con el contador y enlaza a /alertas', async (rol) => {
     montar(rol)
-    const campana = await screen.findByRole('link', { name: 'Alertas: 3 sin atender' })
+    const campana = await screen.findByRole('link', { name: 'Alertas: 6 sin atender' })
     expect(campana).toHaveAttribute('href', '/alertas')
+    expect(campana).toHaveAttribute('title', 'Agotado: 1 · Stock bajo: 2 · Sin rotación: 3')
   })
 
   it('CONTABILIDAD no ve la campana ni consulta el resumen', () => {

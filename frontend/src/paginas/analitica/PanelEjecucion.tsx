@@ -29,6 +29,17 @@ function formatearDuracion(ms: number | null): string {
   return `${Math.floor(s / 60)} min ${Math.round(s % 60)} s`
 }
 
+function valor(n: number | null): string {
+  return n === null ? '—' : n.toLocaleString('es-CO')
+}
+
+function alertaStock(e: EjecucionAnaliticaResponse): string {
+  if (e.enAlertaStock === null || e.variantesActivas === null) return '—'
+  const porcentaje =
+    e.porcentajeAlertaStock === null ? '' : ` (${e.porcentajeAlertaStock.toLocaleString('es-CO', { maximumFractionDigits: 1 })} %)`
+  return `${valor(e.enAlertaStock)} de ${valor(e.variantesActivas)}${porcentaje}`
+}
+
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
   return (
     <div>
@@ -50,13 +61,11 @@ function DetalleEjecucion({ e }: { e: EjecucionAnaliticaResponse }) {
         <Dato etiqueta="Inicio">{formatearFecha(e.iniciadaEn, true)}</Dato>
         <Dato etiqueta="Duración">{formatearDuracion(e.duracionMs)}</Dato>
         <Dato etiqueta="Clases A / B / C">
-          {e.claseA} / {e.claseB} / {e.claseC}
+          {valor(e.claseA)} / {valor(e.claseB)} / {valor(e.claseC)}
         </Dato>
-        <Dato etiqueta="Variantes en alerta de stock">
-          {e.enAlertaStock} de {e.variantesActivas} ({e.porcentajeAlertaStock.toLocaleString('es-CO', { maximumFractionDigits: 1 })} %)
-        </Dato>
-        <Dato etiqueta="Sin rotación activas">{e.sinRotacionActivas}</Dato>
-        <Dato etiqueta="Con punto de reorden">{e.conPuntoReorden}</Dato>
+        <Dato etiqueta="Variantes en alerta de stock">{alertaStock(e)}</Dato>
+        <Dato etiqueta="Sin rotación activas">{valor(e.sinRotacionActivas)}</Dato>
+        <Dato etiqueta="Con punto de reorden">{valor(e.conPuntoReorden)}</Dato>
       </dl>
       {e.estado === 'FALLIDA' && (
         <p role="alert" className="mt-3 text-sm font-medium text-critico">

@@ -103,6 +103,30 @@ describe('PanelEjecucion', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Falló el cálculo ABC')
   })
 
+  it('ejecución EN_CURSO sin conteos muestra guiones', async () => {
+    montar(
+      'INVENTARIO',
+      ejecucion({
+        estado: 'EN_CURSO', terminadaEn: null, duracionMs: null, variantesAnalizadas: null, claseA: null, claseB: null,
+        claseC: null, conPuntoReorden: null, alertasEvaluadas: null, alertasFallidas: null, variantesActivas: null,
+        enAlertaStock: null, porcentajeAlertaStock: null, sinRotacionActivas: null,
+      }),
+    )
+    expect(await screen.findByText('En curso')).toBeInTheDocument()
+    expect(screen.getByText('— / — / —')).toBeInTheDocument()
+    expect(screen.getByText('Variantes en alerta de stock').nextElementSibling).toHaveTextContent('—')
+  })
+
+  it('ejecución FALLIDA con métrica de alertas y sin conteos del cálculo', async () => {
+    montar(
+      'ADMIN',
+      ejecucion({ estado: 'FALLIDA', mensaje: 'x', claseA: null, claseB: null, claseC: null, conPuntoReorden: null }),
+    )
+    expect(await screen.findByText('Fallida')).toBeInTheDocument()
+    expect(screen.getByText('— / — / —')).toBeInTheDocument()
+    expect(screen.getByText(/13,8 %/)).toBeInTheDocument()
+  })
+
   it('muestra error con reintento', async () => {
     vi.mocked(api.obtenerUltimaEjecucion).mockRejectedValueOnce(new Error('x')).mockResolvedValue(ejecucion())
     renderizarApp(<AnaliticaPage />, { rol: 'ADMIN' })

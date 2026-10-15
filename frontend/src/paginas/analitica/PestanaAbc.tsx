@@ -124,7 +124,11 @@ export function PestanaAbc() {
   return (
     <div className="flex flex-col gap-4">
       <p data-testid="ventana-abc" className="text-sm text-oxford/70">
-        Ventana analizada: {formatearFecha(datos.ventanaDesde)} a {formatearFecha(datos.ventanaHasta)} · Ingreso neto total{' '}
+        Ventana analizada:{' '}
+        {datos.ventanaDesde && datos.ventanaHasta
+          ? `${formatearFecha(datos.ventanaDesde)} a ${formatearFecha(datos.ventanaHasta)}`
+          : '—'}{' '}
+        · Ingreso neto total{' '}
         <strong className="text-oxford">{formatearMoneda(datos.totalIngreso)}</strong>
       </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

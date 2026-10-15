@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
+import { BadgeClaseAbc } from '../../componentes/dominio/BadgeClaseAbc'
 import { BadgeStock } from '../../componentes/dominio/BadgeStock'
 import { ModalAjuste } from '../../componentes/dominio/ModalAjuste'
 import { Campo } from '../../componentes/ui/Campo'
@@ -102,6 +103,19 @@ export function InventarioPage() {
       ocultarEnMovil: true,
     },
     { clave: 'disponible', encabezado: 'Disponible', celda: (v) => v.stockDisponible, className: 'text-right' },
+    {
+      clave: 'umbral',
+      encabezado: 'Umbral',
+      celda: (v) => (
+        <div className="flex flex-col">
+          <span>{v.puntoReorden ?? v.stockMinimo}</span>
+          <span className="text-xs text-oxford/70">{v.puntoReorden !== null ? 'ROP' : 'stock mín.'}</span>
+        </div>
+      ),
+      className: 'text-right',
+      ocultarEnMovil: true,
+    },
+    { clave: 'clase', encabezado: 'Clase', celda: (v) => <BadgeClaseAbc clase={v.claseAbc} />, ocultarEnMovil: true },
     { clave: 'estado', encabezado: 'Estado', celda: (v) => <BadgeStock estado={v.estadoStock} /> },
     { clave: 'precio', encabezado: 'Precio', celda: (v) => formatearMoneda(v.precioVenta), className: 'text-right', ocultarEnMovil: true },
   ]

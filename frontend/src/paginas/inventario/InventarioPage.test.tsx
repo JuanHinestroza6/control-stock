@@ -57,6 +57,24 @@ describe('InventarioPage', () => {
     expect(ultimosFiltros()).toMatchObject({ page: 0, size: 20, sort: 'producto.nombre,asc', incluirInactivas: false })
   })
 
+  it('muestra Clase y Umbral con su fuente (ROP o stock mínimo)', async () => {
+    vi.mocked(api.listarInventario).mockResolvedValue(
+      pagina([item(1, { claseAbc: 'A', puntoReorden: 12 }), item(2, { claseAbc: null, puntoReorden: null, stockMinimo: 3 })]),
+    )
+    renderizarApp(<InventarioPage />, { rol: 'VENDEDOR' })
+    await screen.findByText('LIV001-M-NEG1')
+    const tabla = screen.getByRole('table')
+    expect(within(tabla).getByRole('columnheader', { name: 'Clase' })).toBeInTheDocument()
+    expect(within(tabla).getByRole('columnheader', { name: 'Umbral' })).toBeInTheDocument()
+    const [, fila1, fila2] = within(tabla).getAllByRole('row')
+    expect(within(fila1).getByLabelText('Clase A')).toBeInTheDocument()
+    expect(within(fila1).getByText('12')).toBeInTheDocument()
+    expect(within(fila1).getByText('ROP')).toBeInTheDocument()
+    expect(within(fila2).getByLabelText('Sin clasificar')).toBeInTheDocument()
+    expect(within(fila2).getByText('3')).toBeInTheDocument()
+    expect(within(fila2).getByText('stock mín.')).toBeInTheDocument()
+  })
+
   it('muestra el error y reintenta', async () => {
     vi.mocked(api.listarInventario).mockRejectedValueOnce(
       new AxiosError('x', 'E', undefined, undefined, {
