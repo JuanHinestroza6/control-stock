@@ -10,7 +10,7 @@
 | **Tipo** | Funcional |
 | **Stakeholder** | Vendedor |
 | **Necesidad** | NEC-05 |
-| **Caso de uso** | CU-08 |
+| **Caso de uso** | CU-08 "Identificar productos más vendidos" |
 | **Relacionados** | REQ-08 (las devoluciones restan de las unidades y del ingreso); REQ-14 (el ingreso neto por variante coincide con el de la clasificación ABC); REQ-06 (roles) |
 | **Prioridad** | Media |
 | **Módulos** | `analitica` (`MasVendidosService`, `AnaliticaController`, consulta agregada en `analitica.repositorio`); frontend: `paginas/analitica` (pestaña "Más vendidos"), `api/analitica` |
@@ -66,7 +66,7 @@ reposición. El ranking se calcula con consultas agregadas de solo lectura sobre
 
 ## Observaciones
 
-- Datos del Word: Vendedor, NEC-05, CU-08, prioridad Media. El nombre de CU-08 no consta en el repositorio y no se asume.
+- Datos del Word: Vendedor, NEC-05, CU-08 "Identificar productos más vendidos", prioridad Media.
 - Inconsistencias del Word: REQ-08 y REQ-09 con nombre y descripción cruzados; NEC-010 debería ser NEC-10.
 - La demanda observada está censurada por las ventas perdidas por falta de stock (2,5 % a 3 % en la semilla); lo corrige
   el pronóstico de la Fase 6.
