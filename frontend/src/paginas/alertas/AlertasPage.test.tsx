@@ -79,7 +79,7 @@ describe('AlertasPage', () => {
     vi.mocked(api.atenderAlerta).mockResolvedValue(alerta(5, { tipo: 'SIN_ROTACION', estado: 'ATENDIDA' }))
     montar('INVENTARIO', [alerta(5, { tipo: 'SIN_ROTACION', stockDisponible: 4, sku: 'LIV009-M-AZU' })])
     expect(await screen.findByText('Sin rotación', { selector: 'span' })).toBeInTheDocument()
-    expect(screen.getByText('El producto no vende hace 60 días o más')).toBeInTheDocument()
+    expect(screen.getByText('El producto no registra ventas en el periodo configurado (60 días por defecto)')).toBeInTheDocument()
     await userEvent.selectOptions(screen.getByLabelText('Tipo'), 'SIN_ROTACION')
     await waitFor(() => expect(ultimos()).toMatchObject({ tipo: 'SIN_ROTACION' }))
     await userEvent.click(screen.getByRole('button', { name: 'Atender LIV009-M-AZU' }))

@@ -59,7 +59,7 @@ public class ConsultaAnaliticaService {
 
     public Page<AbcVarianteResponse> listarAbc(ClaseAbc clase, Long categoriaId, String q, Pageable pageable) {
         Ordenamiento.validar(pageable, ORDEN_ABC);
-        return instantanea.consultarAbc(clase != null ? clase.name() : null, categoriaId,
+        return instantanea.consultarAbc(clase != null ? Character.valueOf(clase.name().charAt(0)) : null, categoriaId,
                 ProductoRepository.patronContiene(q), traducir(pageable, "posicion"))
                 .map(AbcVarianteResponse::de);
     }
@@ -68,8 +68,8 @@ public class ConsultaAnaliticaService {
             MetodoReorden metodo, Boolean enAlerta, Pageable pageable) {
         Ordenamiento.validar(pageable, ORDEN_REORDEN);
         int modoAlerta = enAlerta == null ? 0 : enAlerta ? 1 : 2;
-        return instantanea.consultarReorden(clase != null ? clase.name() : null, categoriaId,
-                ProductoRepository.patronContiene(q), metodo != null ? metodo.name() : null, modoAlerta,
+        return instantanea.consultarReorden(clase != null ? Character.valueOf(clase.name().charAt(0)) : null, categoriaId,
+                ProductoRepository.patronContiene(q), metodo, modoAlerta,
                 traducir(pageable, "sku")).map(ReordenVarianteResponse::de);
     }
 

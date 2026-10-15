@@ -64,13 +64,16 @@ public class ConsultasVentaAnalitica {
 
     /** Líneas vendidas con su devuelta total (demanda comercial); misma semántica que {@link #INGRESO_NETO}. */
     private static final String LINEAS_NETAS = """
-            SELECT d.variante_id AS variante_id, d.cantidad - COALESCE(dev.devuelta, 0) AS unidades,
-                   (d.cantidad - COALESCE(dev.devuelta, 0)) * d.precio_unitario AS ingreso
-            FROM venta v
-            JOIN detalle_venta d ON d.venta_id = v.id
-            LEFT JOIN (SELECT detalle_venta_id, SUM(cantidad) AS devuelta
-                       FROM devolucion GROUP BY detalle_venta_id) dev ON dev.detalle_venta_id = d.id
-            WHERE v.estado = 'REGISTRADA' AND v.fecha >= :desde AND v.fecha < :hasta
+            SELECT linea.variante_id AS variante_id, linea.cantidad - linea.devuelta AS unidades,
+                   (linea.cantidad - linea.devuelta) * linea.precio_unitario AS ingreso
+            FROM (
+                SELECT d.variante_id, d.cantidad, d.precio_unitario,
+                       (SELECT COALESCE(SUM(dev.cantidad), 0) FROM devolucion dev
+                        WHERE dev.detalle_venta_id = d.id) AS devuelta
+                FROM venta v
+                JOIN detalle_venta d ON d.venta_id = v.id
+                WHERE v.estado = 'REGISTRADA' AND v.fecha >= :desde AND v.fecha < :hasta
+            ) linea
             """;
 
     private final NamedParameterJdbcTemplate jdbc;

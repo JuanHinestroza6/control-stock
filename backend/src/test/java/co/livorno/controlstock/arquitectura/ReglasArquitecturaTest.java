@@ -12,6 +12,7 @@ import com.tngtech.archunit.core.domain.JavaAccess;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaCodeUnit;
 import com.tngtech.archunit.core.domain.JavaFieldAccess;
+import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
@@ -137,8 +138,40 @@ class ReglasArquitecturaTest {
     static final ArchRule analiticaRepositorioSiEscribeRopYClase = methods()
             .that().areDeclaredIn(co.livorno.controlstock.analitica.repositorio.AnaliticaVarianteRepository.class)
             .and().areAnnotatedWith(Modifying.class)
-            .should().haveNameMatching("aplicarAVariante|limpiarInactivas")
+            .should().haveName("aplicarAVariante")
             .because("AnaliticaVarianteRepository es el único escritor de punto_reorden y clase_abc (ADR-009)");
+
+    /** Clases de solo lectura autorizadas a usar JDBC directo (el tipo JDBC no se inyecta en ninguna otra). */
+    private static final String[] CLASES_JDBC_DE_LECTURA = {
+        "co.livorno.controlstock.analitica.repositorio.ConsultasVentaAnalitica",
+        "co.livorno.controlstock.analitica.repositorio.ConsultasEstadoAlertas"};
+
+    private static final Set<String> TIPOS_JDBC = Set.of("org.springframework.jdbc.core.JdbcTemplate",
+            "org.springframework.jdbc.core.JdbcOperations",
+            "org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate",
+            "org.springframework.jdbc.core.namedparam.NamedParameterJdbcOperations",
+            "org.springframework.jdbc.core.simple.JdbcClient");
+
+    /**
+     * JDBC directo evita JPA y por tanto cualquier regla sobre entidades: solo lo usan las consultas de lectura de la
+     * analítica y el módulo semilla (verifica y consulta, nunca escribe; ver la regla siguiente).
+     */
+    @ArchTest
+    static final ArchRule jdbcDirectoSoloEnClasesDeLectura = noClasses()
+            .that().doNotHaveFullyQualifiedName(CLASES_JDBC_DE_LECTURA[0])
+            .and().doNotHaveFullyQualifiedName(CLASES_JDBC_DE_LECTURA[1])
+            .and().resideOutsideOfPackage("co.livorno.controlstock.semilla..")
+            .should().dependOnClassesThat(DescribedPredicate.describe("son JdbcTemplate, NamedParameterJdbcTemplate"
+                    + " o JdbcClient", (JavaClass c) -> TIPOS_JDBC.contains(c.getName())))
+            .because("un UPDATE por JDBC saltaría las reglas de stock, kardex y ROP/clase (reglas de oro 1 y 2, ADR-009)");
+
+    /** Ni siquiera las clases autorizadas escriben: sin update, batchUpdate ni execute sobre JDBC. */
+    @ArchTest
+    static final ArchRule jdbcDirectoNuncaEscribeEnProduccion = noClasses()
+            .should().callMethodWhere(DescribedPredicate.describe("JdbcTemplate.update/batchUpdate/execute",
+                    (JavaMethodCall c) -> TIPOS_JDBC.stream().anyMatch(t -> c.getTarget().getOwner().getName().equals(t))
+                            && Set.of("update", "batchUpdate", "execute").contains(c.getName())))
+            .because("el JDBC directo es solo de lectura; las escrituras pasan por servicios y repositorios JPA");
 
     @ArchTest
     static final ArchRule nadieBorraEntidadesConEntityManager = noClasses()

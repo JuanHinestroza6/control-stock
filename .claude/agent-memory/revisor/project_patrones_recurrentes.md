@@ -1,6 +1,6 @@
 ---
 name: project-patrones-recurrentes
-description: Errores que el equipo repite (collation ai_ci vs Java, IllegalArgumentException=500, catch DIVE genérico, ADR/contrato que no coincide con el código, pruebas de concurrencia, reglas ArchUnit vacuas, cast en JPQL que anula índices, @Size antes de strip)
+description: Errores que el equipo repite (collation, IAE=500, ADR≠código, concurrencia sin prueba, ArchUnit vacua, cast en JPQL, @Size antes de strip, listener sin bloqueo, locks implícitos de InnoDB por FK y UPDATE con subconsulta, tipos TS no nulos)
 metadata:
   type: project
 ---
@@ -46,3 +46,13 @@ Fase 4 (rama fase-4-datos-semilla, 2026-10-04), sin críticos:
 
 10. Datos personales (Ley 1581) copiados a tablas inmutables (motivo de cancelación en la observación del kardex) y sin
     plan de supresión/anonimización de `reserva.cliente_*` (columnas updatable=false).
+
+Fase 5 (rama fase-5-analitica, 2026-10-14), sin críticos; 847 pruebas, 0 skipped:
+14. Bloqueos implícitos de InnoDB que el equipo no modela: (a) el INSERT de una fila hija toma S sobre el padre por la
+    FK (movimiento→variante, analitica_variante→variante) y luego el UPDATE del padre pide X: deadlock S→X con otro
+    escritor (ejemplo del manual de MySQL); (b) `UPDATE t ... WHERE col IN (SELECT ... FROM s)` pone S next-key en `s`;
+    (c) UPDATE con `OR` entre columnas sin índice bloquea toda la tabla en REPEATABLE READ. Pedir: UPDATE del padre antes
+    de insertar hijos, ids por SELECT no bloqueante y luego `IN (:ids)`, y prueba con dos hilos intercalados.
+15. Tipos TS no nulos para campos que el backend devuelve null (stockSeguridad en SIN_HISTORIA) → Intl.format(null)="0".
+Se repitieron el 6 (regla ArchUnit solo mira @Query de @Modifying; JdbcTemplate la evade), el 7 (cast(enum as string))
+y el 9 (SIN_ROTACION cruza variantes del producto bajo el bloqueo de una sola variante).

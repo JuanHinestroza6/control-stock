@@ -90,7 +90,9 @@ export function PanelEjecucion() {
   if (!visible) return null
 
   const ultima = consulta.data
-  const corriendo = recalcular.isPending || ultima?.estado === 'EN_CURSO'
+  const corriendo = recalcular.isPending
+  // Una ejecución huérfana (proceso caído) no debe bloquear la vía de recuperación: el backend responde 409 si de verdad hay una en curso.
+  const hayEnCurso = ultima?.estado === 'EN_CURSO'
 
   const confirmar = () => {
     setErrorRecalculo(undefined)
@@ -124,6 +126,12 @@ export function PanelEjecucion() {
           </Boton>
         )}
       </div>
+
+      {hayEnCurso && !recalcular.isPending && (
+        <p className="mb-3 text-sm text-oxford/70">
+          La última ejecución figura en curso. Si lleva mucho tiempo, puedes volver a recalcular: el sistema avisa si de verdad hay una activa.
+        </p>
+      )}
 
       {aviso && (
         <p role="status" className="mb-3 text-sm font-medium text-oxford">

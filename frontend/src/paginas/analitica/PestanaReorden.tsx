@@ -59,7 +59,7 @@ const COLUMNAS: Columna<ReordenVarianteResponse>[] = [
   { clave: 'desviacion', encabezado: 'Desv. (σ)', celda: (f) => num2.format(f.desviacion), className: 'text-right tabular-nums', ocultarEnMovil: true },
   { clave: 'lead', encabezado: 'Lead time (días)', celda: (f) => f.leadTimeDias, className: 'text-right tabular-nums', ocultarEnMovil: true },
   { clave: 'servicio', encabezado: 'Nivel de servicio', celda: (f) => `${Math.round(f.nivelServicio * 100)} %`, className: 'text-right tabular-nums', ocultarEnMovil: true },
-  { clave: 'ss', encabezado: 'Stock de seguridad', celda: (f) => num1.format(f.stockSeguridad), className: 'text-right tabular-nums', ocultarEnMovil: true },
+  { clave: 'ss', encabezado: 'Stock de seguridad', celda: (f) => (f.stockSeguridad === null ? '—' : num1.format(f.stockSeguridad)), className: 'text-right tabular-nums', ocultarEnMovil: true },
   { clave: 'rop', encabezado: 'ROP', celda: (f) => (f.puntoReorden === null ? '—' : entero.format(f.puntoReorden)), className: 'text-right tabular-nums' },
   { clave: 'metodo', encabezado: 'Método', celda: (f) => <BadgeMetodoReorden metodo={f.metodo} />, ocultarEnMovil: true },
   { clave: 'minimo', encabezado: 'Stock mínimo', celda: (f) => f.stockMinimo, className: 'text-right tabular-nums', ocultarEnMovil: true },

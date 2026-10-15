@@ -1,6 +1,7 @@
 package co.livorno.controlstock.analitica.repositorio;
 
 import co.livorno.controlstock.analitica.modelo.AnaliticaVariante;
+import co.livorno.controlstock.analitica.modelo.MetodoReorden;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,13 +22,13 @@ public interface AnaliticaVarianteRepository extends JpaRepository<AnaliticaVari
     @Query(value = "UPDATE variante SET punto_reorden = :rop, clase_abc = :clase WHERE id = :id", nativeQuery = true)
     int aplicarAVariante(@Param("id") Long id, @Param("rop") Integer rop, @Param("clase") String clase);
 
-    /** Deja en null ROP y clase de las variantes inactivas o de productos inactivos. */
-    @Modifying
-    @Query(value = """
-            UPDATE variante SET punto_reorden = NULL, clase_abc = NULL
-            WHERE (activo = 0 OR producto_id IN (SELECT id FROM producto WHERE activo = 0))
-              AND (punto_reorden IS NOT NULL OR clase_abc IS NOT NULL)""", nativeQuery = true)
-    int limpiarInactivas();
+    /**
+     * Bloquea la fila de la variante solo si nadie la tiene bloqueada: no espera ni se encola. Una venta en curso
+     * (que ya tiene S sobre la variante por la FK del movimiento y pedirá X al confirmar) nunca queda detrás de una
+     * solicitud nuestra, así que no hay interbloqueo S-X (ADR-009, R1). Vacío = ocupada (o inexistente).
+     */
+    @Query(value = "SELECT id FROM variante WHERE id = :id FOR UPDATE SKIP LOCKED", nativeQuery = true)
+    List<Long> bloquearSiLibre(@Param("id") Long id);
 
     /**
      * Página de la clasificación ABC: solo variantes activas de productos activos. Filtros nulos se ignoran; la clase
@@ -36,7 +37,7 @@ public interface AnaliticaVarianteRepository extends JpaRepository<AnaliticaVari
     @Query(value = """
             select a from AnaliticaVariante a join fetch a.variante v join fetch v.producto p join fetch p.categoria c
             where v.activo = true and p.activo = true
-              and (:clase is null or cast(a.claseAbc as string) = :clase)
+              and (:clase is null or a.claseAbc = :clase)
               and (:categoriaId is null or c.id = :categoriaId)
               and (:patron is null or v.sku like :patron escape '!' or p.codigo like :patron escape '!'
                    or p.nombre like :patron escape '!')
@@ -44,12 +45,12 @@ public interface AnaliticaVarianteRepository extends JpaRepository<AnaliticaVari
             countQuery = """
             select count(a) from AnaliticaVariante a join a.variante v join v.producto p join p.categoria c
             where v.activo = true and p.activo = true
-              and (:clase is null or cast(a.claseAbc as string) = :clase)
+              and (:clase is null or a.claseAbc = :clase)
               and (:categoriaId is null or c.id = :categoriaId)
               and (:patron is null or v.sku like :patron escape '!' or p.codigo like :patron escape '!'
                    or p.nombre like :patron escape '!')
             """)
-    Page<AnaliticaVariante> consultarAbc(@Param("clase") String clase, @Param("categoriaId") Long categoriaId,
+    Page<AnaliticaVariante> consultarAbc(@Param("clase") Character clase, @Param("categoriaId") Long categoriaId,
             @Param("patron") String patron, Pageable pageable);
 
     /**
@@ -59,11 +60,11 @@ public interface AnaliticaVarianteRepository extends JpaRepository<AnaliticaVari
     @Query(value = """
             select a from AnaliticaVariante a join fetch a.variante v join fetch v.producto p join fetch p.categoria c
             where v.activo = true and p.activo = true
-              and (:clase is null or cast(a.claseAbc as string) = :clase)
+              and (:clase is null or a.claseAbc = :clase)
               and (:categoriaId is null or c.id = :categoriaId)
               and (:patron is null or v.sku like :patron escape '!' or p.codigo like :patron escape '!'
                    or p.nombre like :patron escape '!')
-              and (:metodo is null or cast(a.metodoReorden as string) = :metodo)
+              and (:metodo is null or a.metodoReorden = :metodo)
               and (:modoAlerta = 0
                    or (:modoAlerta = 1 and v.stockFisico - v.stockReservado <= coalesce(a.puntoReorden, v.stockMinimo))
                    or (:modoAlerta = 2 and v.stockFisico - v.stockReservado > coalesce(a.puntoReorden, v.stockMinimo)))
@@ -71,17 +72,17 @@ public interface AnaliticaVarianteRepository extends JpaRepository<AnaliticaVari
             countQuery = """
             select count(a) from AnaliticaVariante a join a.variante v join v.producto p join p.categoria c
             where v.activo = true and p.activo = true
-              and (:clase is null or cast(a.claseAbc as string) = :clase)
+              and (:clase is null or a.claseAbc = :clase)
               and (:categoriaId is null or c.id = :categoriaId)
               and (:patron is null or v.sku like :patron escape '!' or p.codigo like :patron escape '!'
                    or p.nombre like :patron escape '!')
-              and (:metodo is null or cast(a.metodoReorden as string) = :metodo)
+              and (:metodo is null or a.metodoReorden = :metodo)
               and (:modoAlerta = 0
                    or (:modoAlerta = 1 and v.stockFisico - v.stockReservado <= coalesce(a.puntoReorden, v.stockMinimo))
                    or (:modoAlerta = 2 and v.stockFisico - v.stockReservado > coalesce(a.puntoReorden, v.stockMinimo)))
             """)
-    Page<AnaliticaVariante> consultarReorden(@Param("clase") String clase, @Param("categoriaId") Long categoriaId,
-            @Param("patron") String patron, @Param("metodo") String metodo, @Param("modoAlerta") int modoAlerta,
+    Page<AnaliticaVariante> consultarReorden(@Param("clase") Character clase, @Param("categoriaId") Long categoriaId,
+            @Param("patron") String patron, @Param("metodo") MetodoReorden metodo, @Param("modoAlerta") int modoAlerta,
             Pageable pageable);
 
     /** Variantes e ingreso neto por clase (agregado en SQL), solo variantes activas de productos activos. */

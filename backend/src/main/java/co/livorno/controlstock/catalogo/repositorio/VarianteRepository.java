@@ -46,4 +46,16 @@ public interface VarianteRepository extends JpaRepository<Variante, Long> {
             order by v.id
             """)
     List<VarianteAnalizable> activasConProducto();
+
+    /**
+     * ROP y clase vigentes de todas las variantes, por id. Lectura simple (sin bloqueos): la analítica decide qué
+     * UPDATE dirigidos hacen falta, incluida la limpieza de las inactivas (ADR-009, R1).
+     */
+    @Query("""
+            select new co.livorno.controlstock.catalogo.repositorio.AnaliticaActualVariante(
+                v.id, v.puntoReorden, v.claseAbc)
+            from Variante v
+            order by v.id
+            """)
+    List<AnaliticaActualVariante> analiticaActual();
 }

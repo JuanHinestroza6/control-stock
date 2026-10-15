@@ -28,8 +28,14 @@ SIN_ROTACION y la re-evaluación nocturna. Había ocho cuestiones abiertas:
    null (umbral = `stockMinimo`); d̄ = 0 → 0. `stockMinimo` es solo respaldo; `loteMinimo` no interviene.
 3. **Escritura dirigida**: `puntoReorden` y `claseAbc` se mapean con `updatable = false`; solo
    `analitica.repositorio.AnaliticaVarianteRepository` los escribe con un UPDATE nativo por variante, en orden de id, sin
-   tocar `version` ni `actualizado_en`. ArchUnit restringe esos `@Modifying` al paquete `analitica.repositorio`. El stock
-   nunca se toca (regla de oro 1 intacta).
+   tocar `version` ni `actualizado_en`. ArchUnit restringe esos `@Modifying` al paquete `analitica.repositorio` y prohíbe
+   escribir con JDBC fuera de él. El stock nunca se toca (regla de oro 1 intacta).
+   **Sin esperar a las ventas** (revisión de la fase 5): cada variante se bloquea con `SELECT … FOR UPDATE SKIP LOCKED`
+   antes de su UPDATE; si una venta en curso la tiene, el cálculo la salta y la reintenta (5 × 200 ms). Solo se escriben
+   las variantes cuyo ROP o clase cambian (las inactivas con valores se limpian en el mismo recorrido por id) y la
+   instantánea se reemplaza al final. Así el cálculo nunca queda encolado detrás de una venta y no hay ciclo de
+   bloqueos (los INSERT de la instantánea toman S sobre `variante` por la FK; una venta que ya insertó su movimiento
+   también tiene S y pediría X al confirmar).
 4. **Instantánea** `analitica_variante` (una fila por variante activa, reemplazada en cada ejecución) con los insumos
    del cálculo, y **registro** `ejecucion_analitica` (origen, usuario, estado, conteos, métrica de alertas). Migración V14,
    que además agrega el índice `movimiento(variante_id, tipo, fecha)`.
@@ -42,7 +48,9 @@ SIN_ROTACION y la re-evaluación nocturna. Había ocho cuestiones abiertas:
    disponible > 0. Las tres alertas son **excluyentes**: AGOTADO > SIN_ROTACION > STOCK_BAJO. Se evalúa en
    `AlertaService` con el kardex (VENTA/VENTA_RESERVA sin ANULACION_VENTA), por evento y en la noche; una venta cierra la
    de todo el producto. Atendida a mano no se reabre en el mismo episodio. Variante inactiva → se cierran todas sus
-   alertas.
+   alertas. El cierre por producto lee primero los ids de las SIN_ROTACION ACTIVAS y actualiza por id (sin subconsulta
+   sobre `variante`, que bloquearía las variantes hermanas); `evaluar` corre en READ COMMITTED y, tras abrir una
+   SIN_ROTACION, relee las ventas confirmadas por si otra talla vendió mientras tanto.
 7. **Analítica como modelo de lectura**: consultas SQL agregadas de solo lectura sobre venta, detalle y devolución desde
    `analitica.repositorio`; ningún módulo salvo `semilla` depende de `analitica` (ArchUnit).
 8. **Métrica de alertas** guardada en cada ejecución (`% de variantes activas con AGOTADO o STOCK_BAJO`, SIN_ROTACION
@@ -82,7 +90,16 @@ SIN_ROTACION y la re-evaluación nocturna. Había ocho cuestiones abiertas:
   estado de alerta deja de coincidir siempre con `estadoStock()` (SIN_ROTACION puede reemplazar a BAJO).
 - Skill `algoritmos-analitica`: ventana ABC de 12 meses, ROP híbrido sin piso, dos definiciones de demanda.
 - Las alertas AGOTADO/STOCK_BAJO atendidas a mano se reabren en la noche si la condición sigue.
-- Hasta la siguiente ejecución, una variante reactivada o nueva usa `stockMinimo`.
+- Hasta la siguiente ejecución, una variante nueva usa `stockMinimo`; una variante desactivada y reactivada entre dos
+  ejecuciones conserva su ROP y su clase anteriores (solo la ejecución los limpia), y el inventario muestra la clase de
+  una variante recién desactivada hasta entonces.
+- Riesgos residuales aceptados (revisión de la fase 5):
+  - Una variante ocupada por una venta durante todos los reintentos conserva su ROP y clase anteriores (log `warn` con
+    los ids) hasta la siguiente ejecución; mientras tanto la instantánea ya muestra el valor nuevo.
+  - Una venta que llegue mientras el cálculo confirma espera unos milisegundos; solo recibiría 409 si superara el
+    `innodb_lock_wait_timeout` (50 s).
+  - Si otra talla del producto vende entre la relectura de `evaluar` y su commit, la SIN_ROTACION recién abierta queda
+    abierta hasta la siguiente evaluación de esa variante o la noche.
 - La meta de alertas queda medida pero pendiente: la fase 6 cambia STOCK_BAJO a la posición de inventario y la semilla
   repone con planes de compra.
 - Sin historial de clases ni de ROP (solo la última instantánea); el historial de ejecuciones sí queda.

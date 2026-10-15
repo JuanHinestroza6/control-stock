@@ -67,16 +67,32 @@ public interface AlertaRepository extends JpaRepository<Alerta, Long> {
     int cerrarActiva(@Param("varianteId") Long varianteId, @Param("tipo") TipoAlerta tipo,
             @Param("ahora") LocalDateTime ahora);
 
-    /** Cierra automáticamente las SIN_ROTACION ACTIVAS de todas las variantes del producto (hubo una venta). */
+    /**
+     * Ids de las SIN_ROTACION ACTIVAS de las variantes del producto: lectura simple, sin bloqueos, para decidir si hay
+     * algo que cerrar. Por id ascendente, el mismo orden con que {@link #cerrarPorIds} toma sus bloqueos.
+     */
+    @Query("""
+            select a.id from Alerta a
+            where a.tipo = co.livorno.controlstock.inventario.modelo.TipoAlerta.SIN_ROTACION
+              and a.estado = co.livorno.controlstock.inventario.modelo.EstadoAlerta.ACTIVA
+              and a.variante.producto.id = :productoId
+            order by a.id
+            """)
+    List<Long> idsSinRotacionActivas(@Param("productoId") Long productoId);
+
+    /**
+     * Cierra automáticamente (atendida_por null) las alertas ACTIVAS dadas, por clave primaria: sin subconsulta sobre
+     * {@code variante}, así que no toma bloqueos sobre las variantes de otras tallas (dos evaluaciones del mismo
+     * producto no se interbloquean).
+     */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             update Alerta a set a.estado = co.livorno.controlstock.inventario.modelo.EstadoAlerta.ATENDIDA,
                 a.atendidaEn = :ahora, a.atendidaPor = null
-            where a.tipo = co.livorno.controlstock.inventario.modelo.TipoAlerta.SIN_ROTACION
+            where a.id in :ids
               and a.estado = co.livorno.controlstock.inventario.modelo.EstadoAlerta.ACTIVA
-              and a.variante.id in (select v.id from Variante v where v.producto.id = :productoId)
             """)
-    int cerrarSinRotacionDeProducto(@Param("productoId") Long productoId, @Param("ahora") LocalDateTime ahora);
+    int cerrarPorIds(@Param("ids") List<Long> ids, @Param("ahora") LocalDateTime ahora);
 
     /** Hay una SIN_ROTACION de la variante atendida a mano (usuario) en o después de {@code desde}. */
     @Query("""

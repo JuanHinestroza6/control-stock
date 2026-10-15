@@ -163,9 +163,10 @@ describe('PanelEjecucion', () => {
     expect(await within(screen.getByRole('dialog')).findByRole('alert')).toHaveTextContent(/error inesperado/i)
   })
 
-  it('con una ejecución EN_CURSO el botón está deshabilitado', async () => {
+  it('con una ejecución EN_CURSO el botón sigue habilitado y se informa', async () => {
     montar('ADMIN', ejecucion({ estado: 'EN_CURSO', duracionMs: null, terminadaEn: null }))
     expect(await screen.findByText('En curso')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /recalculando/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Recalcular' })).toBeEnabled()
+    expect(screen.getByText(/figura en curso/i)).toBeInTheDocument()
   })
 })

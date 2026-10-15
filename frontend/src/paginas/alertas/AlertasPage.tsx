@@ -55,7 +55,7 @@ export function AlertasPage() {
     { clave: 'tipo', encabezado: 'Alerta', celda: (a) => (
         <div className="flex flex-col items-start gap-1">
           <BadgeTipoAlerta tipo={a.tipo} />
-          {a.tipo === 'SIN_ROTACION' && <span className="text-xs text-oxford/70">El producto no vende hace 60 días o más</span>}
+          {a.tipo === 'SIN_ROTACION' && <span className="text-xs text-oxford/70">El producto no registra ventas en el periodo configurado (60 días por defecto)</span>}
         </div>
       ),
     },

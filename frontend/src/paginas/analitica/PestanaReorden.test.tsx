@@ -100,6 +100,13 @@ describe('PestanaReorden', () => {
     expect(within(tabla).getByText('—')).toBeInTheDocument()
   })
 
+  it('SIN_HISTORIA sin stock de seguridad ni ROP muestra guiones', async () => {
+    montar('ADMIN', resumen(), pagina([fila({ metodo: 'SIN_HISTORIA', stockSeguridad: null, puntoReorden: null, umbralEfectivo: 5, fuenteUmbral: 'STOCK_MINIMO' })]))
+    const tabla = await screen.findByRole('table')
+    expect(within(tabla).getAllByText('—')).toHaveLength(2)
+    expect(within(tabla).queryByText('0,0')).not.toBeInTheDocument()
+  })
+
   it('la ayuda con la fórmula se muestra al desplegar', async () => {
     montar()
     await screen.findByText('Camiseta Oversize')

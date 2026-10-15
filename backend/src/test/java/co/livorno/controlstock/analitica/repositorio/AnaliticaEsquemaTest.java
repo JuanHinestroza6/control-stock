@@ -243,20 +243,9 @@ class AnaliticaEsquemaTest {
     }
 
     @Test
-    void limpiarInactivas_dejaEnNullRopYClaseDeVariantesYProductosInactivos() {
-        analiticaVariantes.aplicarAVariante(variante.getId(), 7, "A");
-        analiticaVariantes.limpiarInactivas();
-        assertThat(jdbc.queryForObject("select punto_reorden from variante where id = ?", Integer.class,
-                variante.getId())).as("activa: intacta").isEqualTo(7);
-
-        jdbc.update("update variante set activo = 0 where id = ?", variante.getId());
-        int filas = analiticaVariantes.limpiarInactivas();
-
-        assertThat(filas).isEqualTo(1);
-        assertThat(jdbc.queryForObject("select punto_reorden from variante where id = ?", Integer.class,
-                variante.getId())).isNull();
-        assertThat(jdbc.queryForObject("select clase_abc from variante where id = ?", String.class,
-                variante.getId())).isNull();
+    void bloquearSiLibre_varianteSinBloqueos_devuelveSuIdYInexistenteDevuelveVacio() {
+        assertThat(analiticaVariantes.bloquearSiLibre(variante.getId())).containsExactly(variante.getId());
+        assertThat(analiticaVariantes.bloquearSiLibre(-1L)).isEmpty();
     }
 
     @Test

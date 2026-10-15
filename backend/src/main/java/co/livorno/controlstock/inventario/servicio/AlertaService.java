@@ -17,6 +17,7 @@ import co.livorno.controlstock.usuario.modelo.Usuario;
 import co.livorno.controlstock.usuario.repositorio.UsuarioRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -24,6 +25,7 @@ import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -99,9 +101,10 @@ public class AlertaService {
      * o NOT_SUPPORTED ahí). Idempotente: reevaluar sin cambios solo refresca {@code revisadaEn}. También lo usa la
      * re-evaluación nocturna (una transacción por variante).
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, isolation = Isolation.READ_COMMITTED)
     public void evaluar(Long varianteId) {
         // Bloquea la variante: dos evaluaciones simultáneas se serializan y la última ve el stock final confirmado.
+        // READ_COMMITTED: cada lectura ve lo último confirmado y no hay bloqueos de hueco (menos interbloqueos).
         Variante v = variantes.bloquearPorId(varianteId).orElse(null);
         if (v == null) {
             return;
@@ -113,11 +116,21 @@ public class AlertaService {
         // Una venta reciente del producto cierra la SIN_ROTACION de todas sus variantes (también al anular una venta
         // se recalcula: la anulada ya no cuenta).
         boolean ventaReciente = activa && ventaReciente(producto, ahora);
+        TipoAlerta vigente = aplicar(varianteId, v, producto, activa, ventaReciente, ahora);
+        // Carrera con la venta de otra talla: si ella confirmó y cerró las SIN_ROTACION del producto antes de que
+        // esta transacción insertara la suya, nadie la cerraría. Se relee lo confirmado tras abrirla y, si ya hay
+        // venta, se corrige. Queda una ventana de milisegundos entre esta relectura y el commit (ver ADR-009).
+        if (vigente == TipoAlerta.SIN_ROTACION && ventaReciente(producto, ahora)) {
+            aplicar(varianteId, v, producto, activa, true, ahora);
+        }
+    }
+
+    private TipoAlerta aplicar(Long varianteId, Variante v, Producto producto, boolean activa, boolean ventaReciente,
+            LocalDateTime ahora) {
         if (ventaReciente) {
-            alertas.cerrarSinRotacionDeProducto(producto.getId(), ahora);
+            cerrarSinRotacionDeProducto(producto.getId(), ahora);
         }
         TipoAlerta vigente = activa ? calcularTipo(v, producto, ahora, ventaReciente) : null;
-
         for (TipoAlerta tipo : TipoAlerta.values()) {
             if (tipo != vigente) {
                 alertas.cerrarActiva(varianteId, tipo, ahora);
@@ -126,6 +139,15 @@ public class AlertaService {
         // Variante o producto inactivo: vigente es null, así que se cierran todas las ACTIVAS y no se abre ninguna.
         if (vigente != null) {
             alertas.abrirOActualizar(varianteId, vigente.name(), ahora);
+        }
+        return vigente;
+    }
+
+    /** Lectura simple de las SIN_ROTACION activas del producto; solo si hay, un UPDATE por clave primaria. */
+    private void cerrarSinRotacionDeProducto(Long productoId, LocalDateTime ahora) {
+        List<Long> ids = alertas.idsSinRotacionActivas(productoId);
+        if (!ids.isEmpty()) {
+            alertas.cerrarPorIds(ids, ahora);
         }
     }
 

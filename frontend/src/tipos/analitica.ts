@@ -137,7 +137,8 @@ export interface ReordenVarianteResponse {
   leadTimeDias: number
   nivelServicio: number
   z: number
-  stockSeguridad: number
+  /** null con método SIN_HISTORIA (no hay cálculo). */
+  stockSeguridad: number | null
   puntoReorden: number | null
   metodo: MetodoReorden
   stockMinimo: number

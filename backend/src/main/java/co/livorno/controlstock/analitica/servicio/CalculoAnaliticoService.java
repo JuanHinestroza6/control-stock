@@ -12,6 +12,7 @@ import co.livorno.controlstock.analitica.repositorio.AnaliticaVarianteRepository
 import co.livorno.controlstock.analitica.repositorio.ConsultasVentaAnalitica;
 import co.livorno.controlstock.analitica.repositorio.DemandaDiaVariante;
 import co.livorno.controlstock.analitica.repositorio.VentaNetaVariante;
+import co.livorno.controlstock.catalogo.repositorio.AnaliticaActualVariante;
 import co.livorno.controlstock.catalogo.repositorio.VarianteAnalizable;
 import co.livorno.controlstock.catalogo.repositorio.VarianteRepository;
 import java.math.BigDecimal;
@@ -24,13 +25,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Calcula la clasificación ABC y el punto de reorden de las variantes activas y los aplica (ADR-009, R1, R2, R4
  * paso 2). Una sola transacción, todo o nada: primero todas las lecturas y los cálculos en memoria; al final las
- * escrituras (instantánea, un UPDATE dirigido por variante en orden de id, limpieza de inactivas). Nunca toca stock
+ * escrituras (un UPDATE dirigido por variante en orden de id solo donde hay cambio, limpieza de inactivas incluida, y al
+ * final la instantánea). Nunca toca stock
  * ni {@code version}: una venta concurrente no recibe 409 y su UPDATE no reescribe ROP ni clase.
  *
  * <p>Ventanas respecto del corte (excluye el día en curso): ABC {@code [corte − 365 d, corte)}; ROP
@@ -38,6 +42,10 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class CalculoAnaliticoService {
+
+    private static final Logger log = LoggerFactory.getLogger(CalculoAnaliticoService.class);
+    private static final int INTENTOS = 5;
+    private static final long ESPERA_MS = 200;
 
     private final VarianteRepository variantes;
     private final ConsultasVentaAnalitica consultas;
@@ -128,15 +136,63 @@ public class CalculoAnaliticoService {
                     rop.stockSeguridad(), rop.puntoReorden(), rop.metodo(), ahora));
         }
 
-        // 3. Escrituras: instantánea, UPDATE dirigido por variante (orden de id) y limpieza de inactivas
+        // 3. Escrituras. Primero los UPDATE dirigidos y solo después la instantánea: el INSERT de analitica_variante
+        // toma S sobre la variante (FK) y, hecho antes, se cruzaría con la venta que ya tiene S y pedirá X (R1).
+        aplicarCambios(filas);
         analitica.deleteAllInBatch();
         analitica.saveAll(filas);
-        for (AnaliticaVariante fila : filas) {
-            analitica.aplicarAVariante(fila.getVarianteId(), fila.getPuntoReorden(),
-                    String.valueOf(fila.getClaseAbc()));
-        }
-        analitica.limpiarInactivas();
 
         return new ResultadoCalculo(filas.size(), a, b, c, conRop);
+    }
+
+    /**
+     * UPDATE dirigido por variante en orden de id, solo donde ROP o clase cambian (las inactivas con valores
+     * previos quedan en null). Cada fila se bloquea con SKIP LOCKED: si una venta la tiene, no se espera (esperar
+     * encolaría una X delante de la X que la venta pedirá al confirmar y se interbloquearían). Las ocupadas se
+     * reintentan unos instantes; si siguen ocupadas se dejan para el próximo cálculo.
+     */
+    private void aplicarCambios(List<AnaliticaVariante> filas) {
+        Map<Long, AnaliticaVariante> objetivo = new HashMap<>();
+        for (AnaliticaVariante f : filas) {
+            objetivo.put(f.getVarianteId(), f);
+        }
+        List<Cambio> pendientes = new ArrayList<>();
+        for (AnaliticaActualVariante actual : variantes.analiticaActual()) { // ordenadas por id
+            AnaliticaVariante f = objetivo.get(actual.id());
+            Integer rop = f == null ? null : f.getPuntoReorden();
+            Character clase = f == null ? null : Character.valueOf(f.getClaseAbc());
+            if (!Objects.equals(rop, actual.puntoReorden()) || !Objects.equals(clase, actual.claseAbc())) {
+                pendientes.add(new Cambio(actual.id(), rop, clase));
+            }
+        }
+        for (int intento = 0; intento < INTENTOS && !pendientes.isEmpty(); intento++) {
+            if (intento > 0) {
+                esperar();
+            }
+            List<Cambio> ocupadas = new ArrayList<>();
+            for (Cambio c : pendientes) {
+                if (analitica.bloquearSiLibre(c.id()).isEmpty()) {
+                    ocupadas.add(c);
+                } else {
+                    analitica.aplicarAVariante(c.id(), c.rop(), c.clase() == null ? null : c.clase().toString());
+                }
+            }
+            pendientes = ocupadas;
+        }
+        if (!pendientes.isEmpty()) {
+            log.warn("Analítica: {} variantes ocupadas por ventas en curso conservan su ROP/clase anterior hasta el"
+                    + " próximo cálculo: {}", pendientes.size(), pendientes.stream().map(Cambio::id).toList());
+        }
+    }
+
+    private static void esperar() {
+        try {
+            Thread.sleep(ESPERA_MS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private record Cambio(Long id, Integer rop, Character clase) {
     }
 }

@@ -140,10 +140,40 @@ class AlertaServiceTest {
     void evaluar_ventaReciente_cierraSinRotacionDeTodoElProducto() {
         Variante v = variante(20, 0);
         when(movimientos.ultimaVentaNetaDesde(any(), any())).thenReturn(AHORA.minusDays(3));
+        when(alertas.idsSinRotacionActivas(v.getProducto().getId())).thenReturn(java.util.List.of(5L, 9L));
 
         servicio.evaluar(ID);
 
-        verify(alertas).cerrarSinRotacionDeProducto(v.getProducto().getId(), AHORA);
+        verify(alertas).cerrarPorIds(java.util.List.of(5L, 9L), AHORA);
+    }
+
+    @Test
+    void evaluar_ventaRecienteSinSinRotacionActivas_noEjecutaNingunUpdateSobreElProducto() {
+        Variante v = variante(20, 0);
+        when(movimientos.ultimaVentaNetaDesde(any(), any())).thenReturn(AHORA.minusDays(3));
+        when(alertas.idsSinRotacionActivas(v.getProducto().getId())).thenReturn(java.util.List.of());
+
+        servicio.evaluar(ID);
+
+        verify(alertas, never()).cerrarPorIds(any(), any());
+    }
+
+    @Test
+    void evaluar_ventaConfirmadaTrasLaPrimeraLectura_corrigeLaSinRotacionRecienAbierta() {
+        // dado: la primera lectura no ve venta (producto viejo), la relectura tras abrir sí la ve
+        Variante v = variante(8, 3);
+        org.springframework.test.util.ReflectionTestUtils.setField(v.getProducto(), "creadoEn", AHORA.minusDays(90));
+        when(movimientos.ultimaVentaNetaDesde(any(), any())).thenReturn(null, AHORA.minusDays(1));
+        when(alertas.idsSinRotacionActivas(v.getProducto().getId())).thenReturn(java.util.List.of(7L));
+
+        servicio.evaluar(ID);
+
+        // entonces: se abrió y se cerró la SIN_ROTACION, y el tipo final es STOCK_BAJO
+        var orden = org.mockito.Mockito.inOrder(alertas);
+        orden.verify(alertas).abrirOActualizar(ID, "SIN_ROTACION", AHORA);
+        orden.verify(alertas).cerrarPorIds(java.util.List.of(7L), AHORA);
+        orden.verify(alertas).cerrarActiva(ID, TipoAlerta.SIN_ROTACION, AHORA);
+        orden.verify(alertas).abrirOActualizar(ID, "STOCK_BAJO", AHORA);
     }
 
     @Test

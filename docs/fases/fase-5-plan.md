@@ -433,6 +433,8 @@ SIN_ROTACION (se reabre cada noche); columnas σ/z/nivel de servicio en la pesta
 ## Riesgos y decisiones
 - ROP pisado por una entidad vieja → `updatable = false` + prueba de integración.
 - 409 a vendedores por el cálculo → UPDATE nativo sin `version`.
+- (Revisión final) Interbloqueos con ventas: el cálculo usa `FOR UPDATE SKIP LOCKED` por variante con reintentos y solo
+  escribe lo que cambia; ver ADR-009 punto 3 y riesgos residuales.
 - Interbloqueos → lecturas primero, escrituras al final, UPDATE por variante en orden de id (igual que ventas). Si
   MySQL elige al cálculo como víctima, la ejecución queda FALLIDA y se reintenta (manual o la noche siguiente).
 - Recálculo manual lento en el hilo HTTP → medido en T2; asíncrono solo si > 15 s.

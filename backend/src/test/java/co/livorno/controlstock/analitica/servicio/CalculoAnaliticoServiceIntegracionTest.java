@@ -349,7 +349,7 @@ class CalculoAnaliticoServiceIntegracionTest {
         servicio.calcularYAplicar(CORTE, primera);
         venta(v[3], LocalDateTime.of(2020, 5, 30, 10, 0), 3, "100.00", false);
         Long segunda = nuevaEjecucion();
-        doThrow(new IllegalStateException("fallo forzado")).when(repositorioAnalitica).limpiarInactivas();
+        doThrow(new IllegalStateException("fallo forzado")).when(repositorioAnalitica).saveAll(org.mockito.ArgumentMatchers.anyList());
 
         // cuando: la segunda ejecución falla en el último paso, después de la instantánea y de los UPDATE
         assertThatThrownBy(() -> servicio.calcularYAplicar(CORTE, segunda))
@@ -417,6 +417,69 @@ class CalculoAnaliticoServiceIntegracionTest {
             assertThat(v.get("clase_abc")).isEqualTo("A");
             assertThat(v.get("stock_fisico")).isEqualTo(9);
             assertThat(((Number) v.get("version")).longValue()).isEqualTo(versionInicial + 1);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void calcularYAplicar_ventaConMovimientoInsertadoSinConfirmar_ventaConfirmaSin409YCalculoNoSeBloquea()
+            throws Exception {
+        // dado: V1 con ventas (su ROP cambiaría a 21) y V2 sin ventas (ROP pasaría a 0), ambas con stock
+        Long p = producto("D", true);
+        Long v1 = variante(p, "S", CREADA, true, 10);
+        Long v2 = variante(p, "M", CREADA, true, 10);
+        ventasV1(v1);
+        Long ejecucion = nuevaEjecucion();
+        long versionInicial = ((Number) variante(v1).get("version")).longValue();
+        CountDownLatch insertado = new CountDownLatch(1);
+        CountDownLatch calculado = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            // el hilo A registra una venta de V1: el movimiento ya está insertado (S sobre la variante por la FK) y
+            // su UPDATE de variante llegará al confirmar, después de que el cálculo termine
+            Future<Throwable> hiloA = pool.submit(() -> {
+                try {
+                    transaccion.executeWithoutResult(estado -> {
+                        movimientos.registrar(new SolicitudMovimiento(v1, TipoMovimiento.VENTA, 1, null, usuarioId,
+                                null, null, null));
+                        insertado.countDown();
+                        try {
+                            if (!calculado.await(60, TimeUnit.SECONDS)) {
+                                throw new IllegalStateException("tiempo agotado");
+                            }
+                        } catch (InterruptedException e) {
+                            throw new IllegalStateException(e);
+                        }
+                    });
+                    return null;
+                } catch (Throwable t) {
+                    return t;
+                }
+            });
+            assertThat(insertado.await(60, TimeUnit.SECONDS)).isTrue();
+
+            // cuando: el cálculo corre con la venta en curso (no debe esperarla ni interbloquearse)
+            Future<ResultadoCalculo> hiloB = pool.submit(() -> servicio.calcularYAplicar(CORTE, ejecucion));
+            ResultadoCalculo r = hiloB.get(30, TimeUnit.SECONDS);
+            calculado.countDown();
+            Throwable error = hiloA.get(60, TimeUnit.SECONDS);
+
+            // entonces: la venta confirma sin 409; V2 (libre) se actualizó; V1, ocupada todo el cálculo, conserva su
+            // valor anterior hasta el siguiente cálculo y la instantánea sí quedó completa
+            assertThat(error).isNull();
+            assertThat(r.variantesAnalizadas()).isGreaterThanOrEqualTo(2);
+            assertThat(variante(v2).get("punto_reorden")).isEqualTo(0);
+            assertThat(variante(v1).get("punto_reorden")).isNull();
+            assertThat(((Number) variante(v1).get("version")).longValue()).isEqualTo(versionInicial + 1);
+            assertThat(variante(v1).get("stock_fisico")).isEqualTo(9);
+            assertThat(fila(v1).get("punto_reorden")).isEqualTo(21);
+
+            // y el siguiente cálculo, ya sin ventas en curso, lo aplica
+            Long siguiente = nuevaEjecucion();
+            servicio.calcularYAplicar(CORTE, siguiente);
+            assertThat(variante(v1).get("punto_reorden")).isEqualTo(21);
+            assertThat(variante(v1).get("clase_abc")).isEqualTo("A");
         } finally {
             pool.shutdownNow();
         }
