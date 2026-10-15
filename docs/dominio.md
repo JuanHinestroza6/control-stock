@@ -325,7 +325,7 @@ la última ejecución; VENDEDOR solo ve más vendidos (sin costos). La clase ABC
 | REQ-02 Registrar automáticamente operaciones de stock (CU-03) | inventario |
 | REQ-03 Reportes de rentabilidad | reporte |
 | REQ-04 Emitir alertas de nivel mínimo de stock (CU-10) | inventario (alertas) + analitica (ROP) |
-| REQ-05 Productos más vendidos | analitica |
+| REQ-05 Identificar Productos de Mayor Venta (CU-08) | analitica |
 | REQ-06 Controlar el acceso y roles de usuario (CU-02) | auth, usuario |
 | REQ-07 Reportes contables | reporte |
 | REQ-08 Gestionar el registro de devoluciones (CU-09) | venta |
@@ -334,7 +334,7 @@ la última ejecución; VENDEDOR solo ve más vendidos (sin costos). La clase ABC
 | REQ-11 Gestión de productos (CU-11) | catalogo |
 | REQ-12 Registrar y gestionar usuarios (CU-12) | usuario |
 | REQ-13 Gestionar apartados (CU-14, nuevo) | inventario (reservas), venta (conversión) |
-| REQ-14 Clasificación ABC (nuevo) | analitica |
+| REQ-14 Clasificación ABC (CU-15, nuevo) | analitica |
 
 Nota: en el documento PPI, REQ-08 y REQ-09 tienen nombre y descripción cruzados; corregir en la próxima versión.
 
@@ -342,8 +342,8 @@ Nota: en el documento PPI, REQ-08 y REQ-09 tienen nombre y descripción cruzados
 
 - `REQ-xx`: requisitos funcionales (tabla anterior). `RNF-xx`: requisitos no funcionales del documento Word, que allí
   aparecen numerados como REQ-01..REQ-05; aquí se renombran a RNF-01..RNF-05 para no chocar con los funcionales.
-- `CU-xx`: casos de uso. Nuevos, no presentes en el Word: CU-13 "Iniciar sesión" (fase 0, ligado a RNF-02) y CU-14
-  "Gestionar apartados" (fase 3, REQ-13).
+- `CU-xx`: casos de uso. Nuevos, no presentes en el Word: CU-13 "Iniciar sesión" (fase 0, ligado a RNF-02), CU-14
+  "Gestionar apartados" (fase 3, REQ-13) y CU-15 "Clasificar productos (ABC)" (fase 5, REQ-14).
 - `NEC-xx`: necesidades del Word, con dos dígitos (NEC-010 del Word es NEC-10). Nueva: NEC-11 "Apartar prendas para
   clientes que reservan por redes sociales" (REQ-13).
 
