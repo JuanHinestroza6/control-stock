@@ -66,6 +66,7 @@ de servicio con el que se calcula el punto de reorden.
 ## Diagramas
 
 - Casos de uso de CU-15 y la ejecución analítica: [`diagramas/casos-uso-cu15-clasificacion-abc.puml`](../diagramas/casos-uso-cu15-clasificacion-abc.puml)
+- Clases del módulo `analitica`: [`diagramas/clases-fase5-analitica.puml`](../diagramas/clases-fase5-analitica.puml)
 
 ## Resultados de la prueba T2 (2026-10-15, semilla de 24 meses)
 

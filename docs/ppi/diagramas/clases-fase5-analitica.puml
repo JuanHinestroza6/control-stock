@@ -1,0 +1,301 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+title Diagrama de clases - Fase 5 (módulo analitica)
+
+package "catalogo" {
+  class Variante {
+    id: Long
+    sku: String
+    stockMinimo: int
+    puntoReorden: Integer
+    claseAbc: Character
+    version: long
+  }
+  class Producto {
+    id: Long
+    codigo: String
+    leadTimeDias: int
+  }
+}
+
+package "inventario" {
+  class AlertaService {
+    evaluar(varianteId: Long)
+    tipoEsperado(varianteId: Long): TipoAlerta
+  }
+}
+
+package "analitica" {
+
+  package "modelo" {
+    enum ClaseAbc {
+      A
+      B
+      C
+    }
+    enum MetodoReorden {
+      NORMAL
+      POISSON
+      SIN_DEMANDA
+      SIN_HISTORIA
+    }
+    enum OrigenEjecucion {
+      NOCTURNA
+      MANUAL
+      SEMILLA
+    }
+    enum EstadoEjecucion {
+      EN_CURSO
+      EXITOSA
+      FALLIDA
+    }
+    class EjecucionAnalitica {
+      id: Long
+      origen: OrigenEjecucion
+      usuarioId: Long
+      iniciadaEn: LocalDateTime
+      terminadaEn: LocalDateTime
+      estado: EstadoEjecucion
+      fechaCorte: LocalDate
+      variantesAnalizadas: Integer
+      claseA: Integer
+      claseB: Integer
+      claseC: Integer
+      conPuntoReorden: Integer
+      alertasEvaluadas: Integer
+      alertasFallidas: Integer
+      variantesActivas: Integer
+      enAlertaStock: Integer
+      sinRotacionActivas: Integer
+      duracionMs: Long
+      mensaje: String
+      {static} iniciar(origen, usuarioId, ahora, fechaCorte): EjecucionAnalitica
+      terminar(ahora, resultado: ResultadoEjecucion)
+      fallar(ahora, mensaje)
+      getPorcentajeAlertaStock(): BigDecimal
+    }
+    class AnaliticaVariante {
+      varianteId: Long
+      ejecucionId: Long
+      unidadesNetas: int
+      ingresoNeto: BigDecimal
+      participacion: BigDecimal
+      acumulado: BigDecimal
+      posicion: int
+      claseAbc: char
+      diasHistoria: int
+      demandaMedia: BigDecimal
+      desviacion: BigDecimal
+      leadTimeDias: int
+      nivelServicio: BigDecimal
+      z: BigDecimal
+      stockSeguridad: BigDecimal
+      puntoReorden: Integer
+      metodoReorden: MetodoReorden
+      calculadoEn: LocalDateTime
+    }
+    class ResultadoEjecucion <<record>> {
+      variantesAnalizadas: int
+      claseA: int
+      claseB: int
+      claseC: int
+      conPuntoReorden: int
+      alertasEvaluadas: int
+      alertasFallidas: int
+      variantesActivas: int
+      enAlertaStock: int
+      sinRotacionActivas: int
+    }
+  }
+
+  package "calculo" {
+    class ClasificadorAbc <<utilidad>> {
+      {static} clasificar(ingresos: List<IngresoVariante>, corteA, corteB): List<ClasificacionAbc>
+    }
+    class IngresoVariante <<record>> {
+      varianteId: long
+      ingresoNeto: BigDecimal
+    }
+    class ClasificacionAbc <<record>> {
+      varianteId: long
+      ingresoNeto: BigDecimal
+      posicion: int
+      participacion: BigDecimal
+      acumulado: BigDecimal
+      clase: char
+    }
+    class SerieDemanda <<inmutable>> {
+      {static} construir(netoPorDia, fechaCreacion, corte, ventanaDias): SerieDemanda
+      dias(): int
+      total(): long
+      media(): double
+      desviacion(): double
+    }
+    class DistribucionPoisson <<utilidad>> {
+      {static} acumulada(lambda: double, r: int): double
+      {static} cuantil(lambda: double, p: double): int
+    }
+    class CalculadoraReorden {
+      calcular(serie: SerieDemanda, leadTimeDias: int, clase: Character): ResultadoReorden
+    }
+    class ResultadoReorden <<record>> {
+      puntoReorden: Integer
+      metodo: MetodoReorden
+      diasHistoria: int
+      demandaMedia: BigDecimal
+      desviacion: BigDecimal
+      leadTimeDias: int
+      nivelServicio: BigDecimal
+      z: BigDecimal
+      stockSeguridad: BigDecimal
+    }
+  }
+
+  package "config" {
+    class PropiedadesAnalitica <<record>> {
+      cron: String
+      ventanaAbcDias: int
+      ventanaDemandaDias: int
+      corteA: BigDecimal
+      corteB: BigDecimal
+      historiaMinimaDias: int
+      umbralPoisson: BigDecimal
+      parametrosDe(clase: Character): ParametrosClase
+    }
+  }
+
+  package "repositorio" {
+    interface AnaliticaVarianteRepository {
+      aplicarAVariante(id: Long, rop: Integer, clase: String): int
+      bloquearSiLibre(id: Long): List<Long>
+      consultarAbc(clase, categoriaId, q, pageable): Page<AnaliticaVariante>
+      consultarReorden(clase, categoriaId, q, pageable): Page<AnaliticaVariante>
+      resumenPorClase(): List<ResumenClaseFila>
+    }
+    interface EjecucionAnaliticaRepository
+    class ConsultasVentaAnalitica <<JDBC, solo lectura>> {
+      ingresoNetoPorVariante(desde, hasta): List<VentaNetaVariante>
+      demandaDiariaNeta(desde, hasta): List<DemandaDiaVariante>
+      masVendidos(filtro: FiltroMasVendidos): List<MasVendidoFila>
+      totalVentaNeta(filtro: FiltroMasVendidos): TotalVentaNeta
+    }
+    class ConsultasEstadoAlertas <<JDBC, solo lectura>> {
+      idsTodasLasVariantes(): List<Long>
+      variantesActivas(): int
+      enAlertaStock(): int
+      sinRotacionActivas(): int
+    }
+  }
+
+  package "servicio" {
+    class EjecucionAnaliticaService <<orquestador>> {
+      ejecutar(origen: OrigenEjecucion, usuarioId: Long): EjecucionAnalitica
+    }
+    class CalculoAnaliticoService {
+      calcularYAplicar(ejecucionId: Long): ResultadoCalculo
+      calcularYAplicar(corte: LocalDate, ejecucionId: Long): ResultadoCalculo
+    }
+    class RegistroEjecucionService {
+      iniciar(origen, usuarioId, fechaCorte): Long
+      terminar(id, resultado): EjecucionAnalitica
+      fallar(id, mensaje): EjecucionAnalitica
+    }
+    class RecalculoAnaliticoService {
+      recalcular(): EjecucionAnaliticaResponse
+    }
+    class AnaliticaNocturnaTarea {
+      ejecutar()
+    }
+    class ConsultaAnaliticaService {
+      listarAbc(clase, categoriaId, q, pageable): Page<AbcVarianteResponse>
+      listarReorden(clase, categoriaId, q, pageable): Page<ReordenVarianteResponse>
+      resumenAbc(): ResumenAbcResponse
+      ultimaEjecucion(): Optional<EjecucionAnaliticaResponse>
+    }
+    class MasVendidosService {
+      consultar(desde, hasta, categoriaId, criterio, agrupacion, limite): MasVendidosResponse
+    }
+    class EjecucionEnCursoException <<409>>
+    class ResultadoCalculo <<record>> {
+      variantesAnalizadas: int
+      claseA: int
+      claseB: int
+      claseC: int
+      conPuntoReorden: int
+    }
+  }
+
+  package "web" {
+    class AnaliticaController {
+      masVendidos(...): MasVendidosResponse
+      abc(...): Page<AbcVarianteResponse>
+      resumenAbc(): ResumenAbcResponse
+      reorden(...): Page<ReordenVarianteResponse>
+      ultimaEjecucion(): ResponseEntity<EjecucionAnaliticaResponse>
+      recalcular(): EjecucionAnaliticaResponse
+    }
+  }
+}
+
+' Modelo
+EjecucionAnalitica --> OrigenEjecucion
+EjecucionAnalitica --> EstadoEjecucion
+EjecucionAnalitica ..> ResultadoEjecucion : usa
+AnaliticaVariante --> MetodoReorden
+AnaliticaVariante "0..1" --> "1" Variante : varianteId
+AnaliticaVariante "*" ..> "1" EjecucionAnalitica : ejecucionId
+Variante "*" --> "1" Producto
+
+' Cálculo
+ClasificadorAbc ..> IngresoVariante
+ClasificadorAbc ..> ClasificacionAbc
+CalculadoraReorden ..> SerieDemanda
+CalculadoraReorden ..> DistribucionPoisson
+CalculadoraReorden ..> ResultadoReorden
+CalculadoraReorden --> PropiedadesAnalitica
+ResultadoReorden --> MetodoReorden
+
+' Servicios
+AnaliticaNocturnaTarea --> EjecucionAnaliticaService
+RecalculoAnaliticoService --> EjecucionAnaliticaService
+RecalculoAnaliticoService --> ConsultaAnaliticaService
+EjecucionAnaliticaService --> RegistroEjecucionService
+EjecucionAnaliticaService --> CalculoAnaliticoService
+EjecucionAnaliticaService --> ConsultasEstadoAlertas
+EjecucionAnaliticaService --> AlertaService : evaluar(varianteId)
+EjecucionAnaliticaService ..> EjecucionEnCursoException : lanza
+EjecucionAnaliticaService ..> ResultadoEjecucion
+RegistroEjecucionService --> EjecucionAnaliticaRepository
+CalculoAnaliticoService --> ConsultasVentaAnalitica
+CalculoAnaliticoService --> ClasificadorAbc
+CalculoAnaliticoService --> SerieDemanda
+CalculoAnaliticoService --> CalculadoraReorden
+CalculoAnaliticoService --> AnaliticaVarianteRepository
+CalculoAnaliticoService --> Variante : lee (VarianteRepository)
+CalculoAnaliticoService ..> ResultadoCalculo
+ConsultaAnaliticaService --> AnaliticaVarianteRepository
+ConsultaAnaliticaService --> EjecucionAnaliticaRepository
+MasVendidosService --> ConsultasVentaAnalitica
+AnaliticaController --> MasVendidosService
+AnaliticaController --> ConsultaAnaliticaService
+AnaliticaController --> RecalculoAnaliticoService
+
+note bottom of AnaliticaVarianteRepository
+  Escritura dirigida (regla de oro 1 intacta): puntoReorden y claseAbc
+  no son actualizables desde la entidad Variante (updatable = false).
+  Solo aplicarAVariante ejecuta un UPDATE por variante, en orden de id,
+  sin tocar version ni actualizadoEn (el cálculo no provoca 409 a las
+  ventas) y nunca toca stockFisico ni stockReservado.
+  bloquearSiLibre usa FOR UPDATE SKIP LOCKED: una variante ocupada
+  conserva su valor hasta la siguiente ejecución.
+end note
+note right of EjecucionAnaliticaService
+  Una ejecución a la vez (AtomicBoolean): la manual con otra en curso
+  responde 409; la nocturna se omite. Pasos: ABC + ROP en una
+  transacción -> re-evaluación de alertas por variante
+  (un fallo no detiene el ciclo) -> registro y métrica.
+end note
+@enduml
