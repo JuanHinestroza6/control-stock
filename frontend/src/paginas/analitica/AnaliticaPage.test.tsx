@@ -3,12 +3,14 @@ import userEvent from '@testing-library/user-event'
 import { AxiosError, type AxiosResponse } from 'axios'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as api from '../../api/analitica'
+import * as apiCategorias from '../../api/categorias'
 import { renderizarApp } from '../../pruebas/render'
 import type { Rol } from '../../tipos/auth'
 import type { EjecucionAnaliticaResponse } from '../../tipos/analitica'
 import { AnaliticaPage } from './AnaliticaPage'
 
 vi.mock('../../api/analitica')
+vi.mock('../../api/categorias')
 
 function ejecucion(extra: Partial<EjecucionAnaliticaResponse> = {}): EjecucionAnaliticaResponse {
   return {
@@ -34,7 +36,14 @@ async function abrirYConfirmar() {
   await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Recalcular' }))
 }
 
-beforeEach(() => vi.resetAllMocks())
+beforeEach(() => {
+  vi.resetAllMocks()
+  vi.mocked(api.obtenerMasVendidos).mockResolvedValue({
+    desde: '2026-09-15', hasta: '2026-10-14', criterio: 'UNIDADES', agrupacion: 'PRODUCTO', categoriaId: null,
+    totalUnidades: 0, totalIngreso: 0, items: [],
+  })
+  vi.mocked(apiCategorias.listarCategorias).mockResolvedValue([])
+})
 
 describe('AnaliticaPage - pestañas por rol', () => {
   it.each<Rol>(['ADMIN', 'INVENTARIO', 'CONTABILIDAD'])('%s ve las tres pestañas', async (rol) => {
