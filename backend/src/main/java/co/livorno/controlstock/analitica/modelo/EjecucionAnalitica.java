@@ -130,6 +130,19 @@ public class EjecucionAnalitica {
                 : mensaje.length() <= LARGO_MENSAJE ? mensaje : mensaje.substring(0, LARGO_MENSAJE);
     }
 
+    /**
+     * Cierra como FALLIDA (fallo el calculo ABC + ROP) conservando lo que si se midio: las alertas re-evaluadas y la
+     * metrica. Los conteos del calculo (analizadas, clases, con ROP) quedan null.
+     */
+    public void fallar(LocalDateTime ahora, String mensaje, ResultadoEjecucion medido) {
+        fallar(ahora, mensaje);
+        this.alertasEvaluadas = medido.alertasEvaluadas();
+        this.alertasFallidas = medido.alertasFallidas();
+        this.variantesActivas = medido.variantesActivas();
+        this.enAlertaStock = medido.enAlertaStock();
+        this.sinRotacionActivas = medido.sinRotacionActivas();
+    }
+
     private void cerrar(LocalDateTime ahora, EstadoEjecucion nuevo) {
         if (estado != EstadoEjecucion.EN_CURSO) {
             throw new IllegalStateException("La ejecucion " + id + " ya termino (" + estado + ")");
