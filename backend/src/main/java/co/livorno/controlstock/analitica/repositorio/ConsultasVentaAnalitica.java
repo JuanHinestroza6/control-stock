@@ -1,5 +1,8 @@
 package co.livorno.controlstock.analitica.repositorio;
 
+import co.livorno.controlstock.analitica.dto.AgrupacionRanking;
+import co.livorno.controlstock.analitica.dto.CriterioRanking;
+import co.livorno.controlstock.analitica.dto.FiltroMasVendidos;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -59,6 +62,17 @@ public class ConsultasVentaAnalitica {
             ORDER BY variante_id, dia
             """;
 
+    /** Líneas vendidas con su devuelta total (demanda comercial); misma semántica que {@link #INGRESO_NETO}. */
+    private static final String LINEAS_NETAS = """
+            SELECT d.variante_id AS variante_id, d.cantidad - COALESCE(dev.devuelta, 0) AS unidades,
+                   (d.cantidad - COALESCE(dev.devuelta, 0)) * d.precio_unitario AS ingreso
+            FROM venta v
+            JOIN detalle_venta d ON d.venta_id = v.id
+            LEFT JOIN (SELECT detalle_venta_id, SUM(cantidad) AS devuelta
+                       FROM devolucion GROUP BY detalle_venta_id) dev ON dev.detalle_venta_id = d.id
+            WHERE v.estado = 'REGISTRADA' AND v.fecha >= :desde AND v.fecha < :hasta
+            """;
+
     private final NamedParameterJdbcTemplate jdbc;
 
     public ConsultasVentaAnalitica(NamedParameterJdbcTemplate jdbc) {
@@ -83,6 +97,57 @@ public class ConsultasVentaAnalitica {
         return jdbc.query(DEMANDA_DIARIA, limites(desde, hasta), (rs, n) -> new DemandaDiaVariante(
                 rs.getLong("variante_id"), rs.getObject("dia", LocalDate.class),
                 new BigDecimal(rs.getString("neto")).intValueExact()));
+    }
+
+    /**
+     * Ranking de más vendidos (R10): demanda comercial en {@code [desde, hasta]} inclusivo, categoría opcional, top-N.
+     * Desempata por el otro criterio y luego por id; excluye los ítems con neto 0.
+     */
+    public List<MasVendidoFila> masVendidos(FiltroMasVendidos f) {
+        boolean porVariante = f.agrupacion() == AgrupacionRanking.VARIANTE;
+        String columnasVariante = porVariante
+                ? "va.id AS variante_id, va.sku AS sku, va.talla AS talla, va.color AS color, va.activo AS activo,"
+                : "NULL AS variante_id, NULL AS sku, NULL AS talla, NULL AS color, p.activo AS activo,";
+        String grupo = porVariante ? "va.id, va.sku, va.talla, va.color, va.activo, " : "p.activo, ";
+        String orden = f.criterio() == CriterioRanking.UNIDADES
+                ? "unidades DESC, ingreso DESC" : "ingreso DESC, unidades DESC";
+        String idDesempate = porVariante ? "va.id" : "p.id";
+        String sql = "SELECT p.id AS producto_id, p.codigo AS codigo, p.nombre AS nombre, c.id AS categoria_id, "
+                + "c.nombre AS categoria, " + columnasVariante
+                + " SUM(l.unidades) AS unidades, SUM(l.ingreso) AS ingreso"
+                + " FROM (" + LINEAS_NETAS + ") l"
+                + " JOIN variante va ON va.id = l.variante_id JOIN producto p ON p.id = va.producto_id"
+                + " JOIN categoria c ON c.id = p.categoria_id"
+                + (f.categoriaId() != null ? " WHERE c.id = :categoriaId" : "")
+                + " GROUP BY " + grupo + "p.id, p.codigo, p.nombre, c.id, c.nombre"
+                + " HAVING SUM(l.unidades) > 0"
+                + " ORDER BY " + orden + ", " + idDesempate + " ASC LIMIT :limite";
+        MapSqlParameterSource params = limitesInclusivos(f).addValue("limite", f.limite());
+        return jdbc.query(sql, params, (rs, n) -> new MasVendidoFila(
+                rs.getLong("producto_id"), rs.getString("codigo"), rs.getString("nombre"),
+                rs.getLong("categoria_id"), rs.getString("categoria"),
+                porVariante ? rs.getLong("variante_id") : null, rs.getString("sku"), rs.getString("talla"),
+                rs.getString("color"), rs.getBigDecimal("unidades").longValueExact(),
+                rs.getBigDecimal("ingreso").setScale(2, RoundingMode.HALF_UP), rs.getBoolean("activo")));
+    }
+
+    /** Totales netos del mismo periodo y categoría que {@link #masVendidos} (no solo del top). */
+    public TotalVentaNeta totalVentaNeta(FiltroMasVendidos f) {
+        String sql = "SELECT COALESCE(SUM(l.unidades), 0) AS unidades, COALESCE(SUM(l.ingreso), 0) AS ingreso"
+                + " FROM (" + LINEAS_NETAS + ") l"
+                + (f.categoriaId() != null ? " JOIN variante va ON va.id = l.variante_id"
+                        + " JOIN producto p ON p.id = va.producto_id WHERE p.categoria_id = :categoriaId" : "");
+        return jdbc.queryForObject(sql, limitesInclusivos(f), (rs, n) -> new TotalVentaNeta(
+                rs.getBigDecimal("unidades").longValueExact(),
+                rs.getBigDecimal("ingreso").setScale(2, RoundingMode.HALF_UP)));
+    }
+
+    private static MapSqlParameterSource limitesInclusivos(FiltroMasVendidos f) {
+        MapSqlParameterSource p = limites(f.desde(), f.hasta().plusDays(1));
+        if (f.categoriaId() != null) {
+            p.addValue("categoriaId", f.categoriaId());
+        }
+        return p;
     }
 
     private static MapSqlParameterSource limites(LocalDate desde, LocalDate hasta) {
