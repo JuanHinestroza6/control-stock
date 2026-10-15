@@ -278,18 +278,18 @@ class ModeloDemandaTest {
     }
 
     @Test
-    void estancados_ceroUnidadesEnLosUltimos3Meses_yVentasAntes() {
+    void estancados_ceroUnidadesEnLosUltimos90Dias_yVentasAntes() {
         ModeloDemanda m = new ModeloDemanda(CATALOGO, INICIO, FIN, BASE, new Random(42));
-        assertThat(m.inicioEstancamiento()).isEqualTo(LocalDate.of(2025, 10, 1));
+        assertThat(m.inicioEstancamiento()).isEqualTo(LocalDate.of(2025, 10, 3));  // fin − 89 días: los últimos 90
         List<ProductoSemilla> estancados = CATALOGO.stream().filter(ProductoSemilla::estancado).toList();
         assertThat(estancados).hasSizeBetween(2, 3);
         for (ProductoSemilla p : estancados) {
             int i = CATALOGO.indexOf(p);
-            assertThat(sim.unidadesEstancamiento[i]).as("%s en los últimos 3 meses", p.codigo()).isZero();
+            assertThat(sim.unidadesEstancamiento[i]).as("%s en los últimos 90 días", p.codigo()).isZero();
             assertThat(sim.unidadesPorProducto[i] - sim.unidadesEstancamiento[i]).as("%s antes", p.codigo())
                     .isPositive();
             assertThat(m.demandaEsperadaDiaria(p, FIN)).isZero();
-            assertThat(m.demandaEsperadaDiaria(p, LocalDate.of(2025, 9, 30))).isPositive();
+            assertThat(m.demandaEsperadaDiaria(p, LocalDate.of(2025, 10, 2))).isPositive();
         }
     }
 
@@ -416,10 +416,11 @@ class ModeloDemandaTest {
     }
 
     @Test
-    void historiaDeUnDia_yCatalogoTodoEstancado_sinTicketsVacios() {
-        // Historia corta: inicio = fin; todo el día cae en el periodo de estancamiento.
+    void historiaCorta_yCatalogoTodoEstancado_sinTicketsVacios() {
+        // Historia corta (40 días): el estancamiento arranca 30 días tras el inicio y el último día ya está en él.
         ProductoSemilla unico = producto("A01", 1, true);
-        ModeloDemanda m = new ModeloDemanda(List.of(unico), FIN, FIN, 50, new Random(42));
+        ModeloDemanda m = new ModeloDemanda(List.of(unico), FIN.minusDays(40), FIN, 50, new Random(42));
+        assertThat(m.inicioEstancamiento()).isEqualTo(FIN.minusDays(10));
         assertThat(m.lambdaTickets(FIN)).isPositive();
         assertThat(m.ticketsDelDia(FIN)).isEmpty();
         assertThat(m.pesoEfectivo(unico, FIN)).isZero();
@@ -514,7 +515,7 @@ class ModeloDemandaTest {
                 unidadesPorProducto[i] += l.cantidad();
                 ingresoPorProducto[i] += l.cantidad() * l.producto().precioVenta().doubleValue();
                 if (!d.isBefore(m.inicioEstancamiento())) {
-                    unidadesEstancamiento[i] += l.cantidad();  // unidades en los últimos 3 meses
+                    unidadesEstancamiento[i] += l.cantidad();  // unidades en los últimos 90 días
                 }
                 unidadesPorMes[d.getYear() - INICIO.getYear()][d.getMonthValue()] += l.cantidad();
                 lineasPorTalla[l.talla().ordinal()]++;

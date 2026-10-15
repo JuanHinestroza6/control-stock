@@ -25,7 +25,7 @@ import java.util.Random;
  * tickets(día) ~ Poisson(λ)
  * λ(día)       = ticketsDiaBase × factorMes(mes) × factorDía(díaSemana) × 1,015^mesesDesdeInicio
  * líneas por ticket: 1 (70 %), 2 (22 %), 3 (8 %), productos distintos elegidos con pesos escalonados
- * peso(producto) = pesosEscalonados(n)[rango − 1]   (estancados = 0 en los últimos 3 meses, el resto se renormaliza)
+ * peso(producto) = pesosEscalonados(n)[rango − 1]   (estancados = 0 en los últimos 90 días, el resto se renormaliza)
  * talla: S 20 %, M 35 %, L 30 %, XL 15 % (accesorios: UNICA)
  * color: el primero 50 %, el resto se reparte por igual
  * cantidad: 1 (85 %) o 2 (15 %); descuento: 15 % de las líneas, 5–20 %; hora 09:00–21:00
@@ -53,8 +53,11 @@ public final class ModeloDemanda {
     /** Crecimiento mensual de la empresa: tendencia = 1,015^mes. */
     public static final double TENDENCIA_MENSUAL = 1.015;
 
-    /** Meses finales de la historia en los que los productos estancados no venden. */
-    public static final int MESES_ESTANCAMIENTO = 3;
+    /** Días finales de la historia (contando {@code fin}) en los que los productos estancados no venden nada. */
+    public static final int DIAS_ESTANCAMIENTO = 90;
+
+    /** Días mínimos de demanda normal al inicio de la historia, para que los estancados tengan stock y ventas previas. */
+    public static final int DIAS_PREVIOS_AL_ESTANCAMIENTO = 30;
 
     private static final double[] PROBABILIDAD_LINEAS = {0.70, 0.22, 0.08};
     /** E[líneas por ticket] = 1×0,70 + 2×0,22 + 3×0,08 = 1,38. */
@@ -86,7 +89,7 @@ public final class ModeloDemanda {
     /**
      * @param productos      catálogo (orden fijo); los rangos de demanda deben ser 1..n sin repetir
      * @param inicio         primer día de la historia (mes 0 de la tendencia)
-     * @param fin            último día de la historia (los estancados no venden en sus últimos 3 meses)
+     * @param fin            último día de la historia (los estancados no venden en sus últimos 90 días)
      * @param ticketsDiaBase tickets esperados en un día con todos los factores en 1
      * @param random         fuente de aleatoriedad (semilla fija para reproducir la carga)
      */
@@ -106,7 +109,9 @@ public final class ModeloDemanda {
             throw new IllegalArgumentException("ticketsDiaBase debe ser positivo");
         }
         this.ticketsDiaBase = ticketsDiaBase;
-        this.inicioEstancamiento = fin.minusMonths(MESES_ESTANCAMIENTO).plusDays(1);
+        LocalDate desdeEstancamiento = fin.minusDays(DIAS_ESTANCAMIENTO - 1L);
+        LocalDate primerPosible = inicio.plusDays(DIAS_PREVIOS_AL_ESTANCAMIENTO);  // historias cortas
+        this.inicioEstancamiento = desdeEstancamiento.isBefore(primerPosible) ? primerPosible : desdeEstancamiento;
 
         int n = this.productos.size();
         double[] escalonados = pesosEscalonados(n);
@@ -304,7 +309,7 @@ public final class ModeloDemanda {
                 * tendencia(mesesDesdeInicio(dia));
     }
 
-    /** {@code true} si el producto es estancado y el día cae en los últimos 3 meses de la historia. */
+    /** {@code true} si el producto es estancado y el día cae en los últimos 90 días de la historia. */
     public boolean estaEstancado(ProductoSemilla producto, LocalDate dia) {
         return producto.estancado() && !dia.isBefore(inicioEstancamiento);
     }

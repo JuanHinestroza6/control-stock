@@ -39,7 +39,9 @@ unidades(día, producto) ~ Poisson(λ)
 - `factor_día_semana`: lun–jue 0.85, vie 1.1, sáb 1.3, dom 1.0.
 - `tendencia`: crecimiento de ~1.5% mensual (la empresa está creciendo, como dice el PPI).
 - Distribución por talla: S 20%, M 35%, L 30%, XL 15%. Por color: el primero de cada producto 50%, el resto se reparte.
-- 2–3 productos "estancados" con demanda casi nula en los últimos 3 meses (para demostrar SIN_ROTACION).
+- 3 productos "estancados" (LIV004, LIV026, LIV030): demanda baja antes, y **ninguna venta ni reserva en los últimos 90 días**
+  de la historia (`ModeloDemanda.DIAS_ESTANCAMIENTO`; en historias cortas arranca 30 días después del inicio). Conservan stock
+  disponible para que se vea la alerta SIN_ROTACION (60 días sin ventas).
 
 ## Operación
 
