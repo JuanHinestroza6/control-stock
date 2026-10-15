@@ -45,6 +45,8 @@ class AnaliticaControllerTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean MasVendidosService servicio;
+    @MockitoBean co.livorno.controlstock.analitica.servicio.ConsultaAnaliticaService consulta;
+    @MockitoBean co.livorno.controlstock.analitica.servicio.RecalculoAnaliticoService recalculo;
     @MockitoBean co.livorno.controlstock.usuario.repositorio.UsuarioRepository usuarioRepository;
 
     private static Authentication como(String rol) {
