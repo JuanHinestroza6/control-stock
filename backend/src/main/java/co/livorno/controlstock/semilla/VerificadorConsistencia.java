@@ -107,6 +107,33 @@ public class VerificadorConsistencia {
     }
 
     /**
+     * Tras la analítica de cierre: alertas coherentes con el stock ({@link #verificarAlertas()}), toda variante
+     * activa de producto activo con clase ABC y toda una con 30 días o más de historia con punto de reorden.
+     */
+    public void verificarAnalitica() {
+        verificarAlertas();
+        Long sinClase = jdbc.queryForObject("""
+                select count(*) from variante v join producto p on p.id = v.producto_id
+                where v.activo = 1 and p.activo = 1 and v.clase_abc is null""", Long.class);
+        Long sinRop = jdbc.queryForObject("""
+                select count(*) from variante v join analitica_variante a on a.variante_id = v.id
+                where a.dias_historia >= 30 and v.punto_reorden is null""", Long.class);
+        Long sinInstantanea = jdbc.queryForObject("""
+                select count(*) from variante v join producto p on p.id = v.producto_id
+                where v.activo = 1 and p.activo = 1
+                and not exists (select 1 from analitica_variante a where a.variante_id = v.id)""", Long.class);
+        if (n(sinClase) > 0 || n(sinRop) > 0 || n(sinInstantanea) > 0) {
+            throw new SemillaAbortadaException("Analítica incoherente: " + n(sinClase) + " variantes activas sin clase, "
+                    + n(sinRop) + " con 30 días o más de historia sin punto de reorden, " + n(sinInstantanea)
+                    + " sin instantánea.");
+        }
+    }
+
+    private static long n(Long valor) {
+        return valor == null ? 0 : valor;
+    }
+
+    /**
      * Tras evaluar las alertas: para cada variante activa la alerta ACTIVA coincide con {@code tipoEsperado} (AGOTADO,
      * SIN_ROTACION, STOCK_BAJO o ninguna) y no hay alertas ACTIVAS de variantes inactivas.
      */

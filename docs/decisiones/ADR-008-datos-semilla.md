@@ -2,6 +2,8 @@
 
 - Estado: aceptada
 - Fecha: 2026-10-04
+- Modificada por: ADR-009 — al cerrar, la semilla ejecuta la analítica completa (origen SEMILLA) en lugar de su bucle
+  propio de alertas; si falla, la carga queda confirmada, termina con código 1 y se recupera con "Recalcular" (ADMIN).
 
 ## Contexto
 La analítica de las Fases 5–6 (ABC, punto de reorden, Holt-Winters con m = 12) y la sustentación necesitan 24 meses de

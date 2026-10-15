@@ -9,7 +9,9 @@ import co.livorno.controlstock.TestcontainersConfiguration;
 import co.livorno.controlstock.auth.dto.LoginRequest;
 import co.livorno.controlstock.auth.dto.LoginResponse;
 import co.livorno.controlstock.auth.servicio.AuthService;
+import co.livorno.controlstock.analitica.servicio.EjecucionAnaliticaService;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -37,8 +39,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
         "app.semilla.password=ClaveDemo-2026-ok"})
 class SemillaIntegracionTest {
 
+    private static final LocalDate FIN = LocalDate.of(2025, 12, 31);
     private static final String[] TABLAS = {"usuario", "categoria", "producto", "variante", "movimiento", "venta",
-            "detalle_venta", "devolucion", "reserva", "alerta"};
+            "detalle_venta", "devolucion", "reserva", "alerta", "ejecucion_analitica", "analitica_variante"};
 
     @Autowired
     GeneradorDatosSemilla generador;
@@ -50,11 +53,23 @@ class SemillaIntegracionTest {
     RelojSimulado reloj;
     @MockitoSpyBean
     VerificadorConsistencia verificador;
+    @MockitoSpyBean
+    EjecucionAnaliticaService ejecucionAnalitica;
 
     @BeforeEach
-    @AfterEach
-    void limpiar() {
+    void prepararBaseYReloj() {
         LimpiezaSemilla.limpiar(jdbc);
+        LimpiezaSemilla.fijarCierreTrasFin(reloj, FIN);
+    }
+
+    /** Un solo @AfterEach: el reloj real se restablece siempre, aunque la limpieza falle. */
+    @AfterEach
+    void limpiarYRestablecerReloj() {
+        try {
+            LimpiezaSemilla.limpiar(jdbc);
+        } finally {
+            LimpiezaSemilla.restablecerReloj(reloj);
+        }
     }
 
     private long contar(String sql) {
@@ -173,19 +188,76 @@ class SemillaIntegracionTest {
     }
 
     @Test
-    void generar_baseYaCargadaConAlertasPerdidas_lasRecuperaDeFormaIdempotente() {
+    void generar_cierre_clasificaTodasLasVariantesYCalculaElRopConHistoria() {
+        ResumenSemilla r = generador.generar();
+
+        assertThat(contar("""
+                select count(*) from variante v join producto p on p.id = v.producto_id
+                where v.activo = 1 and p.activo = 1 and v.clase_abc is null""")).isZero();
+        assertThat(contar("""
+                select count(*) from analitica_variante a join variante v on v.id = a.variante_id
+                where a.dias_historia >= 30 and v.punto_reorden is null""")).isZero();
+        assertThat(contar("select count(*) from analitica_variante where dias_historia >= 30")).isPositive();
+        // el cierre con corte = fecha-fin + 1 ve ventas recientes: hay demanda y ROP calculado por distribución
+        assertThat(contar("select count(*) from analitica_variante where metodo_reorden in ('NORMAL', 'POISSON')"))
+                .isPositive();
+        verificador.verificarAnalitica();
+        var cierre = r.analitica();
+        assertThat(cierre.claseA() + cierre.claseB() + cierre.claseC()).isEqualTo(cierre.variantesActivas());
+        assertThat(cierre.ropPorMetodo().values().stream().mapToLong(Long::longValue).sum()).isEqualTo(cierre.variantesActivas());
+        assertThat(r.texto()).contains("analítica de cierre");
+    }
+
+    @Test
+    void generar_cierre_guardaUnaEjecucionSemillaExitosaCuyaMetricaCoincideConElConteoSql() {
+        ResumenSemilla r = generador.generar();
+
+        assertThat(contar("select count(*) from ejecucion_analitica")).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select origen from ejecucion_analitica", String.class)).isEqualTo("SEMILLA");
+        assertThat(jdbc.queryForObject("select estado from ejecucion_analitica", String.class)).isEqualTo("EXITOSA");
+        assertThat(jdbc.queryForObject("select fecha_corte from ejecucion_analitica", LocalDate.class))
+                .isEqualTo(FIN.plusDays(1));
+        long enAlerta = contar("""
+                select count(distinct v.id) from alerta a join variante v on v.id = a.variante_id
+                join producto p on p.id = v.producto_id
+                where a.estado = 'ACTIVA' and a.tipo in ('AGOTADO', 'STOCK_BAJO') and v.activo = 1 and p.activo = 1""");
+        long activas = contar("""
+                select count(*) from variante v join producto p on p.id = v.producto_id
+                where v.activo = 1 and p.activo = 1""");
+        BigDecimal esperado = BigDecimal.valueOf(enAlerta * 100).divide(BigDecimal.valueOf(activas), 1,
+                java.math.RoundingMode.HALF_UP);
+        assertThat(r.analitica().enAlertaStock()).isEqualTo((int) enAlerta);
+        assertThat(r.analitica().variantesActivas()).isEqualTo((int) activas);
+        assertThat(r.analitica().porcentajeAlerta()).isEqualByComparingTo(esperado);
+        assertThat(r.alertasAgotado() + r.alertasStockBajo()).isEqualTo(enAlerta);
+    }
+
+    @Test
+    void generar_segundaEjecucion_noCreaOtraEjecucionAnaliticaNiTocaAlertas() {
         generador.generar();
-        long esperadas = contar("select count(*) from alerta where estado = 'ACTIVA'");
-        assertThat(esperadas).isPositive();
-        // simula el fallo posterior al commit: las alertas no llegaron a evaluarse
-        jdbc.update("delete from alerta");
+        Map<String, Long> antes = conteos();
+        long revisadas = contar("select count(*) from alerta where revisada_en is not null");
 
         ResumenSemilla segunda = generador.generar();
 
         assertThat(segunda.generado()).isFalse();
-        assertThat(contar("select count(*) from alerta where estado = 'ACTIVA'")).isEqualTo(esperadas);
-        generador.generar();
-        assertThat(contar("select count(*) from alerta where estado = 'ACTIVA'")).isEqualTo(esperadas);
+        assertThat(conteos()).isEqualTo(antes);
+        assertThat(contar("select count(*) from ejecucion_analitica")).isEqualTo(1);
+        assertThat(contar("select count(*) from alerta where revisada_en is not null")).isEqualTo(revisadas);
+    }
+
+    @Test
+    void generar_analiticaDeCierreFallida_avisaCómoRecuperarseYLaCargaQuedaConfirmada() {
+        doThrow(new IllegalStateException("fallo forzado de la analítica")).when(ejecucionAnalitica)
+                .ejecutar(any(), any());
+
+        assertThatThrownBy(generador::generar).isInstanceOf(SemillaAbortadaException.class)
+                .hasMessageContaining("Recalcular");
+
+        assertThat(contar("select count(*) from venta")).isPositive();
+        assertThat(reloj.estaSimulando()).isFalse();
+        // una nueva ejecución dice "ya hay datos" y no hace nada
+        assertThat(generador.generar().generado()).isFalse();
     }
 
     @Test

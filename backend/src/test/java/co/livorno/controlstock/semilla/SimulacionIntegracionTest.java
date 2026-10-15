@@ -33,11 +33,23 @@ class SimulacionIntegracionTest {
     GeneradorDatosSemilla generador;
     @Autowired
     JdbcTemplate jdbc;
+    @Autowired
+    RelojSimulado reloj;
 
     @BeforeEach
-    @AfterEach
-    void limpiar() {
+    void prepararBaseYReloj() {
         LimpiezaSemilla.limpiar(jdbc);
+        LimpiezaSemilla.fijarCierreTrasFin(reloj, LocalDate.of(2026, 2, 15));
+    }
+
+    /** Un solo @AfterEach: el reloj real se restablece siempre, aunque la limpieza falle. */
+    @AfterEach
+    void limpiarYRestablecerReloj() {
+        try {
+            LimpiezaSemilla.limpiar(jdbc);
+        } finally {
+            LimpiezaSemilla.restablecerReloj(reloj);
+        }
     }
 
     private long contar(String sql) {
@@ -86,7 +98,7 @@ class SimulacionIntegracionTest {
         assertThat(contar("select count(*) from reserva where estado = 'ACTIVA' and vence_en <= '2026-02-15 23:59:59'"))
                 .isZero();
 
-        // alertas evaluadas al cierre (SIN_ROTACION se incorpora al resumen en B8): coinciden con el stock (el verificador ya lo comprobó) y hay activas
+        // alertas evaluadas al cierre coinciden con el stock (el verificador ya lo comprobó) y hay activas
         assertThat(resumen.alertasAgotado() + resumen.alertasStockBajo())
                 .isEqualTo(contar("select count(*) from alerta where estado = 'ACTIVA' and tipo in ('AGOTADO', 'STOCK_BAJO')"));
 

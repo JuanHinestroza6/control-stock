@@ -40,7 +40,8 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
 - Validación del body antes de `@PreAuthorize`: un rol sin permiso con body inválido recibe 400 en vez de 403.
 - Revocación por `iat` con precisión de segundos: un token emitido en el mismo segundo del cambio sigue válido (ADR-005).
 - Desactivación simultánea de los dos últimos ADMIN: el perdedor del deadlock de MySQL recibe 409.
-- Semilla: las alertas se evalúan tras el commit de la carga (si fallan, una nueva ejecución las re-evalúa).
+- Semilla: la analítica (ABC, ROP y alertas) corre tras el commit de la carga; si falla, la carga queda confirmada y se
+  recupera con "Recalcular" como ADMIN (una nueva ejecución de la semilla dice "ya hay datos").
 - Umbral de alertas: hoy 141 de 299 variantes quedan en alerta tras la carga (AGOTADO 30, STOCK_BAJO 111). No se ajusta
   `stockMinimo` ahora: se revisa después del punto de reorden dinámico de la fase 5, con meta de ~10–15 % de variantes en
   alerta (decisión del usuario, 2026-10-13).
