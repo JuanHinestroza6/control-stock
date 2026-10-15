@@ -63,6 +63,11 @@ de servicio con el que se calcula el punto de reorden.
 - **Puntos de extensión**: consultar el punto de reorden de cada variante (REQ-04); planeación de compras (REQ-10, Fase 6).
 - **Poscondición**: cada variante activa con clase A, B o C; stock y kardex sin cambios.
 
+## Diagramas
+
+- Casos de uso de CU-15 y la ejecución analítica: [`diagramas/casos-uso-cu15-clasificacion-abc.puml`](../diagramas/casos-uso-cu15-clasificacion-abc.puml)
+- Clases del módulo `analitica`: [`diagramas/clases-fase5-analitica.puml`](../diagramas/clases-fase5-analitica.puml)
+
 ## Resultados de la prueba T2 (2026-10-15, semilla de 24 meses)
 
 Ejecución SEMILLA exitosa en 4.951 ms; 291 variantes activas analizadas. Ingreso neto de 12 meses: $1.197.540.900.
