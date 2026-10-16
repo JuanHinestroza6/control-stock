@@ -144,7 +144,9 @@ class ReglasArquitecturaTest {
     /** Clases de solo lectura autorizadas a usar JDBC directo (el tipo JDBC no se inyecta en ninguna otra). */
     private static final String[] CLASES_JDBC_DE_LECTURA = {
         "co.livorno.controlstock.analitica.repositorio.ConsultasVentaAnalitica",
-        "co.livorno.controlstock.analitica.repositorio.ConsultasEstadoAlertas"};
+        "co.livorno.controlstock.analitica.repositorio.ConsultasEstadoAlertas",
+        "co.livorno.controlstock.analitica.repositorio.ConsultasDemandaMensual",
+        "co.livorno.controlstock.analitica.repositorio.ConsultasDisponibilidad"};
 
     private static final Set<String> TIPOS_JDBC = Set.of("org.springframework.jdbc.core.JdbcTemplate",
             "org.springframework.jdbc.core.JdbcOperations",
@@ -160,6 +162,8 @@ class ReglasArquitecturaTest {
     static final ArchRule jdbcDirectoSoloEnClasesDeLectura = noClasses()
             .that().doNotHaveFullyQualifiedName(CLASES_JDBC_DE_LECTURA[0])
             .and().doNotHaveFullyQualifiedName(CLASES_JDBC_DE_LECTURA[1])
+            .and().doNotHaveFullyQualifiedName(CLASES_JDBC_DE_LECTURA[2])
+            .and().doNotHaveFullyQualifiedName(CLASES_JDBC_DE_LECTURA[3])
             .and().resideOutsideOfPackage("co.livorno.controlstock.semilla..")
             .should().dependOnClassesThat(DescribedPredicate.describe("son JdbcTemplate, NamedParameterJdbcTemplate"
                     + " o JdbcClient", (JavaClass c) -> TIPOS_JDBC.contains(c.getName())))
