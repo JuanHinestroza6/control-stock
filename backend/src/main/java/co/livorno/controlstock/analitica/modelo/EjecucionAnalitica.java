@@ -91,6 +91,26 @@ public class EjecucionAnalitica {
     @Column(length = LARGO_MENSAJE)
     private String mensaje;
 
+    /** Fase 6 (ADR-010): productos con pronóstico, por método, y WAPE global. Null si el pronóstico no corrió. */
+    @Column(name = "productos_pronosticados")
+    private Integer productosPronosticados;
+
+    @Column(name = "con_holt_winters")
+    private Integer conHoltWinters;
+
+    @Column(name = "con_ses")
+    private Integer conSes;
+
+    @Column(name = "wape_global", precision = 7, scale = 4)
+    private BigDecimal wapeGlobal;
+
+    /** Variantes que estarían en alerta de stock sin contar lo que viene en camino (métrica contrafactual). */
+    @Column(name = "en_alerta_sin_transito")
+    private Integer enAlertaSinTransito;
+
+    @Column(name = "con_pedido_en_camino")
+    private Integer conPedidoEnCamino;
+
     private EjecucionAnalitica(OrigenEjecucion origen, Long usuarioId, LocalDateTime ahora, LocalDate fechaCorte) {
         this.origen = origen;
         this.usuarioId = usuarioId;
@@ -141,6 +161,21 @@ public class EjecucionAnalitica {
         this.variantesActivas = medido.variantesActivas();
         this.enAlertaStock = medido.enAlertaStock();
         this.sinRotacionActivas = medido.sinRotacionActivas();
+    }
+
+    /** Registra el resultado del paso de pronóstico (wapeGlobal puede ser null). */
+    public void registrarPronostico(int productosPronosticados, int conHoltWinters, int conSes,
+            BigDecimal wapeGlobal) {
+        this.productosPronosticados = productosPronosticados;
+        this.conHoltWinters = conHoltWinters;
+        this.conSes = conSes;
+        this.wapeGlobal = wapeGlobal;
+    }
+
+    /** Registra la métrica contrafactual de alertas y las variantes con pedido en camino (Fase 6). */
+    public void registrarPosicion(int enAlertaSinTransito, int conPedidoEnCamino) {
+        this.enAlertaSinTransito = enAlertaSinTransito;
+        this.conPedidoEnCamino = conPedidoEnCamino;
     }
 
     private void cerrar(LocalDateTime ahora, EstadoEjecucion nuevo) {

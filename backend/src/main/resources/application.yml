@@ -80,3 +80,9 @@ app:
       a: {nivel-servicio: 0.95, z: 1.65}
       b: {nivel-servicio: 0.90, z: 1.28}
       c: {nivel-servicio: 0.80, z: 0.84}
+  pronostico: # pronóstico de demanda mensual (ADR-010)
+    meses-historia: 36
+    disponibilidad-minima: 0.5 # piso al corregir la demanda por agotados
+    ventana-mezcla-dias: 180 # participación de cada variante en su producto
+    horizonte: 3 # mes actual y los dos siguientes
+    meses-backtest: 6

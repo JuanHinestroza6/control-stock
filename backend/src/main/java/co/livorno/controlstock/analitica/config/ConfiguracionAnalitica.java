@@ -4,6 +4,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Configuration;
 
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties(PropiedadesAnalitica.class)
+@EnableConfigurationProperties({PropiedadesAnalitica.class, PropiedadesPronostico.class})
 public class ConfiguracionAnalitica {
 }

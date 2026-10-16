@@ -92,6 +92,19 @@ public class AnaliticaVariante implements Persistable<Long> {
     @Column(name = "calculado_en", nullable = false)
     private LocalDateTime calculadoEn;
 
+    /** De dónde salió la demanda del lead time (ADR-010); HISTORICA salvo que se llame {@link #usarPronostico}. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "fuente_demanda", nullable = false, length = 10)
+    private FuenteDemanda fuenteDemanda = FuenteDemanda.HISTORICA;
+
+    /** μL usada en el ROP cuando la fuente es PRONOSTICO. */
+    @Column(name = "demanda_lead_time", precision = 10, scale = 2)
+    private BigDecimal demandaLeadTime;
+
+    /** Tasa diaria pronosticada de la variante (unidades/día) en el mes del corte. */
+    @Column(name = "tasa_pronosticada", precision = 10, scale = 4)
+    private BigDecimal tasaPronosticada;
+
     @Transient
     private boolean nueva = true;
 
@@ -117,6 +130,13 @@ public class AnaliticaVariante implements Persistable<Long> {
         this.puntoReorden = puntoReorden;
         this.metodoReorden = metodoReorden;
         this.calculadoEn = calculadoEn;
+    }
+
+    /** Marca que el ROP usó la demanda pronosticada (fuente PRONOSTICO) y guarda sus insumos. */
+    public void usarPronostico(BigDecimal demandaLeadTime, BigDecimal tasaPronosticada) {
+        this.fuenteDemanda = FuenteDemanda.PRONOSTICO;
+        this.demandaLeadTime = demandaLeadTime;
+        this.tasaPronosticada = tasaPronosticada;
     }
 
     @Override

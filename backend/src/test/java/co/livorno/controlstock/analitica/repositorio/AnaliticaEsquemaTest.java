@@ -33,7 +33,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/** Esquema V1-V14 con ddl-auto=validate, CHECK de las tablas de analítica y escritura dirigida de ROP/clase (ADR-009). */
+/** Esquema V1-V15 con ddl-auto=validate, CHECK de las tablas de analítica y escritura dirigida de ROP/clase (ADR-009). */
 @Testcontainers(disabledWithoutDocker = true)
 @DataJpaTest(properties = "spring.jpa.hibernate.ddl-auto=validate")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
