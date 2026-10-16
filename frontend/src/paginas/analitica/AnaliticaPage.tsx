@@ -5,10 +5,11 @@ import { puedeVerAnaliticaCompleta } from '../../lib/permisos'
 import { PanelEjecucion } from './PanelEjecucion'
 import { PestanaAbc } from './PestanaAbc'
 import { PestanaMasVendidos } from './PestanaMasVendidos'
+import { PestanaPronostico } from './PestanaPronostico'
 import { PestanaReorden } from './PestanaReorden'
 import { PestanaTendencias } from './PestanaTendencias'
 
-type ClavePestana = 'mas-vendidos' | 'abc' | 'reorden' | 'tendencias'
+type ClavePestana = 'mas-vendidos' | 'abc' | 'reorden' | 'tendencias' | 'pronostico'
 
 /** Para agregar una pestaña: añadir su entrada aquí y su componente en `contenido`. */
 const PESTANAS: { clave: ClavePestana; etiqueta: string; soloCompleta: boolean }[] = [
@@ -16,6 +17,7 @@ const PESTANAS: { clave: ClavePestana; etiqueta: string; soloCompleta: boolean }
   { clave: 'abc', etiqueta: 'Clasificación ABC', soloCompleta: true },
   { clave: 'reorden', etiqueta: 'Punto de reorden', soloCompleta: true },
   { clave: 'tendencias', etiqueta: 'Tendencias', soloCompleta: true },
+  { clave: 'pronostico', etiqueta: 'Pronóstico', soloCompleta: true },
 ]
 
 const contenido: Record<ClavePestana, () => ReactNode> = {
@@ -23,6 +25,7 @@ const contenido: Record<ClavePestana, () => ReactNode> = {
   abc: () => <PestanaAbc />,
   reorden: () => <PestanaReorden />,
   tendencias: () => <PestanaTendencias />,
+  pronostico: () => <PestanaPronostico />,
 }
 
 export function AnaliticaPage() {

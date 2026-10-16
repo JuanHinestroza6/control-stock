@@ -46,10 +46,10 @@ beforeEach(() => {
 })
 
 describe('AnaliticaPage - pestañas por rol', () => {
-  it.each<Rol>(['ADMIN', 'INVENTARIO', 'CONTABILIDAD'])('%s ve las cuatro pestañas', async (rol) => {
+  it.each<Rol>(['ADMIN', 'INVENTARIO', 'CONTABILIDAD'])('%s ve las cinco pestañas', async (rol) => {
     montar(rol)
     const tabs = screen.getAllByRole('tab').map((t) => t.textContent)
-    expect(tabs).toEqual(['Más vendidos', 'Clasificación ABC', 'Punto de reorden', 'Tendencias'])
+    expect(tabs).toEqual(['Más vendidos', 'Clasificación ABC', 'Punto de reorden', 'Tendencias', 'Pronóstico'])
     expect(await screen.findByText('Última ejecución')).toBeInTheDocument()
   })
 
@@ -72,6 +72,13 @@ describe('AnaliticaPage - pestañas por rol', () => {
     expect(screen.queryByRole('tab', { name: 'Tendencias' })).not.toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Más vendidos', selected: true })).toBeInTheDocument()
     expect(api.obtenerTendencias).not.toHaveBeenCalled()
+  })
+
+  it('VENDEDOR no ve Pronóstico ni siquiera por la URL, y no consulta pronósticos', () => {
+    montar('VENDEDOR', null, '/analitica?pestana=pronostico')
+    expect(screen.queryByRole('tab', { name: 'Pronóstico' })).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Más vendidos', selected: true })).toBeInTheDocument()
+    expect(api.listarPronosticos).not.toHaveBeenCalled()
   })
 
   it('la pestaña activa sale de la URL y cambia al hacer clic', async () => {
