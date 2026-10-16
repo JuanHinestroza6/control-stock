@@ -1,9 +1,12 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   listarAbc,
+  listarPronosticos,
   listarReorden,
   obtenerMasVendidos,
+  obtenerPronostico,
   obtenerResumenAbc,
+  obtenerTendencias,
   obtenerUltimaEjecucion,
   recalcularAnalitica,
 } from '../api/analitica'
@@ -11,11 +14,16 @@ import type {
   EjecucionAnaliticaResponse,
   FiltrosAbc,
   FiltrosMasVendidos,
+  FiltrosPronosticos,
   FiltrosReorden,
+  FiltrosTendencias,
   MasVendidosResponse,
   PaginaAbc,
+  PaginaPronosticos,
   PaginaReorden,
+  PronosticoDetalleResponse,
   ResumenAbcResponse,
+  TendenciaResponse,
 } from '../tipos/analitica'
 
 /** `habilitado = false` deja la consulta en reposo (rol sin acceso). */
@@ -59,6 +67,33 @@ export function useUltimaEjecucion(habilitado = true) {
     queryKey: ['analitica', 'ejecucion'],
     queryFn: obtenerUltimaEjecucion,
     enabled: habilitado,
+  })
+}
+
+export function useTendencias(filtros: FiltrosTendencias, habilitado = true) {
+  return useQuery<TendenciaResponse>({
+    queryKey: ['analitica', 'tendencias', filtros],
+    queryFn: () => obtenerTendencias(filtros),
+    placeholderData: keepPreviousData,
+    enabled: habilitado,
+  })
+}
+
+export function usePronosticos(filtros: FiltrosPronosticos, habilitado = true) {
+  return useQuery<PaginaPronosticos>({
+    queryKey: ['analitica', 'pronosticos', 'lista', filtros],
+    queryFn: () => listarPronosticos(filtros),
+    placeholderData: keepPreviousData,
+    enabled: habilitado,
+  })
+}
+
+/** `productoId` indefinido deshabilita la consulta. */
+export function usePronostico(productoId: number | undefined, habilitado = true) {
+  return useQuery<PronosticoDetalleResponse>({
+    queryKey: ['analitica', 'pronosticos', 'detalle', productoId],
+    queryFn: () => obtenerPronostico(productoId as number),
+    enabled: habilitado && productoId !== undefined,
   })
 }
 

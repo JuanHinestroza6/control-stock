@@ -11,6 +11,12 @@ import {
   puedeVerKardex,
   puedeRecalcularAnalitica,
   puedeVerAnaliticaCompleta,
+  puedeVerPronostico,
+  puedeVerCompras,
+  puedeGestionarPlanes,
+  puedeAprobarPlan,
+  puedeRecibirPlan,
+  puedeCancelarPlan,
 } from './permisos'
 
 describe('puedeEditarCatalogo', () => {
@@ -63,5 +69,31 @@ describe('permisos de la fase 5', () => {
   })
   it('puedeRecalcularAnalitica', () => {
     expect(roles.map(puedeRecalcularAnalitica)).toEqual([true, false, false, false, false])
+  })
+})
+
+describe('permisos de la fase 6', () => {
+  const roles = ['ADMIN', 'INVENTARIO', 'VENDEDOR', 'CONTABILIDAD', undefined] as const
+  it('puedeVerPronostico y puedeVerCompras', () => {
+    expect(roles.map(puedeVerPronostico)).toEqual([true, true, false, true, false])
+    expect(roles.map(puedeVerCompras)).toEqual([true, true, false, true, false])
+  })
+  it('puedeGestionarPlanes y puedeRecibirPlan', () => {
+    expect(roles.map(puedeGestionarPlanes)).toEqual([true, true, false, false, false])
+    expect(roles.map(puedeRecibirPlan)).toEqual([true, true, false, false, false])
+  })
+  it('puedeAprobarPlan', () => {
+    expect(roles.map(puedeAprobarPlan)).toEqual([true, false, false, false, false])
+  })
+  it('puedeCancelarPlan depende del rol y del estado', () => {
+    expect(puedeCancelarPlan('ADMIN', 'BORRADOR')).toBe(true)
+    expect(puedeCancelarPlan('ADMIN', 'APROBADO')).toBe(true)
+    expect(puedeCancelarPlan('ADMIN', 'RECIBIDO')).toBe(false)
+    expect(puedeCancelarPlan('ADMIN', 'CANCELADO')).toBe(false)
+    expect(puedeCancelarPlan('INVENTARIO', 'BORRADOR')).toBe(true)
+    expect(puedeCancelarPlan('INVENTARIO', 'APROBADO')).toBe(false)
+    expect(puedeCancelarPlan('VENDEDOR', 'BORRADOR')).toBe(false)
+    expect(puedeCancelarPlan('CONTABILIDAD', 'BORRADOR')).toBe(false)
+    expect(puedeCancelarPlan(undefined, 'BORRADOR')).toBe(false)
   })
 })
