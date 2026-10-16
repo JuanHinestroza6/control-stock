@@ -6,20 +6,23 @@ import { PanelEjecucion } from './PanelEjecucion'
 import { PestanaAbc } from './PestanaAbc'
 import { PestanaMasVendidos } from './PestanaMasVendidos'
 import { PestanaReorden } from './PestanaReorden'
+import { PestanaTendencias } from './PestanaTendencias'
 
-type ClavePestana = 'mas-vendidos' | 'abc' | 'reorden'
+type ClavePestana = 'mas-vendidos' | 'abc' | 'reorden' | 'tendencias'
 
 /** Para agregar una pestaña: añadir su entrada aquí y su componente en `contenido`. */
 const PESTANAS: { clave: ClavePestana; etiqueta: string; soloCompleta: boolean }[] = [
   { clave: 'mas-vendidos', etiqueta: 'Más vendidos', soloCompleta: false },
   { clave: 'abc', etiqueta: 'Clasificación ABC', soloCompleta: true },
   { clave: 'reorden', etiqueta: 'Punto de reorden', soloCompleta: true },
+  { clave: 'tendencias', etiqueta: 'Tendencias', soloCompleta: true },
 ]
 
 const contenido: Record<ClavePestana, () => ReactNode> = {
   'mas-vendidos': () => <PestanaMasVendidos />,
   abc: () => <PestanaAbc />,
   reorden: () => <PestanaReorden />,
+  tendencias: () => <PestanaTendencias />,
 }
 
 export function AnaliticaPage() {
