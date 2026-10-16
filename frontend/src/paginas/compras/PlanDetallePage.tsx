@@ -8,10 +8,11 @@ import { useAprobarPlan, usePlan } from '../../hooks/useCompras'
 import { useSesion } from '../../hooks/useSesion'
 import { mensajeError } from '../../lib/errores'
 import { formatearFecha, formatearMoneda } from '../../lib/formato'
-import { puedeAprobarPlan, puedeCancelarPlan, puedeGestionarPlanes } from '../../lib/permisos'
+import { puedeAprobarPlan, puedeCancelarPlan, puedeGestionarPlanes, puedeRecibirPlan } from '../../lib/permisos'
 import type { PlanCompraDetalleResponse } from '../../tipos/compras'
 import { EditorBorrador } from './EditorBorrador'
 import { ModalCancelarPlan } from './ModalCancelarPlan'
+import { ModalRecibirPlan } from './ModalRecibirPlan'
 import type { EstadoNavegacionPlan } from './ModalSugerirPlan'
 import { TablaLineasPlan } from './TablaLineasPlan'
 import { ETIQUETA_ORIGEN, etiquetaEstadoPlan, TONO_ESTADO_PLAN } from './textosPlan'
@@ -30,7 +31,7 @@ function conUsuario(fecha: string | null, usuario: string | null) {
   return `${formatearFecha(fecha, true)}${usuario ? ` · ${usuario}` : ''}`
 }
 
-/** Detalle del plan de compras: cabecera, edición del borrador, aprobar y cancelar. Recibir llega con F6. */
+/** Detalle del plan de compras: cabecera, edición del borrador, aprobar, cancelar y recibir. */
 export function PlanDetallePage() {
   const { id } = useParams()
   const numero = Number(id)
@@ -75,11 +76,13 @@ function ContenidoPlan({ plan, recargar }: ContenidoPlanProps) {
   const [reinicio, setReinicio] = useState(0)
   const [confirmando, setConfirmando] = useState(false)
   const [cancelando, setCancelando] = useState(false)
+  const [recibiendo, setRecibiendo] = useState(false)
 
   const borrador = plan.estado === 'BORRADOR'
   const editable = borrador && puedeGestionarPlanes(rol)
   const puedeAprobar = borrador && puedeAprobarPlan(rol)
   const puedeCancelar = puedeCancelarPlan(rol, plan.estado)
+  const puedeRecibir = plan.estado === 'APROBADO' && puedeRecibirPlan(rol)
 
   return (
     <>
@@ -106,7 +109,7 @@ function ContenidoPlan({ plan, recargar }: ContenidoPlanProps) {
         </p>
       )}
 
-      {(puedeAprobar || puedeCancelar) && (
+      {(puedeAprobar || puedeCancelar || puedeRecibir) && (
         <div className="flex flex-wrap items-center gap-3">
           {puedeAprobar && (
             <Boton
@@ -120,6 +123,7 @@ function ContenidoPlan({ plan, recargar }: ContenidoPlanProps) {
               Aprobar plan
             </Boton>
           )}
+          {puedeRecibir && <Boton onClick={() => setRecibiendo(true)}>Recibir</Boton>}
           {puedeCancelar && (
             <Boton variante="peligro" onClick={() => setCancelando(true)}>
               {borrador ? 'Descartar borrador' : 'Cancelar plan'}
@@ -160,6 +164,7 @@ function ContenidoPlan({ plan, recargar }: ContenidoPlanProps) {
         onConfirmar={() => aprobar.mutate({ version: plan.version }, { onSuccess: () => setConfirmando(false) })}
         onCancelar={() => setConfirmando(false)}
       />
+      {recibiendo && <ModalRecibirPlan plan={plan} onCerrar={() => setRecibiendo(false)} />}
       {cancelando && (
         <ModalCancelarPlan planId={plan.id} numero={plan.numero} aprobado={plan.estado === 'APROBADO'} onCerrar={() => setCancelando(false)} />
       )}

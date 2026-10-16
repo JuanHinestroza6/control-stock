@@ -219,12 +219,12 @@ describe('PlanDetallePage — solo lectura', () => {
     expect(screen.getByRole('cell', { name: /26\.000/ })).toBeInTheDocument()
   })
 
-  it('APROBADO atrasado muestra el badge y no ofrece recibir hasta F6', async () => {
+  it('APROBADO atrasado muestra el badge y ofrece Recibir a INVENTARIO', async () => {
     vi.mocked(api.obtenerPlan).mockResolvedValue(plan('APROBADO', { atrasado: true, llegadaEsperada: '2026-10-01T00:00:00' }))
     montar('INVENTARIO')
     expect(await screen.findByText('Atrasado')).toBeInTheDocument()
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Recibir' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Recibir' })).toBeInTheDocument()
   })
 
   it('muestra error con reintento si el plan no carga', async () => {
@@ -239,7 +239,7 @@ describe('PlanDetallePage — matriz de botones por rol y estado', () => {
   const ESTADOS: EstadoPlan[] = ['BORRADOR', 'APROBADO', 'RECIBIDO', 'CANCELADO']
   const ROLES: Rol[] = ['ADMIN', 'INVENTARIO', 'VENDEDOR', 'CONTABILIDAD']
   const nada: [boolean, boolean, boolean] = [false, false, false]
-  // [aprobar, descartar borrador, cancelar plan]
+  // [aprobar, descartar borrador, cancelar plan]; Recibir se verifica aparte
   const esperado: Record<Rol, Record<EstadoPlan, [boolean, boolean, boolean]>> = {
     ADMIN: { BORRADOR: [true, true, false], APROBADO: [false, false, true], RECIBIDO: nada, CANCELADO: nada },
     INVENTARIO: { BORRADOR: [false, true, false], APROBADO: nada, RECIBIDO: nada, CANCELADO: nada },
@@ -258,7 +258,8 @@ describe('PlanDetallePage — matriz de botones por rol y estado', () => {
     expect(!!screen.queryByRole('button', { name: 'Cancelar plan' })).toBe(cancelar)
     const editable = estado === 'BORRADOR' && (rol === 'ADMIN' || rol === 'INVENTARIO')
     expect(!!screen.queryByRole('button', { name: 'Guardar cambios' })).toBe(editable)
-    expect(screen.queryByRole('button', { name: /Recibir/ })).not.toBeInTheDocument()
+    const recibir = estado === 'APROBADO' && (rol === 'ADMIN' || rol === 'INVENTARIO')
+    expect(!!screen.queryByRole('button', { name: 'Recibir' })).toBe(recibir)
   })
 })
 
