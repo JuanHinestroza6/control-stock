@@ -1,6 +1,7 @@
 package co.livorno.controlstock.analitica.dto;
 
 import co.livorno.controlstock.analitica.modelo.AnaliticaVariante;
+import co.livorno.controlstock.analitica.modelo.FuenteDemanda;
 import co.livorno.controlstock.analitica.modelo.MetodoReorden;
 import co.livorno.controlstock.catalogo.dto.CategoriaRef;
 import co.livorno.controlstock.catalogo.modelo.EstadoStock;
@@ -30,7 +31,10 @@ public record ReordenVarianteResponse(
         int umbralEfectivo,
         FuenteUmbral fuenteUmbral,
         int stockDisponible,
-        EstadoStock estadoStock) {
+        EstadoStock estadoStock,
+        FuenteDemanda fuenteDemanda,
+        BigDecimal demandaLeadTime,
+        BigDecimal tasaPronosticada) {
 
     public static ReordenVarianteResponse de(AnaliticaVariante a) {
         Variante v = a.getVariante();
@@ -41,6 +45,6 @@ public record ReordenVarianteResponse(
                 a.getLeadTimeDias(), a.getNivelServicio(), a.getZ(), a.getStockSeguridad(), rop,
                 a.getMetodoReorden(), v.getStockMinimo(), rop != null ? rop : v.getStockMinimo(),
                 rop != null ? FuenteUmbral.ROP : FuenteUmbral.STOCK_MINIMO, v.getStockDisponible(),
-                v.estadoStock());
+                v.estadoStock(), a.getFuenteDemanda(), a.getDemandaLeadTime(), a.getTasaPronosticada());
     }
 }

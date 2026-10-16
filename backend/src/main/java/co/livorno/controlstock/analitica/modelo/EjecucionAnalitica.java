@@ -163,6 +163,19 @@ public class EjecucionAnalitica {
         this.sinRotacionActivas = medido.sinRotacionActivas();
     }
 
+    /**
+     * Cierra como FALLIDA aunque el cálculo ABC + ROP sí se aplicó (falló solo el pronóstico): conserva todos los
+     * conteos del resultado.
+     */
+    public void fallarConResultado(LocalDateTime ahora, String mensaje, ResultadoEjecucion resultado) {
+        fallar(ahora, mensaje, resultado);
+        this.variantesAnalizadas = resultado.variantesAnalizadas();
+        this.claseA = resultado.claseA();
+        this.claseB = resultado.claseB();
+        this.claseC = resultado.claseC();
+        this.conPuntoReorden = resultado.conPuntoReorden();
+    }
+
     /** Registra el resultado del paso de pronóstico (wapeGlobal puede ser null). */
     public void registrarPronostico(int productosPronosticados, int conHoltWinters, int conSes,
             BigDecimal wapeGlobal) {

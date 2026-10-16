@@ -95,6 +95,9 @@ class AnaliticaConsultasIntegracionTest {
 
     @AfterEach
     void limpiar() {
+        jdbc.update("DELETE FROM pronostico");
+        jdbc.update("DELETE FROM analitica_producto_mes");
+        jdbc.update("DELETE FROM analitica_producto");
         jdbc.update("DELETE FROM analitica_variante WHERE ejecucion_id > ?", idEjecucionBase);
         for (Long v : variantes) {
             jdbc.update("DELETE FROM movimiento WHERE variante_id = ?", v);
