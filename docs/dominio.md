@@ -337,15 +337,23 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. Desde la Fas
 
 ## Datos semilla (ADR-008)
 
-- **Propósito**: 24 meses de historia de demostración (fase 6, B12: pasará a 36 meses y reposición por planes de compra) para la analítica (ABC, ROP, pronóstico) y la sustentación. No son
-  datos de referencia: no van en migraciones.
+- **Propósito**: 36 meses de historia de demostración (35 completos al cerrar; Holt-Winters compite desde 30 meses,
+  ADR-010) para la analítica (ABC, ROP, pronóstico) y la sustentación. No son datos de referencia: no van en migraciones.
 - **Módulo `semilla`** (`co.livorno.controlstock.semilla`): todas sus clases llevan `@Profile("seed")` y ningún otro módulo
   depende de él (ArchUnit). Se ejecuta con los perfiles `dev,seed`, carga y **termina la aplicación** (código 0 si todo
   salió bien, 1 si falló). Después se arranca normal con `dev`.
 - **Solo servicios reales**: catálogo, entradas, ajustes, ventas, devoluciones, anulaciones y reservas pasan por los mismos
   servicios que usa la API; el stock cambia solo vía `MovimientoService`. Nada de inserts directos de stock ni de kardex.
   El generador fija el usuario que actúa en el contexto de seguridad (VENDEDOR vende, devuelve y convierte; INVENTARIO
-  ingresa, ajusta y reserva; ADMIN anula); los vencimientos usan `ReservaService.vencer(id, ahora)` con `usuarioId` null.
+  recibe pedidos, ajusta y reserva; ADMIN anula y aprueba planes); los vencimientos usan `ReservaService.vencer(id, ahora)`
+  con `usuarioId` null.
+- **Reposición por planes de compra** (ADR-010, D8): la política de pedido es propia de la semilla (punto de pedido =
+  demanda esperada del lead time + 7 días; cantidad = 30–60 días de demanda; no usa el ROP ni la sugerencia del
+  sistema). Cada pedido es un plan por producto y día: INVENTARIO lo crea, ADMIN lo aprueba a la misma hora e INVENTARIO
+  lo recibe al llegar (la ENTRADA lleva referencia `PLAN_COMPRA/{id}`). Los pedidos que llegan después de `fin` quedan
+  APROBADOS (en camino). El verificador comprueba que Σ cantidad aprobada de los planes APROBADO por variante coincida
+  con la simulación; el resumen imprime planes creados, recibidos y en camino y las métricas de la analítica de cierre
+  (productos HW/SES, WAPE global, % en alerta con y sin lo en camino).
 - **Reloj simulado (solo en `seed`)**: un `Clock` ajustable marcado `@Primary` reemplaza al del sistema; los servicios y la
   auditoría fechan con él. Solo avanza (retroceder lanza excepción), así el kardex queda cronológico, y vuelve al reloj
   del sistema al terminar. Las operaciones de cada día simulado se ejecutan en orden de hora.

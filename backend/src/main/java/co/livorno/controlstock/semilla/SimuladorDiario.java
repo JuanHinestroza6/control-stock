@@ -1,6 +1,14 @@
 package co.livorno.controlstock.semilla;
 
 import co.livorno.controlstock.catalogo.dto.ActualizarProductoRequest;
+import co.livorno.controlstock.compra.dto.AprobarPlanRequest;
+import co.livorno.controlstock.compra.dto.CrearPlanRequest;
+import co.livorno.controlstock.compra.dto.LineaPlanRequest;
+import co.livorno.controlstock.compra.dto.LineaPlanResponse;
+import co.livorno.controlstock.compra.dto.LineaRecepcionRequest;
+import co.livorno.controlstock.compra.dto.PlanCompraDetalleResponse;
+import co.livorno.controlstock.compra.dto.RecibirPlanRequest;
+import co.livorno.controlstock.compra.servicio.PlanCompraService;
 import co.livorno.controlstock.catalogo.dto.ProductoDetalleResponse;
 import co.livorno.controlstock.catalogo.modelo.Talla;
 import co.livorno.controlstock.catalogo.servicio.ProductoService;
@@ -13,8 +21,6 @@ import co.livorno.controlstock.inventario.dto.ReservaResponse;
 import co.livorno.controlstock.inventario.servicio.ReservaService;
 import co.livorno.controlstock.venta.dto.ConvertirReservasRequest;
 import java.time.LocalDateTime;
-import co.livorno.controlstock.inventario.dto.EntradaRequest;
-import co.livorno.controlstock.inventario.dto.LineaEntradaRequest;
 import co.livorno.controlstock.inventario.modelo.TipoMovimiento;
 import co.livorno.controlstock.inventario.servicio.OperacionInventarioService;
 import co.livorno.controlstock.semilla.CreadorCatalogo.CatalogoCreado;
@@ -50,7 +56,8 @@ import org.springframework.stereotype.Component;
 /**
  * Simulación día a día (ADR-008, B4): ventas, reposición, ajustes, alza de precios, devoluciones, anulaciones y el
  * producto descontinuado. Todo pasa por los servicios reales, como el usuario con el rol correcto y con el reloj
- * simulado, que solo avanza: las operaciones de cada día se ejecutan en orden de hora. Entre días solo se guardan ids
+ * simulado, que solo avanza: las operaciones de cada día se ejecutan en orden de hora. La reposición pasa por el plan
+ * de compras real (ADR-010, D8): INVENTARIO crea, ADMIN aprueba e INVENTARIO recibe al llegar. Entre días solo se guardan ids
  * y contadores (flush + clear al terminar cada día). Se ejecuta dentro de la transacción de la carga.
  */
 @Component
@@ -111,6 +118,7 @@ public class SimuladorDiario {
     private final ReservaService reservaService;
     private final DevolucionService devoluciones;
     private final OperacionInventarioService operaciones;
+    private final PlanCompraService planes;
     private final ProductoService productos;
     private final ComoUsuario comoUsuario;
     private final RelojSimulado reloj;
@@ -118,13 +126,14 @@ public class SimuladorDiario {
     private final JdbcTemplate jdbc;
 
     public SimuladorDiario(VentaService ventas, ReservaService reservaService, DevolucionService devoluciones,
-                           OperacionInventarioService operaciones, ProductoService productos,
-                           ComoUsuario comoUsuario, RelojSimulado reloj, EntityManager entityManager,
+                           OperacionInventarioService operaciones, PlanCompraService planes,
+                           ProductoService productos, ComoUsuario comoUsuario, RelojSimulado reloj, EntityManager entityManager,
                            JdbcTemplate jdbc) {
         this.ventas = ventas;
         this.reservaService = reservaService;
         this.devoluciones = devoluciones;
         this.operaciones = operaciones;
+        this.planes = planes;
         this.productos = productos;
         this.comoUsuario = comoUsuario;
         this.reloj = reloj;
@@ -148,7 +157,11 @@ public class SimuladorDiario {
     private record Clave(String codigo, Talla talla, int indiceColor) {
     }
 
-    private record Llegada(String codigo, Map<Integer, Integer> cantidades, BigDecimal costo) {
+    /** Línea de un plan en camino: índice de variante, id del detalle y cantidad aprobada. */
+    private record LineaLlegada(int idx, Long detalleId, int cantidad) {
+    }
+
+    private record Llegada(String codigo, Long planId, List<LineaLlegada> lineas, BigDecimal costo) {
     }
 
     private record PlanDevolucion(LocalTime hora, Long ventaId, Long detalleId, int varianteIdx, int cantidad,
@@ -214,6 +227,8 @@ public class SimuladorDiario {
         private long nDevoluciones;
         private long noAptas;
         private long entradas;
+        private long planesCreados;
+        private long planesRecibidos;
         private long ajustes;
         private int alzas;
         private BigDecimal ingreso = BigDecimal.ZERO;
@@ -264,10 +279,17 @@ public class SimuladorDiario {
                 entityManager.clear();
                 dias++;
             }
+            List<Integer> pendiente = new ArrayList<>();
+            long unidadesEnCamino = 0;
+            for (int n : enCamino) {
+                pendiente.add(n);
+                unidadesEnCamino += n;
+            }
             return new ResultadoSimulacion(dias, nVentas, unidadesVendidas, lineasPedidas, lineasPerdidas,
                     lineasEvitablesPedidas, lineasEvitablesPerdidas, unidadesPerdidas,
                     anuladas, nDevoluciones, noAptas, entradas, ajustes, alzas, desactivados.size(), ingreso,
-                    reservasCreadas, reservasConvertidas, reservasCanceladas, reservasVencidas);
+                    reservasCreadas, reservasConvertidas, reservasCanceladas, reservasVencidas, planesCreados, planesRecibidos,
+                    planesCreados - planesRecibidos, unidadesEnCamino, pendiente);
         }
 
         private void simularDia(LocalDate dia) {
@@ -601,10 +623,8 @@ public class SimuladorDiario {
                         continue;
                     }
                 }
+                // El pedido puede llegar después de fin: queda APROBADO (en camino) al terminar la carga.
                 LocalDate fechaLlegada = diaActual.plusDays(p.leadTimeDias());
-                if (fechaLlegada.isAfter(fin)) {
-                    continue;
-                }
                 // Punto de pedido por variante = demanda esperada durante el lead time + 7 días de seguridad.
                 double demandaPedido = modelo.demandaEsperada(p, diaActual, p.leadTimeDias() + DIAS_SEGURIDAD);
                 int dias = DIAS_REPOSICION_MIN + azar.nextInt(DIAS_REPOSICION_MAX - DIAS_REPOSICION_MIN + 1);
@@ -627,10 +647,27 @@ public class SimuladorDiario {
                 if (cantidades != null) {
                     BigDecimal costo = CreadorCatalogo.costoEntrada(p.costoBase(),
                             modelo.mesesDesdeInicio(diaActual), costos);
-                    llegadas.computeIfAbsent(fechaLlegada, k -> new ArrayList<>())
-                            .add(new Llegada(codigo, cantidades, costo));
+                    pedir(codigo, cantidades, costo, fechaLlegada);
                 }
             }
+        }
+
+        /** Crea el plan (INVENTARIO), lo aprueba (ADMIN, a la misma hora) y agenda su llegada. */
+        private void pedir(String codigo, Map<Integer, Integer> cantidades, BigDecimal costo, LocalDate llegada) {
+            List<LineaPlanRequest> lineasPlan = new ArrayList<>();
+            for (Map.Entry<Integer, Integer> e : cantidades.entrySet()) {
+                lineasPlan.add(new LineaPlanRequest(variantes.get(e.getKey()).id(), e.getValue(), costo));
+            }
+            PlanCompraDetalleResponse[] plan = new PlanCompraDetalleResponse[1];
+            en(inventario, () -> plan[0] = planes.crear(new CrearPlanRequest("Reposición de " + codigo, lineasPlan)));
+            en(admin, () -> plan[0] = planes.aprobar(plan[0].id(), new AprobarPlanRequest(plan[0].version())));
+            List<LineaLlegada> lineas = new ArrayList<>();
+            for (LineaPlanResponse l : plan[0].lineas()) {
+                lineas.add(new LineaLlegada(indiceDeVariante(l.varianteId()), l.id(), l.cantidadAprobada()));
+            }
+            planesCreados++;
+            llegadas.computeIfAbsent(llegada, k -> new ArrayList<>())
+                    .add(new Llegada(codigo, plan[0].id(), lineas, costo));
         }
 
         /** Desactiva el producto (y sus variantes) aunque le quede stock; sin reservas en la carga no hay bloqueo. */
@@ -641,17 +678,17 @@ public class SimuladorDiario {
         }
 
         private void recibir(Llegada l) {
-            List<LineaEntradaRequest> lineas = new ArrayList<>();
-            for (Map.Entry<Integer, Integer> e : l.cantidades().entrySet()) {
-                lineas.add(new LineaEntradaRequest(variantes.get(e.getKey()).id(), e.getValue(), l.costo()));
+            List<LineaRecepcionRequest> lineas = new ArrayList<>();
+            for (LineaLlegada ll : l.lineas()) {
+                lineas.add(new LineaRecepcionRequest(ll.detalleId(), ll.cantidad(), l.costo()));
             }
-            en(inventario, () -> operaciones.registrarEntrada(
-                    new EntradaRequest("Reposición de " + l.codigo(), lineas)));
-            for (Map.Entry<Integer, Integer> e : l.cantidades().entrySet()) {
-                fisico[e.getKey()] += e.getValue();
-                enCamino[e.getKey()] -= e.getValue();
+            en(inventario, () -> planes.recibir(l.planId(), new RecibirPlanRequest(null, lineas)));
+            for (LineaLlegada ll : l.lineas()) {
+                fisico[ll.idx()] += ll.cantidad();
+                enCamino[ll.idx()] -= ll.cantidad();
             }
             entradas++;
+            planesRecibidos++;
         }
     }
 

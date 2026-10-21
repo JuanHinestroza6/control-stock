@@ -132,7 +132,9 @@ public class GeneradorDatosSemilla {
         var analitica = new ResumenSemilla.CierreAnalitica(ejecucion.getClaseA(), ejecucion.getClaseB(),
                 ejecucion.getClaseC(), ejecucion.getConPuntoReorden(), porMetodo, ejecucion.getVariantesActivas(),
                 ejecucion.getEnAlertaStock(), ejecucion.getPorcentajeAlertaStock(),
-                porTipo.getOrDefault("SIN_ROTACION", 0L), ejecucion.getDuracionMs());
+                porTipo.getOrDefault("SIN_ROTACION", 0L), ejecucion.getDuracionMs(),
+                ejecucion.getConHoltWinters(), ejecucion.getConSes(), ejecucion.getWapeGlobal(),
+                ejecucion.getEnAlertaSinTransito(), ejecucion.getConPedidoEnCamino());
         return resumen.conCierre(activas == null ? 0 : activas, porTipo.getOrDefault("AGOTADO", 0L),
                 porTipo.getOrDefault("STOCK_BAJO", 0L), System.currentTimeMillis() - t0, analitica);
     }
@@ -166,6 +168,14 @@ public class GeneradorDatosSemilla {
                 new Random(propiedades.semillaAleatoria() + 2));
 
         verificador.verificarCarga(inicio, fin);
+        Map<Long, Integer> enCamino = new HashMap<>();
+        for (int i = 0; i < creado.variantes().size(); i++) {
+            int unidadesEnCamino = simulacion.enCaminoPorVariante().get(i);
+            if (unidadesEnCamino > 0) {
+                enCamino.put(creado.variantes().get(i).id(), unidadesEnCamino);
+            }
+        }
+        verificador.verificarEnCamino(enCamino);
         return new ResumenSemilla(true, inicio, fin, usuarios.size(), creado.productoIds().size(),
                 creado.variantes().size(), unidades, simulacion, 0, 0, 0, 0, null);
     }

@@ -26,7 +26,7 @@ final class LimpiezaSemilla {
     }
 
     static void limpiar(JdbcTemplate jdbc) {
-        for (String tabla : new String[] {"alerta", "pronostico", "analitica_producto_mes", "analitica_producto",
+        for (String tabla : new String[] {"alerta", "detalle_plan", "plan_compra", "pronostico", "analitica_producto_mes", "analitica_producto",
             "analitica_variante", "ejecucion_analitica", "devolucion", "reserva",
                 "detalle_venta", "movimiento", "venta", "variante", "producto"}) {
             jdbc.update("delete from " + tabla);

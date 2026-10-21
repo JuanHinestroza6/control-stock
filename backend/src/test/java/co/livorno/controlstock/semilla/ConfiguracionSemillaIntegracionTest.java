@@ -58,7 +58,7 @@ class ConfiguracionSemillaIntegracionTest {
             assertThat(p.ejecutar()).isFalse();
             assertThat(p.salirAlTerminar()).isFalse();
             assertThat(p.semillaAleatoria()).isEqualTo(42L);
-            assertThat(p.meses()).isEqualTo(24);
+            assertThat(p.meses()).isEqualTo(36);
             assertThat(p.fechaFin()).isNull();
             assertThat(p.ticketsDiaBase()).isEqualTo(15);
         }

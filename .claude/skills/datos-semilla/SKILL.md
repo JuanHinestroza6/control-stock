@@ -1,6 +1,6 @@
 ---
 name: datos-semilla
-description: Especificación del generador de datos de demostración de Control Stock (perfil Spring "seed") - catálogo de prendas, 24 meses de ventas con estacionalidad colombiana, distribución Pareto, devoluciones, reservas y entradas coherentes con el kardex. Úsalo cuando se cree, modifique o depure el generador de datos, o cuando se necesiten datos realistas para probar analítica o preparar la sustentación.
+description: Especificación del generador de datos de demostración de Control Stock (perfil Spring "seed") - catálogo de prendas, 36 meses de ventas con estacionalidad colombiana, distribución Pareto, devoluciones, reservas y entradas coherentes con el kardex. Úsalo cuando se cree, modifique o depure el generador de datos, o cuando se necesiten datos realistas para probar analítica o preparar la sustentación.
 ---
 
 # Generador de datos semilla
@@ -45,8 +45,8 @@ unidades(día, producto) ~ Poisson(λ)
 
 ## Operación
 
-- Historia de 24 meses hasta la fecha actual (necesario para Holt-Winters con m = 12).
-- Entradas: cuando el disponible de una variante cae bajo un umbral, se programa una ENTRADA tras su lead time por 1–2 meses de demanda. Algunas variantes se dejan agotar a propósito.
+- Historia de 36 meses (35 completos al cerrar) hasta la fecha final (ADR-010 D2): Holt-Winters necesita ≥ 30 meses y el backtest evalúa 6 meses fuera de muestra.
+- Reposición por **planes de compra reales** (ADR-010 D8): cuando la posición (disponible + en camino) de una variante cae bajo el punto de pedido propio de la semilla (demanda del lead time + 7 días), se crea un plan por producto y día (INVENTARIO), se aprueba a la misma hora (ADMIN) y se recibe al llegar (INVENTARIO; la recepción es la ENTRADA `PLAN_COMPRA/{id}`) por 30–60 días de demanda. No usa el ROP ni la sugerencia del sistema. Los pedidos que llegan después de `fin` quedan APROBADOS (en camino); el verificador exige que Σ cantidad aprobada de planes APROBADO coincida con el simulador. Algunas variantes se dejan agotar a propósito.
 - Devoluciones: ~4% de las ventas, dentro de los 15 días siguientes, 80% aptas para venta.
 - Reservas: en los últimos 30 días, ~10 activas, algunas vencidas y otras convertidas.
 - Usuarios demo: uno por rol (`admin@livorno.co`, `inventario@livorno.co`, `ventas@livorno.co`, `contabilidad@livorno.co`) con contraseña desde variable de entorno `SEED_PASSWORD` (obligatoria), sin cambio de contraseña obligatorio.
