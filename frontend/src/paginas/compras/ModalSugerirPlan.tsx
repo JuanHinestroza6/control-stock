@@ -15,6 +15,7 @@ const SIN_CANDIDATAS = 'No hay variantes que necesiten reposición por ahora.'
 /** Estado de navegación hacia el detalle: avisa las variantes omitidas (el detalle posterior no las trae). */
 export interface EstadoNavegacionPlan {
   omitidas?: string[]
+  excluidasPorTope?: number
 }
 
 export function ModalSugerirPlan({ onCerrar }: { onCerrar: () => void }) {
@@ -30,7 +31,7 @@ export function ModalSugerirPlan({ onCerrar }: { onCerrar: () => void }) {
     if (observacion.trim()) datos.observacion = observacion.trim()
     sugerir.mutate(datos, {
       onSuccess: (plan) => {
-        const estado: EstadoNavegacionPlan = { omitidas: plan.omitidas ?? [] }
+        const estado: EstadoNavegacionPlan = { omitidas: plan.omitidas ?? [], excluidasPorTope: plan.excluidasPorTope ?? 0 }
         void navigate(`/compras/${plan.id}`, { state: estado })
       },
     })

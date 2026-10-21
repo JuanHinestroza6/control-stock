@@ -9,29 +9,24 @@ import { mensajeError } from '../../lib/errores'
 import { formatearMoneda } from '../../lib/formato'
 import type { InventarioItemResponse } from '../../tipos/inventario'
 import type { PlanCompraDetalleResponse } from '../../tipos/compras'
-import { construirLineasPlan, MAX_LINEAS_PLAN, type LineaBorrador } from './textosPlan'
+import { construirLineasPlan, MAX_LINEAS_PLAN } from './textosPlan'
+import {
+  desdePlan,
+  fusionar,
+  instantanea,
+  type ConflictoLinea,
+  type ConflictoObservacion,
+  type LineaEditable,
+} from './fusionBorrador'
 
-interface LineaEditable extends LineaBorrador {
-  sugerida: number | null
-  justificacion: string | null
-  inactiva: boolean
+interface BaseEdicion {
+  version: number
+  lineas: LineaEditable[]
+  observacion: string
 }
 
-function desdePlan(plan: PlanCompraDetalleResponse): LineaEditable[] {
-  return plan.lineas.map((l) => ({
-    varianteId: l.varianteId,
-    sku: l.sku,
-    descripcion: `${l.productoNombre} · ${l.talla} · ${l.color}`,
-    cantidad: String(l.cantidadAprobada),
-    costo: String(l.costoEstimado),
-    sugerida: l.cantidadSugerida,
-    justificacion: l.justificacion,
-    inactiva: !l.varianteActiva,
-  }))
-}
-
-function instantanea(lineas: LineaEditable[], observacion: string): string {
-  return JSON.stringify([observacion.trim(), lineas.map((l) => [l.varianteId, l.cantidad.trim(), l.costo.trim()])])
+function resumen(l: LineaEditable | null, quitada: string): string {
+  return l ? `${l.cantidad.trim() || '—'} u. · costo ${l.costo.trim() || 'por defecto'}` : quitada
 }
 
 interface EditorBorradorProps {
@@ -44,17 +39,50 @@ interface EditorBorradorProps {
   onDescartar: () => void
 }
 
-/** Edición del BORRADOR: cantidades, costos, quitar y agregar líneas; guarda con la `version` del plan. */
+/** Edición del BORRADOR: cantidades, costos, quitar y agregar líneas; guarda con la `version` de la base de edición. */
 export function EditorBorrador({ plan, onSucioCambio, onRecargar, onDescartar }: EditorBorradorProps) {
   const actualizar = useActualizarPlan(plan.id)
   const [lineas, setLineas] = useState<LineaEditable[]>(() => desdePlan(plan))
   const [observacion, setObservacion] = useState(plan.observacion ?? '')
-  const [base, setBase] = useState(() => instantanea(desdePlan(plan), plan.observacion ?? ''))
+  // Base: el plan (líneas, observación) y la versión sobre los que empecé a editar. El PUT usa SU versión.
+  const [base, setBase] = useState<BaseEdicion>(() => ({
+    version: plan.version,
+    lineas: desdePlan(plan),
+    observacion: (plan.observacion ?? '').trim(),
+  }))
+  const [conflictos, setConflictos] = useState<ConflictoLinea[]>([])
+  const [conflictoObs, setConflictoObs] = useState<ConflictoObservacion | null>(null)
+  const [aviso, setAviso] = useState<string>()
   const [errores, setErrores] = useState<Record<number, string>>({})
   const [general, setGeneral] = useState<string>()
   const [guardado, setGuardado] = useState(false)
 
-  const sucio = useMemo(() => instantanea(lineas, observacion) !== base, [lineas, observacion, base])
+  // Llegó una versión más nueva (tras un 409 o un refresco): fusión de tres vías base / mío / vigente.
+  if (plan.version > base.version) {
+    const vigentes = desdePlan(plan)
+    const obsVigente = plan.observacion ?? ''
+    const mias = [...lineas, ...conflictos.flatMap((c) => (c.mia ? [c.mia] : []))]
+    const r = fusionar(base.lineas, mias, vigentes, base.observacion, conflictoObs ? conflictoObs.mia : observacion, obsVigente)
+    setLineas(r.lineas)
+    setConflictos(r.conflictos)
+    setConflictoObs(r.conflictoObservacion)
+    if (!r.conflictoObservacion) setObservacion(r.observacion)
+    setBase({ version: plan.version, lineas: vigentes, observacion: obsVigente.trim() })
+    const nConf = r.conflictos.length + (r.conflictoObservacion ? 1 : 0)
+    setAviso(
+      nConf > 0
+        ? `Se cargó la versión vigente del plan y hay ${nConf} conflicto(s) con tus cambios: resuélvelos para poder guardar.`
+        : r.huboCambiosAjenos
+          ? 'Se cargó la versión vigente del plan y se incorporaron los cambios de la otra persona a tus cambios.'
+          : undefined,
+    )
+  }
+
+  const hayConflictos = conflictos.length > 0 || conflictoObs !== null
+  const sucio = useMemo(
+    () => hayConflictos || instantanea(lineas, observacion) !== instantanea(base.lineas, base.observacion),
+    [lineas, observacion, base, hayConflictos],
+  )
   const [avisado, setAvisado] = useState(false)
   if (sucio !== avisado) {
     setAvisado(sucio)
@@ -80,7 +108,7 @@ export function EditorBorrador({ plan, onSucioCambio, onRecargar, onDescartar }:
   const agregar = (v: InventarioItemResponse) => {
     setGuardado(false)
     setLineas((ls) =>
-      ls.some((l) => l.varianteId === v.varianteId) || ls.length >= MAX_LINEAS_PLAN
+      ls.some((l) => l.varianteId === v.varianteId) || conflictos.some((c) => c.varianteId === v.varianteId) || ls.length >= MAX_LINEAS_PLAN
         ? ls
         : [
             ...ls,
@@ -98,18 +126,39 @@ export function EditorBorrador({ plan, onSucioCambio, onRecargar, onDescartar }:
     )
   }
 
+  const resolverLinea = (c: ConflictoLinea, usar: 'mia' | 'vigente') => {
+    setGuardado(false)
+    const elegida = c[usar]
+    setConflictos((cs) => cs.filter((x) => x.varianteId !== c.varianteId))
+    if (elegida) setLineas((ls) => [...ls.filter((l) => l.varianteId !== c.varianteId), elegida])
+  }
+  const resolverObservacion = (usar: 'mia' | 'vigente') => {
+    if (!conflictoObs) return
+    setGuardado(false)
+    setObservacion(conflictoObs[usar])
+    setConflictoObs(null)
+  }
+
   const enviar = (e: FormEvent) => {
     e.preventDefault()
+    if (hayConflictos) return
     const r = construirLineasPlan(lineas)
     setErrores(r.errores)
     setGeneral(r.general)
     if (!r.lineas) return
-    const nuevaBase = instantanea(lineas, observacion)
+    const textoObs = observacion.trim()
+    const nuevaBase: BaseEdicion = { version: base.version, lineas, observacion: textoObs }
     actualizar.mutate(
-      { version: plan.version, lineas: r.lineas, ...(observacion.trim() ? { observacion: observacion.trim() } : {}) },
       {
-        onSuccess: () => {
-          setBase(nuevaBase)
+        version: base.version,
+        lineas: r.lineas,
+        // Vaciar una observación que existía exige enviar null explícito.
+        ...(textoObs ? { observacion: textoObs } : base.observacion ? { observacion: null } : {}),
+      },
+      {
+        onSuccess: (respuesta) => {
+          setBase({ ...nuevaBase, version: respuesta.version })
+          setAviso(undefined)
           setGuardado(true)
         },
       },
@@ -121,11 +170,68 @@ export function EditorBorrador({ plan, onSucioCambio, onRecargar, onDescartar }:
       <BuscadorVariante
         etiqueta="Agregar variante (busca por SKU, código o nombre)"
         onSeleccionar={agregar}
-        excluirIds={lineas.map((l) => l.varianteId)}
+        excluirIds={[...lineas.map((l) => l.varianteId), ...conflictos.map((c) => c.varianteId)]}
       />
       {lineas.length >= MAX_LINEAS_PLAN && <p className="text-sm text-alerta">Llegaste al máximo de {MAX_LINEAS_PLAN} líneas.</p>}
 
       <form onSubmit={enviar} noValidate aria-label="Editar borrador" className="flex flex-col gap-4">
+        {aviso && (
+          <p role="status" className="rounded-lg border border-acento/40 bg-acento/5 p-3 text-sm">
+            {aviso}
+          </p>
+        )}
+        {hayConflictos && (
+          <section aria-label="Conflictos por resolver" className="flex flex-col gap-3 rounded-lg border-2 border-critico bg-critico/5 p-4">
+            <h2 className="text-base">Conflictos por resolver</h2>
+            <p className="text-sm">
+              Tú y otra persona cambiaron lo mismo de forma distinta. Elige qué conservar; no podrás guardar hasta resolverlos todos.
+            </p>
+            <ul className="flex flex-col gap-3">
+              {conflictos.map((c) => (
+                <li key={c.varianteId} className="flex flex-col gap-2 rounded-lg border border-critico/40 bg-fondo p-3 text-sm">
+                  <p className="flex flex-wrap items-center gap-2 font-medium">
+                    <Badge tono="critico">Conflicto</Badge>
+                    {c.sku}
+                    <span className="text-xs font-normal text-oxford/70">{c.descripcion}</span>
+                  </p>
+                  <p>
+                    <strong>Lo mío:</strong> {resumen(c.mia, 'quité esta línea')}
+                  </p>
+                  <p>
+                    <strong>Lo vigente:</strong> {resumen(c.vigente, 'la otra persona quitó esta línea')}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Boton variante="secundario" onClick={() => resolverLinea(c, 'mia')}>
+                      Usar el mío ({c.sku})
+                    </Boton>
+                    <Boton onClick={() => resolverLinea(c, 'vigente')}>Usar el vigente ({c.sku})</Boton>
+                  </div>
+                </li>
+              ))}
+              {conflictoObs && (
+                <li className="flex flex-col gap-2 rounded-lg border border-critico/40 bg-fondo p-3 text-sm">
+                  <p className="flex flex-wrap items-center gap-2 font-medium">
+                    <Badge tono="critico">Conflicto</Badge>
+                    Observación
+                  </p>
+                  <p>
+                    <strong>Lo mío:</strong> {conflictoObs.mia || '(vacía)'}
+                  </p>
+                  <p>
+                    <strong>Lo vigente:</strong> {conflictoObs.vigente || '(vacía)'}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Boton variante="secundario" onClick={() => resolverObservacion('mia')}>
+                      Usar el mío (observación)
+                    </Boton>
+                    <Boton onClick={() => resolverObservacion('vigente')}>Usar el vigente (observación)</Boton>
+                  </div>
+                </li>
+              )}
+            </ul>
+          </section>
+        )}
+
         {lineas.length === 0 ? (
           <p className="rounded-lg border border-dashed border-oxford/20 bg-fondo p-6 text-center text-sm text-oxford/70">
             El plan no tiene líneas. Busca una variante para agregarla.
@@ -201,8 +307,9 @@ export function EditorBorrador({ plan, onSucioCambio, onRecargar, onDescartar }:
             {conflicto && (
               <>
                 <p>
-                  El plan cambió mientras lo editabas. Tus cambios se conservan en pantalla: carga la versión vigente y vuelve a
-                  guardar, o descarta lo escrito.
+                  El plan cambió mientras lo editabas. Tus cambios se conservan en pantalla: al cargar la versión vigente se
+                  fusionan con los de la otra persona (si ambos cambian lo mismo, tú eliges); luego vuelve a guardar, o descarta
+                  lo escrito.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Boton
@@ -233,10 +340,14 @@ export function EditorBorrador({ plan, onSucioCambio, onRecargar, onDescartar }:
           </p>
         )}
         <div className="flex flex-wrap items-center gap-3">
-          <Boton type="submit" cargando={actualizar.isPending} disabled={!sucio}>
+          <Boton type="submit" cargando={actualizar.isPending} disabled={!sucio || hayConflictos}>
             Guardar cambios
           </Boton>
-          {sucio && <span className="text-xs text-oxford/70">Hay cambios sin guardar.</span>}
+          {hayConflictos ? (
+            <span className="text-xs font-medium text-critico">Resuelve los conflictos para guardar.</span>
+          ) : (
+            sucio && <span className="text-xs text-oxford/70">Hay cambios sin guardar.</span>
+          )}
         </div>
       </form>
     </div>

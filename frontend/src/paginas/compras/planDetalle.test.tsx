@@ -366,3 +366,140 @@ describe('PlanDetallePage — casos adicionales', () => {
     expect(screen.getByRole('button', { name: 'Aprobar plan' })).toBeDisabled()
   })
 })
+
+describe('PlanDetallePage — edición concurrente del borrador', () => {
+  const dos = (a: number, b: number, extra: Partial<PlanCompraDetalleResponse> = {}) =>
+    plan('BORRADOR', { lineas: [linea(1, { cantidadAprobada: a }), linea(2, { cantidadAprobada: b })], ...extra })
+
+  async function escribir(etiqueta: string, valor: string) {
+    const campo = await screen.findByLabelText(etiqueta)
+    await userEvent.clear(campo)
+    await userEvent.type(campo, valor)
+  }
+
+  it('el otro edita la línea A y yo la B: tras el 409 y cargar, se guarda A del otro y B mía con la versión vigente', async () => {
+    vi.mocked(api.obtenerPlan).mockResolvedValueOnce(dos(24, 24)).mockResolvedValue(dos(50, 24, { version: 5 }))
+    vi.mocked(api.actualizarPlan).mockRejectedValueOnce(error(409, 'Modificado por otro usuario.')).mockResolvedValue(dos(50, 40, { version: 6 }))
+    montar('INVENTARIO')
+    await escribir('Cantidad de LIV002-M-NEG', '40')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    expect(vi.mocked(api.actualizarPlan).mock.calls[0][1]).toMatchObject({ version: 3 })
+    await userEvent.click(await screen.findByRole('button', { name: 'Cargar versión vigente' }))
+    await waitFor(() => expect(screen.getByLabelText('Cantidad de LIV001-M-NEG')).toHaveValue('50'))
+    expect(screen.getByLabelText('Cantidad de LIV002-M-NEG')).toHaveValue('40')
+    expect(screen.getByText(/se incorporaron los cambios de la otra persona/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    await waitFor(() => expect(api.actualizarPlan).toHaveBeenCalledTimes(2))
+    expect(vi.mocked(api.actualizarPlan).mock.calls[1][1]).toEqual({
+      version: 5,
+      lineas: [{ varianteId: 11, cantidad: 50, costoEstimado: 25000 }, { varianteId: 12, cantidad: 40, costoEstimado: 25000 }],
+    })
+  })
+
+  it('ambos editamos A distinto: queda en conflicto, Guardar deshabilitado hasta elegir', async () => {
+    vi.mocked(api.obtenerPlan).mockResolvedValueOnce(dos(24, 24)).mockResolvedValue(dos(50, 24, { version: 5 }))
+    vi.mocked(api.actualizarPlan).mockRejectedValueOnce(error(409, 'Modificado por otro usuario.')).mockResolvedValue(dos(30, 24, { version: 6 }))
+    montar('ADMIN')
+    await escribir('Cantidad de LIV001-M-NEG', '30')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Cargar versión vigente' }))
+    const seccion = await screen.findByRole('region', { name: 'Conflictos por resolver' })
+    expect(seccion).toHaveTextContent('Conflicto')
+    expect(seccion).toHaveTextContent(/Lo mío:\s*30 u\./)
+    expect(seccion).toHaveTextContent(/Lo vigente:\s*50 u\./)
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Aprobar plan' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Usar el mío (LIV001-M-NEG)' }))
+    expect(screen.queryByRole('region', { name: 'Conflictos por resolver' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Cantidad de LIV001-M-NEG')).toHaveValue('30')
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    await waitFor(() => expect(api.actualizarPlan).toHaveBeenCalledTimes(2))
+    expect(vi.mocked(api.actualizarPlan).mock.calls[1][1]).toMatchObject({ version: 5 })
+    expect(vi.mocked(api.actualizarPlan).mock.calls[1][1].lineas).toContainEqual({ varianteId: 11, cantidad: 30, costoEstimado: 25000 })
+  })
+
+  it('en un conflicto, elegir lo vigente conserva el valor del otro', async () => {
+    vi.mocked(api.obtenerPlan).mockResolvedValueOnce(dos(24, 24)).mockResolvedValue(dos(50, 24, { version: 5 }))
+    vi.mocked(api.actualizarPlan).mockRejectedValueOnce(error(409, 'Modificado por otro usuario.'))
+    montar('ADMIN')
+    await escribir('Cantidad de LIV001-M-NEG', '30')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Cargar versión vigente' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Usar el vigente (LIV001-M-NEG)' }))
+    expect(screen.getByLabelText('Cantidad de LIV001-M-NEG')).toHaveValue('50')
+    expect(screen.queryByRole('region', { name: 'Conflictos por resolver' })).not.toBeInTheDocument()
+  })
+
+  it('el otro quita una línea que yo no toqué: queda quitada', async () => {
+    vi.mocked(api.obtenerPlan).mockResolvedValueOnce(dos(24, 24)).mockResolvedValue(plan('BORRADOR', { version: 5 }))
+    vi.mocked(api.actualizarPlan).mockRejectedValueOnce(error(409, 'Modificado por otro usuario.')).mockResolvedValue(plan('BORRADOR', { version: 6 }))
+    montar('INVENTARIO')
+    await escribir('Cantidad de LIV001-M-NEG', '30')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Cargar versión vigente' }))
+    await waitFor(() => expect(screen.queryByLabelText('Cantidad de LIV002-M-NEG')).not.toBeInTheDocument())
+    expect(screen.getByLabelText('Cantidad de LIV001-M-NEG')).toHaveValue('30')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    await waitFor(() => expect(api.actualizarPlan).toHaveBeenCalledTimes(2))
+    expect(vi.mocked(api.actualizarPlan).mock.calls[1][1]).toEqual({ version: 5, lineas: [{ varianteId: 11, cantidad: 30, costoEstimado: 25000 }] })
+  })
+
+  it('un refresco sin cambios de versión no cambia la base: se guarda con la versión original', async () => {
+    vi.mocked(api.obtenerPlan).mockResolvedValue(plan('BORRADOR'))
+    vi.mocked(api.actualizarPlan).mockRejectedValueOnce(error(409, 'Choque.')).mockResolvedValue(plan('BORRADOR', { version: 4 }))
+    montar('INVENTARIO')
+    await escribir('Cantidad de LIV001-M-NEG', '30')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Cargar versión vigente' }))
+    await waitFor(() => expect(api.obtenerPlan).toHaveBeenCalledTimes(2))
+    expect(screen.queryByRole('region', { name: 'Conflictos por resolver' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    await waitFor(() => expect(api.actualizarPlan).toHaveBeenCalledTimes(2))
+    expect(vi.mocked(api.actualizarPlan).mock.calls[1][1]).toMatchObject({ version: 3 })
+  })
+
+  it('conflicto en la observación: bloquea Guardar y se resuelve con los botones', async () => {
+    vi.mocked(api.obtenerPlan)
+      .mockResolvedValueOnce(plan('BORRADOR', { observacion: 'base' }))
+      .mockResolvedValue(plan('BORRADOR', { observacion: 'del otro', version: 5 }))
+    vi.mocked(api.actualizarPlan).mockRejectedValueOnce(error(409, 'Modificado.'))
+    montar('ADMIN')
+    await escribir('Observación (opcional)', 'mía')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Cargar versión vigente' }))
+    expect(await screen.findByRole('button', { name: 'Usar el vigente (observación)' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Usar el vigente (observación)' }))
+    expect(screen.getByLabelText('Observación (opcional)')).toHaveValue('del otro')
+  })
+
+  it('vaciar una observación existente envía observacion null', async () => {
+    vi.mocked(api.obtenerPlan).mockResolvedValue(plan('BORRADOR', { observacion: 'algo' }))
+    vi.mocked(api.actualizarPlan).mockResolvedValue(plan('BORRADOR', { version: 4 }))
+    montar('ADMIN')
+    await userEvent.clear(await screen.findByLabelText('Observación (opcional)'))
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    await waitFor(() => expect(api.actualizarPlan).toHaveBeenCalled())
+    expect(vi.mocked(api.actualizarPlan).mock.calls[0][1]).toMatchObject({ version: 3, observacion: null })
+  })
+
+  it('avisa las variantes excluidas por el tope de 300 líneas recibidas por la navegación', async () => {
+    vi.mocked(api.obtenerPlan).mockResolvedValue(plan('BORRADOR'))
+    localStorage.clear()
+    guardarSesion(crearSesion('INVENTARIO'))
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={[{ pathname: '/compras/7', state: { omitidas: [], excluidasPorTope: 12 } }]}>
+          <SesionProvider>
+            <Routes>
+              <Route path="/compras/:id" element={<PlanDetallePage />} />
+            </Routes>
+          </SesionProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    expect(await screen.findByText(/12 variante\(s\) quedaron fuera por el límite de 300 líneas/)).toBeInTheDocument()
+  })
+})

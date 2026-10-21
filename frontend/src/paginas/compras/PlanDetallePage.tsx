@@ -39,6 +39,7 @@ export function PlanDetallePage() {
   const consulta = usePlan(valido ? numero : undefined)
   const estado = useLocation().state as EstadoNavegacionPlan | null
   const omitidas = estado?.omitidas ?? []
+  const excluidas = estado?.excluidasPorTope ?? 0
 
   return (
     <section className="flex flex-col gap-4">
@@ -48,6 +49,11 @@ export function PlanDetallePage() {
       {omitidas.length > 0 && (
         <p role="status" className="rounded-lg border border-alerta/50 bg-alerta/10 p-3 text-sm">
           Se omitieron {omitidas.length} variante(s) por estar ya en otro borrador: {omitidas.join(', ')}.
+        </p>
+      )}
+      {excluidas > 0 && (
+        <p role="status" className="rounded-lg border border-alerta/50 bg-alerta/10 p-3 text-sm">
+          {excluidas} variante(s) quedaron fuera por el límite de 300 líneas; se incluyeron las de mayor prioridad.
         </p>
       )}
       {!valido ? (

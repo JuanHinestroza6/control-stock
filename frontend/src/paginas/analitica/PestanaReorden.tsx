@@ -231,7 +231,7 @@ export function PestanaReorden() {
         <EstadoVacio mensaje={hayFiltros ? 'Ninguna variante coincide con los filtros.' : 'No hay puntos de reorden calculados.'} />
       ) : pag ? (
         <>
-          <Tabla columnas={COLUMNAS} filas={pag.content}claveFila={(f) => f.varianteId} descripcion="Punto de reorden por variante" />
+          <Tabla columnas={COLUMNAS} filas={pag.content} claveFila={(f) => f.varianteId} descripcion="Punto de reorden por variante" />
           <Paginacion pagina={pag.page} onCambiar={setPagina} />
         </>
       ) : null}

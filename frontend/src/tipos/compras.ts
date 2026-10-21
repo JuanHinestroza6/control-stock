@@ -61,6 +61,8 @@ export interface PlanCompraDetalleResponse extends Omit<PlanCompraResumenRespons
   canceladoPor: string | null
   /** SKUs omitidos por estar ya en otro borrador; solo al sugerir. */
   omitidas: string[] | null
+  /** Variantes que quedaron fuera por el tope de 300 líneas; solo al sugerir. */
+  excluidasPorTope?: number
   lineas: LineaPlanResponse[]
 }
 
@@ -85,8 +87,10 @@ export interface CrearPlanRequest {
   lineas: LineaPlanRequest[]
 }
 
-export interface ActualizarPlanRequest extends CrearPlanRequest {
+export interface ActualizarPlanRequest extends Omit<CrearPlanRequest, 'observacion'> {
   version: number
+  /** null vacía la observación existente. */
+  observacion?: string | null
 }
 
 export interface AprobarPlanRequest {
