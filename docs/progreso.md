@@ -4,10 +4,10 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
 
 ## Estado actual
 
-- Semana: 3
-- Fase en curso: 5 — Analítica base terminada (rama `fase-5-analitica` publicada, PR abierto); siguiente: Fase 6
-  (predicción y compras)
-- Última actualización: 2026-10-15
+- Semana: 4
+- Fase en curso: 6 — Predicción y compras, **núcleo terminado** (rama `fase-6-prediccion-compras`, sin push); en pausa
+  en el punto de corte para que el usuario decida si sigue con B12, F7, T2 y documentación
+- Última actualización: 2026-10-20
 
 ## Hecho
 
@@ -18,38 +18,34 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
       y REQ-13 (nuevo, NEC-11, CU-14); T3 sin errores (PR #6)
 - [x] Fase 4 — Datos semilla (ADR-008): 30 productos / 299 variantes, 24 meses; T1 real correcta; PPI "Datos de
       demostración" (PR #7)
-- [x] Fase 5 — plan (docs/fases/fase-5-plan.md) y ADR-009 con D1 (a) ABC por variante 12 meses, D2 (b) ROP normal/Poisson
-      sin piso, D3 (a) SIN_ROTACION por producto excluyente, D4 (a) meta de alertas medida ahora y cumplida en la fase 6
-- [x] Fase 5 — backend B1–B8: V14 (ejecucion_analitica, analitica_variante), escritura dirigida de ROP/clase sin
-      `version`, ABC/ROP/Poisson, orquestador con tarea nocturna 02:00 y recálculo manual (ADMIN), SIN_ROTACION con
-      prioridad y episodio, cierre de alertas al desactivar (bug fase 3), más vendidos, endpoints, semilla cierra con la
-      analítica. Algoritmos A1–A2 con prueba Monte Carlo del nivel de servicio
-- [x] Fase 5 — frontend F1–F6: página Analítica (pestañas por rol, panel de ejecución, Más vendidos, ABC, Reorden),
-      Clase y Umbral en inventario, SIN_ROTACION en alertas y campana
-- [x] Fase 5 — T1 flujo de punta a punta y matriz de roles; revisión final sin críticos: 2 importantes de concurrencia
-      (SKIP LOCKED en el cálculo, cierre de SIN_ROTACION por ids) y 7 menores corregidos
-- [x] Fase 5 — T2 real (2026-10-15): la primera corrida no mostró SIN_ROTACION (los estancados vendían por reservas
-      convertidas); se ajustó la semilla (estancados sin ventas ni reservas en los últimos 90 días) y se repitió. Segunda
-      corrida: carga 2 min 10 s; 12.227 ventas (91 anuladas); analítica SEMILLA EXITOSA en 4,95 s; ABC A 79 / B 86 /
-      C 126 (79,9 / 15,1 / 5,0 % del ingreso); ROP NORMAL 26, POISSON 201, SIN_DEMANDA 64; alertas AGOTADO 27, STOCK_BAJO
-      73, SIN_ROTACION 18 (LIV004, LIV026, LIV030); **34,4 % de variantes en alerta de stock** (fase 4: 47 %); Recalcular
-      4,8 s (primera corrida). Revisión por los 4 roles correcta; la segunda ejecución no creó nada
-- [x] Fase 5 — PPI: fichas REQ-05 (Vendedor, NEC-05, CU-08, Media) y REQ-14 nuevo (Asistente de gerencia, NEC-10, CU-15
-      "Clasificar productos (ABC)" nuevo, Media), REQ-04 (fase 5) y "Datos de demostración" con T2. Backend 855/855,
-      frontend 425/425
+- [x] Fase 5 — Analítica base (ADR-009): ABC por variante, ROP normal/Poisson, SIN_ROTACION, más vendidos, ejecución
+      nocturna y manual; T2 real con 34,4 % de variantes en alerta de stock (fase 4: 47 %); PPI REQ-05, REQ-14 (CU-15),
+      REQ-04; diagramas CU-08, CU-15 y clases de `analitica` (PR #8, #9)
+- [x] Fase 6 — plan (docs/fases/fase-6-plan.md) y ADR-010 con D1–D8 (D3 en b), **Holt-Winters multiplicativo** (mes en 0
+      → SES), punto de corte (núcleo primero) y PDF de tendencias (CU-05) movido a la fase 7; dominio y skill de algoritmos
+- [x] Fase 6 — algoritmos A1–A5: serie mensual y corrección por agotados, SES y HW multiplicativo, selección por
+      backtesting con origen móvil (serie sintética de LIV001: WAPE SES 12,1 % vs HW 5,2 %), desagregación y ROP con
+      pronóstico, sugerencia (s, S)
+- [x] Fase 6 — backend B1–B11: V15 (pronóstico e instantáneas), consultas de demanda mensual y disponibilidad,
+      PronosticoService, ejecución con pronóstico previo (fallo → FALLIDA con ROP histórico), V16 y módulo `compra` con
+      puertos, crear/editar/cancelar/aprobar/recibir (entradas `PLAN_COMPRA/{id}` por MovimientoService), STOCK_BAJO por
+      posición y métricas de tránsito, sugerencia con omitidas, endpoints de tendencias, pronósticos y planes
+- [x] Fase 6 — frontend F1–F6: Recharts, pestañas Tendencias y Pronóstico, página Compras (listado, sugerir, plan manual),
+      detalle del plan (editar, aprobar, cancelar) y recepción con costo por producto
+- [x] Fase 6 — T1: flujo de compra de punta a punta por HTTP y matriz de roles de 60 filas. Backend 1247/1247,
+      frontend 561/561
 
 ## En curso
 
-- [ ] PR de `fase-5-analitica` hacia main (revisar CI y hacer merge)
+- [ ] Fase 6 — punto de corte: reporte al usuario antes de seguir
 
 ## Próximos pasos
 
-1. Merge del PR de la fase 5; luego `git switch main && git pull`.
-2. Iniciar `/fase 6`: pronóstico (SES/Holt-Winters con backtesting), tendencias (REQ-09) y plan de compras (REQ-10).
-3. En la fase 6, STOCK_BAJO por posición de inventario (disponible + pedidos aprobados en camino) para llegar a la meta de
-   ~10–15 % de variantes en alerta (D4); hoy 34,4 %.
-4. Diagramas UML de la analítica (casos de uso CU-08/CU-15 y clases de `analitica`): aún no existen; crearlos con
-   `documentador-ppi` cuando se arme el documento PPI (fase 7) o antes si se piden.
+1. Después del corte (si el usuario lo aprueba): B12 semilla de 36 meses con reposición por planes (D8) y skill
+   `datos-semilla`; F7 "en camino" y posición en Inventario, Reorden, Alertas y panel de ejecución (alinear el filtro
+   "Solo en alerta" de Reorden con la posición); T2 real; fichas REQ-09, REQ-10, REQ-04 y diagramas.
+2. Revisión final de la fase con `revisor` (ver pendientes de revisión abajo) y PR de la rama.
+3. Fase 7: dashboard, reportes PDF/Excel (incluye el PDF de tendencias, CU-05), rendimiento y documento PPI.
 
 ## Bloqueos y decisiones pendientes (aceptados, sin acción)
 
@@ -66,6 +62,13 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
   censurada por las ventas perdidas (2,5–3 %): la corrige el pronóstico de la fase 6. El ROP con revisión diaria o ventas
   de 2+ unidades queda unos puntos bajo el nivel de servicio (ver riesgos del plan de la fase 5).
 
+- Pendientes para la revisión final de la fase 6: (1) al guardar un borrador tras un 409 y "Cargar versión vigente",
+  las líneas cambiadas por otro usuario se sobrescriben; (2) no se puede vaciar la observación de un borrador (el PUT
+  omite el campo vacío); (3) el filtro "Solo en alerta" de Reorden aún mira el disponible, no la posición (F7); (4) con
+  más de 300 candidatas la sugerencia toma las primeras 300 por id, no por prioridad.
+- Antes de B12 la demo usa la semilla de 24 meses (23 completos): todos los productos salen SES con POCA_HISTORIA y la
+  métrica de alertas no cambia hasta que se aprueben planes (HW se valida con pruebas).
+
 ## Notas para la próxima sesión
 
 - Maven en el sandbox de Claude Code: usar `./mvnw -o` (offline). Si se agregan dependencias, ejecutar `./mvnw` con red
@@ -75,6 +78,10 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
 - Las pruebas que borran variantes deben borrar antes `alerta` y `reserva`; las de semilla usan `LimpiezaSemilla`.
 - Las reservas ACTIVAS de la semilla vencen a los pocos días: regenerar la víspera de una demo.
 - CI fijado en `ubuntu-24.04`; el limitador de login es en memoria (`getRemoteAddr()`).
+- Frontend: en dos corridas apareció 1 fallo intermitente que no se reprodujo en 7 corridas seguidas; probablemente
+  carga de la máquina con Maven en paralelo. Si reaparece, guardar la salida de `npx vitest run --reporter=verbose`.
+- Fase 6: el IDE volvió a compilar en `target/` ("Unresolved compilation problems"); revisar que Java › Autobuild siga
+  desactivado. Nunca correr dos Maven a la vez (corrompe `target/` y choca con Testcontainers).
 - Problema conocido: `ClassFormatError: Invalid method Code length 0` al arrancar (clase corrupta en `target/`, p. ej.
   `AnaliticaVariante`) se resuelve con `./mvnw clean` (o `.\mvnw.cmd clean`). El usuario desactivó el Auto Build de la
   extensión Java de VS Code, que compilaba en `target/` a la vez que Maven.
