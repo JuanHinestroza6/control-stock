@@ -48,6 +48,14 @@ beforeEach(() => {
 })
 
 describe('InventarioPage', () => {
+  it('muestra "N en camino" junto al estado solo si hay pedido', async () => {
+    vi.mocked(api.listarInventario).mockResolvedValue(pagina([item(1, { enCamino: 25, estadoStock: 'BAJO' }), item(2, { enCamino: 0 })]))
+    renderizarApp(<InventarioPage />, { rol: 'ADMIN' })
+    expect(await screen.findByText('25 en camino')).toBeInTheDocument()
+    expect(screen.getAllByText(/en camino/)).toHaveLength(1)
+    expect(screen.getByText('Stock bajo', { selector: 'span' })).toBeInTheDocument()
+  })
+
   it('muestra carga, luego filas con estado y consulta por defecto sin inactivas', async () => {
     renderizarApp(<InventarioPage />, { rol: 'ADMIN' })
     expect(screen.getByRole('status', { name: 'Cargando' })).toBeInTheDocument()

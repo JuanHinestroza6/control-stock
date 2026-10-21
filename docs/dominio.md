@@ -36,11 +36,18 @@ Reserva        id, varianteId, cantidad, clienteNombre, clienteContacto,
                creadaEn, venceEn, estado, ventaId (nullable), usuarioId (quien la crea),
                cerradaEn (nullable), cerradaPor (nullable: null = proceso del sistema), motivoCancelacion (nullable)
 Alerta         id, varianteId, tipo, estado, creadaEn, revisadaEn, atendidaEn, atendidaPor
-Pronostico     id, productoId, varianteId (nullable), periodo (YYYY-MM), cantidadProyectada,
-               metodo, errorWape, calculadoEn
-PlanCompra     id, fecha, usuarioId, estado
-DetallePlan    id, planId, varianteId, cantidadSugerida, cantidadAprobada, justificacion
+Pronostico     id, productoId, varianteId (nullable: null = total del producto), periodo (día 1 del mes; se muestra
+               YYYY-MM), cantidadProyectada, metodo (SES|HOLT_WINTERS), errorWape (nullable), calculadoEn, ejecucionId
+               (V15; único por producto, variante y periodo)
+PlanCompra     id, estado (BORRADOR|APROBADO|RECIBIDO|CANCELADO), origen (SUGERIDO|MANUAL), observacion,
+               creadoEn/creadoPor, aprobadoEn/aprobadoPor, recibidoEn/recibidoPor, canceladoEn/canceladoPor,
+               motivoCancelacion, ejecucionId (nullable), version, actualizadoEn (V16)
+DetallePlan    id, planId, varianteId, cantidadSugerida (nullable), cantidadAprobada (1–100.000), costoEstimado,
+               justificacion, cantidadRecibida (nullable), costoRecibido (nullable); único (plan, variante) (V16)
 ```
+Instantáneas del pronóstico (V15, solo la última ejecución): `analitica_producto` (método, α/β/γ, WAPE de SES y de HW,
+motivo sin HW, meses de historia, unidades observadas y corregidas de 12 meses) y `analitica_producto_mes` (serie mensual:
+observada, disponibilidad, corregida y pronósticos del backtest).
 
 Auditoría: Usuario, Categoria, Producto y Variante heredan de `EntidadAuditable` (`creadoEn`, `actualizadoEn`, llenados por
 JPA Auditing con un `Clock` en America/Bogota). Movimiento y las demás entidades con fecha propia (`fecha`, `creadaEn`,
@@ -72,8 +79,10 @@ SKU sugerido: `{codigoProducto}-{talla}-{COLOR3}` → `LIV001-M-NEG`.
   que tenga reservas ACTIVAS (409, mensaje con el SKU, el número de apartados y las unidades). Desde la Fase 3 se consulta
   la tabla de reservas (ADR-007) a través de la interfaz `catalogo.servicio.ConsultaReservasActivas`, implementada en
   inventario, y se mantiene también la comprobación `stockReservado > 0` como defensa.
-- **Estado de stock** (`Variante.estadoStock()`, mismo umbral que las alertas): `AGOTADO` si `disponible == 0`; `BAJO` si
-  `disponible ≤ umbral` (`puntoReorden`, o `stockMinimo` si no hay ROP); `OK` en otro caso.
+- **Estado de stock** (`Variante.estadoStock()`, hecho físico sobre el disponible): `AGOTADO` si `disponible == 0`; `BAJO`
+  si `disponible ≤ umbral` (`puntoReorden`, o `stockMinimo` si no hay ROP); `OK` en otro caso. Desde la Fase 6 no cuenta
+  lo que viene en camino (ver "Alertas"): una variante BAJO con pedido en camino puede no tener alerta; la interfaz
+  muestra "N en camino" junto al estado.
 - **Categorías base** (migración V3): Camisetas, Hoodies, Jeans, Joggers, Chaquetas, Accesorios. El generador de datos
   semilla las reutiliza.
 
@@ -114,7 +123,9 @@ Validaciones en `MovimientoService` (lanzan `ExcepcionNegocio` → 422, no se gu
 - El rol lo controla el `@PreAuthorize` del endpoint que origina el movimiento (ajustes: ADMIN o INVENTARIO). El usuario
   llega explícito en la solicitud (`usuarioId`, null en procesos del sistema) y la fecha sale del `Clock` inyectado.
 - Variante o producto inactivo: lo valida el servicio que llama. Entradas y ventas → 422. Ajustes, devoluciones y
-  anulaciones sí se permiten sobre variantes inactivas (reflejan unidades físicas reales).
+  anulaciones sí se permiten sobre variantes inactivas (reflejan unidades físicas reales). También la **recepción de un
+  plan de compras** (ADR-010): la entrada con referencia `PLAN_COMPRA/{id}` se permite aunque la variante se haya
+  desactivado después de aprobar el plan (la mercancía ya pedida llega igual); aprobar sí exige variantes y productos activos.
 
 Concurrencia (ADR-006): `@Version` en `Variante`. Un choque (`OptimisticLockingFailureException`) o un bloqueo de la base
 (`PessimisticLockingFailureException`) responde 409 sin reintento en el servidor; el cliente conserva el formulario y el
@@ -154,7 +165,10 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. Desde la Fas
   siguen CONVERTIDAS y no se reactivan.
 - **Alerta**: `ACTIVA → ATENDIDA` (manual por ADMIN o INVENTARIO, o automática cuando la condición deja de cumplirse, con
   `atendidaPor` null). Si ya hay una ACTIVA para la misma variante y tipo, no se crea otra: se actualiza `revisadaEn`.
-- **PlanCompra**: `BORRADOR → APROBADO → RECIBIDO` (al recibir genera ENTRADAS).
+- **PlanCompra** (ADR-010): `BORRADOR → APROBADO → RECIBIDO` | `BORRADOR → CANCELADO` | `APROBADO → CANCELADO` (motivo
+  obligatorio). Recibir genera ENTRADAS. Toda transición bloquea la fila del plan (`PESSIMISTIC_WRITE`) y verifica el
+  estado; si no corresponde, 409 "El plan PC-000012 ya está APROBADO." RECIBIDO y CANCELADO son finales. Detalle en
+  "Plan de compras".
 
 ## Devoluciones
 
@@ -200,12 +214,17 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. Desde la Fas
 |---|---|---|
 | AGOTADO | `disponible == 0` | 3 (por evento) |
 | SIN_ROTACION | el **producto** no tiene ventas no anuladas en 60 días, existe hace ≥ 60 días y la variante tiene `disponible > 0` | 5 (por evento y nocturna) |
-| STOCK_BAJO | `0 < disponible ≤ umbral` (`puntoReorden`, o `stockMinimo` si no hay ROP calculado) | 3 (por evento) |
+| STOCK_BAJO | `0 < disponible` y `posición ≤ umbral` (`puntoReorden`, o `stockMinimo` si no hay ROP calculado); `posición = disponible + en camino` | 3 (por evento); posición desde la 6 |
 
 - **Las tres son excluyentes**, con prioridad **AGOTADO > SIN_ROTACION > STOCK_BAJO** (ADR-009): una variante tiene como
   máximo una alerta ACTIVA. Al cambiar el tipo vigente se cierra la anterior y se abre la nueva; si no aplica ninguna, se
-  cierran todas. Cerrar = ATENDIDA automática con `atendidaPor` null. AGOTADO y STOCK_BAJO coinciden con
-  `Variante.estadoStock()`; SIN_ROTACION puede reemplazar a BAJO (el estado de stock sigue diciendo BAJO).
+  cierran todas. Cerrar = ATENDIDA automática con `atendidaPor` null. AGOTADO coincide con `Variante.estadoStock()`;
+  STOCK_BAJO coincide solo si no hay pedido en camino (Fase 6); SIN_ROTACION puede reemplazar a BAJO (el estado de stock
+  sigue diciendo BAJO).
+- **Posición de inventario** (ADR-010): `en camino` = Σ `cantidadAprobada` de las líneas de planes APROBADO (puerto
+  `inventario.servicio.ConsultaPedidosEnCamino`, implementado en `compra`). **AGOTADO sigue sobre el disponible**: con
+  pedido en camino no se puede vender, así que la alerta se mantiene. Aprobar o cancelar un plan APROBADO publica
+  `PosicionCambiada(varianteId)` por línea; el `AlertaListener` las re-evalúa AFTER_COMMIT. Recibir publica `StockCambiado`.
 - **SIN_ROTACION** (ADR-009): la condición es por producto (una venta VENTA o VENTA_RESERVA del kardex sin
   ANULACION_VENTA de la misma referencia cuenta como rotación) y la alerta se abre en cada variante con `disponible > 0`.
   Una venta de cualquier variante cierra la SIN_ROTACION de todas las del producto. **Episodio** = desde
@@ -222,7 +241,10 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. Desde la Fas
   ROP no publica `UmbralCambiado`: la re-evaluación completa lo cubre.
 - **Métrica de alertas** (ADR-009): cada ejecución analítica guarda el porcentaje de variantes activas con AGOTADO o
   STOCK_BAJO (SIN_ROTACION aparte). Línea base de la Fase 4 con `stockMinimo`: 141 de 299 (≈ 47 %). La meta de ~10–15 %
-  se alcanza en la Fase 6, cuando STOCK_BAJO use la posición de inventario (disponible + pedidos aprobados en camino).
+  se busca en la Fase 6, cuando STOCK_BAJO usa la posición de inventario (disponible + pedidos aprobados en camino). Desde
+  entonces se guarda además la métrica **contrafactual** "en alerta si no se contara lo que viene en camino"
+  (`en_alerta_sin_transito`) y el número de variantes con pedido en camino, para mostrar el efecto. La definición no
+  cambia para llegar al número: AGOTADO ya pesa ~9 %, de modo que la meta queda en ~11–17 % y se explica con el desglose.
 - El listener se puede apagar con `app.alertas.por-evento=false` (por defecto `true`). Solo el perfil `seed` lo apaga; el
   generador ejecuta la analítica completa al terminar (ver "Datos semilla" y "Analítica").
 
@@ -233,7 +255,7 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. Desde la Fas
     ingreso neto = Σ (cantidad − devuelta) × `precioUnitario`.
   - *Demanda de inventario* (ROP): por día, vendidas (fecha de la venta, incluidas las convertidas de reservas) −
     devueltas **aptas** (fecha de la devolución), recortada a 0. Las reservas ACTIVAS no son demanda.
-  - La demanda observada está censurada por los agotados; se corrige con el pronóstico (Fase 6).
+  - La demanda observada está censurada por los agotados; el pronóstico la corrige (Fase 6, ver "Pronóstico").
 - **Clasificación ABC por variante**: ingreso neto de los **últimos 12 meses** (`[corte − 365 d, corte)`, corte = hoy,
   excluye el día en curso). Orden por ingreso descendente (desempate por id); cortes sobre el acumulado: A ≤ 80 %, B ≤ 95 %,
   C el resto; la primera siempre es A; sin ingreso → C. Universo: variantes activas de productos activos; las inactivas
@@ -244,32 +266,97 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. Desde la Fas
   - Demanda media 0 → ROP 0 (solo AGOTADO), método SIN_DEMANDA.
   - `μL = d̄ × L ≥ 5` → `ROP = ceil(μL + z × s × √L)`, método NORMAL.
   - `μL < 5` → menor `r` con `P(Poisson(μL) ≤ r) ≥` nivel de servicio, método POISSON.
-  - `stockMinimo` es solo el respaldo cuando no hay ROP (no es piso); `loteMinimo` no interviene (Fase 6, sugerencia).
+  - `stockMinimo` es solo el respaldo cuando no hay ROP (no es piso); `loteMinimo` no interviene en el ROP (sí en la
+    sugerencia de compra).
+  - **Desde la Fase 6 (ADR-010, D3 b)**: si el producto tiene pronóstico, `μL` = suma de la tasa diaria pronosticada de la
+    variante en los próximos `L` días (fuente `PRONOSTICO`); `s` sigue saliendo de la serie diaria observada de 90
+    días; misma regla NORMAL/POISSON y mismos niveles de servicio. Sin pronóstico del producto, fórmula de la Fase 5
+    (fuente `HISTORICA`). Queda en `analitica_variante`.
 - **Escritura** (regla de oro 1 intacta): `puntoReorden` y `claseAbc` no se actualizan desde la entidad
   (`updatable = false`); solo los escribe un UPDATE dirigido desde `analitica.repositorio`, por variante en orden de id,
   sin tocar `version` ni `actualizadoEn` (el cálculo no provoca 409 a las ventas). Nunca toca stock.
 - **Instantánea** `analitica_variante` (insumos del último cálculo por variante, para explicar el ROP) y **registro**
   `ejecucion_analitica` (origen NOCTURNA, MANUAL o SEMILLA; estado EN_CURSO, EXITOSA o FALLIDA; conteos y métrica).
 - **Ejecución**: cada noche a las 02:00 America/Bogota (`app.analitica.cron`; apagada en pruebas y en `seed`) y con
-  "Recalcular" (solo ADMIN, síncrono). Pasos: ABC + ROP en una sola transacción (todo o nada) → re-evaluación de las
+  "Recalcular" (solo ADMIN, síncrono). Desde la Fase 6 el primer paso es el pronóstico (transacción propia, todo o nada;
+  si falla, la ejecución queda FALLIDA con "El pronóstico falló; el ROP usó la demanda histórica" y el ABC/ROP se aplica
+  igual). Pasos: ABC + ROP en una sola transacción (todo o nada) → re-evaluación de las
   alertas de todas las variantes, una transacción por variante (corre aunque falle el paso anterior) → registro. Una
   ejecución a la vez: un recálculo manual con otro en curso → 409; la nocturna se omite.
 - **Más vendidos** (REQ-05): ranking top-N (1–50, por defecto 10) por producto o variante, por unidades o ingreso neto,
   rango de fechas inclusivo (por defecto los últimos 30 días, máximo 731) y categoría opcional. Sin costos ni margen.
 - **Roles**: más vendidos, los cuatro roles; ABC, reorden y última ejecución: ADMIN, INVENTARIO y CONTABILIDAD;
   recalcular: solo ADMIN. La clase ABC se muestra también en inventario a todos (no revela costos).
+- **Tendencias históricas** (REQ-09, Fase 6): serie mensual de la demanda **comercial** (unidades e ingreso netos, como
+  "Más vendidos") con el mismo mes del año anterior y su variación; por defecto 24 meses completos, máximo 36; filtros por
+  categoría y producto. Roles: ADMIN, INVENTARIO y CONTABILIDAD. La exportación PDF (CU-05) va con los reportes de la Fase 7.
+
+## Pronóstico (ADR-010)
+
+- **Serie**: mensual por producto, de la *demanda de inventario* (vendidas − devueltas aptas; REGISTRADA; recorte a 0 por
+  mes), solo meses completos anteriores al mes en curso, máximo 36. Se pronostican el mes actual y los dos siguientes.
+  Productos inactivos no se pronostican.
+- **Corrección por agotados**: `corregida = observada / max(disponibilidad, 0,5)`, con `disponibilidad` = fracción de días
+  con stock de las variantes activas ponderada por su participación, reconstruida desde el kardex (día sin stock: abre en 0
+  y ningún movimiento lo deja > 0). Se guardan ambas series.
+- **Método**: SES u **Holt-Winters multiplicativo** (m = 12), elegido por backtesting con origen móvil (cortes n − 6 y
+  n − 3, 3 meses cada uno, WAPE sobre 6 puntos; empate < 0,001 → SES). HW solo compite con n ≥ 30 meses, sin ningún mes
+  en 0 y con nivel positivo; si no, SES y se guarda el motivo (`POCA_HISTORIA`, `MES_EN_CERO`, `NIVEL_NO_POSITIVO`).
+  Menos de 3 meses → SIN_HISTORIA (sin pronóstico; ROP y sugerencia usan la demanda histórica); 3–8 meses → SES sin backtest; 9–29 meses → SES con backtest (WAPE) y motivo `POCA_HISTORIA`.
+- **Desagregación**: el pronóstico del producto se reparte a sus variantes activas por su participación de 180 días,
+  corregida por días con stock. Se guardan filas por producto (`variante_id` null) y por variante.
+- **Regla de oro 1 intacta**: el pronóstico nunca toca stock. Las filas de `pronostico` se insertan en orden ascendente
+  de `variante_id` (mismo orden en que bloquean las ventas). Solo se conserva la última ejecución.
+- **Roles**: ver pronóstico y tendencias: ADMIN, INVENTARIO y CONTABILIDAD; VENDEDOR 403.
+- Riesgo aceptado: el backtest (abril–septiembre con corte en octubre) no cubre noviembre–diciembre; el WAPE puede
+  subestimar el error en los picos.
+
+## Plan de compras (ADR-010)
+
+- **Ciclo de vida**: ver "Máquinas de estado". Número visible `PC-000012`; `@Version` en el plan: editar o aprobar con
+  versión vieja → 409. Orden de bloqueo: plan → variantes (por id). Sin proveedor ni borrado físico; un plan puede mezclar
+  productos. Máximo 300 líneas; variante repetida → 400.
+- **Crear**: *sugerido* (origen SUGERIDO) o *manual*; ambos quedan en BORRADOR, editables. Aprobar exige variantes y
+  productos activos (422 con el SKU).
+- **Sugerencia (s, S)**: candidatas = variantes activas de productos activos con `posición ≤ umbral` que no estén en otro
+  BORRADOR (las omitidas se informan). Cantidad hasta `S = umbral + demanda pronosticada de R = 30 días posteriores al
+  lead time` (`app.compras.periodo-revision-dias`), redondeada hacia arriba al múltiplo de `loteMinimo`; las de cantidad 0
+  no entran. Sin ninguna candidata → 422. Cada línea lleva una justificación legible. Nunca toca stock. Sin ROP y sin
+  demanda pronosticada ni histórica, el respaldo es `S = 2 × stockMinimo`. Con más de 300 candidatas entran 300 por
+  prioridad: agotadas primero, luego clase A, B, C y sin clase, luego mayor faltante relativo
+  `(umbral − posición) / max(umbral, 1)` y por último el id; el plan informa `excluidasPorTope`.
+- **Recibir** (recepción única): por línea, cantidad recibida (0–100.000, por defecto la aprobada) y costo. Una ENTRADA
+  por línea con cantidad > 0, vía `OperacionInventarioService` → `MovimientoService`, referencia `PLAN_COMPRA/{id}`, con las
+  reglas de entradas (mismo costo por producto, `precioCompra` = último costo > 0). Lo no recibido deja de estar en
+  camino. Todas las líneas en 0 → 422 ("use Cancelar"). Se permite sobre variantes inactivas.
+- **Cancelar**: motivo obligatorio (5–200). Un APROBADO cancelado deja de estar en camino y puede reabrir alertas.
+- **Llegada esperada** (calculada): `aprobadoEn + max(leadTimeDias)`; la interfaz marca "atrasado" si ya pasó.
+- **Roles**: crear y editar BORRADOR: ADMIN e INVENTARIO. Aprobar: solo ADMIN. Cancelar: ADMIN (BORRADOR o APROBADO);
+  INVENTARIO solo descarta BORRADOR (403 sobre APROBADO). Recibir: ADMIN e INVENTARIO. Ver: ADMIN, INVENTARIO y
+  CONTABILIDAD (con costos). VENDEDOR: 403.
+- **Módulos**: `compra` depende de `catalogo`, `inventario` y `usuario`; usa dos puertos:
+  `inventario.servicio.ConsultaPedidosEnCamino` (implementado en `compra`) y `compra.servicio.FuenteSugerenciaCompra`
+  (implementado en `analitica`). `compra` no depende de `venta` ni de `analitica`.
 
 ## Datos semilla (ADR-008)
 
-- **Propósito**: 24 meses de historia de demostración para la analítica (ABC, ROP, pronóstico) y la sustentación. No son
-  datos de referencia: no van en migraciones.
+- **Propósito**: 36 meses de historia de demostración (35 completos al cerrar; Holt-Winters compite desde 30 meses,
+  ADR-010) para la analítica (ABC, ROP, pronóstico) y la sustentación. No son datos de referencia: no van en migraciones.
 - **Módulo `semilla`** (`co.livorno.controlstock.semilla`): todas sus clases llevan `@Profile("seed")` y ningún otro módulo
   depende de él (ArchUnit). Se ejecuta con los perfiles `dev,seed`, carga y **termina la aplicación** (código 0 si todo
   salió bien, 1 si falló). Después se arranca normal con `dev`.
 - **Solo servicios reales**: catálogo, entradas, ajustes, ventas, devoluciones, anulaciones y reservas pasan por los mismos
   servicios que usa la API; el stock cambia solo vía `MovimientoService`. Nada de inserts directos de stock ni de kardex.
   El generador fija el usuario que actúa en el contexto de seguridad (VENDEDOR vende, devuelve y convierte; INVENTARIO
-  ingresa, ajusta y reserva; ADMIN anula); los vencimientos usan `ReservaService.vencer(id, ahora)` con `usuarioId` null.
+  recibe pedidos, ajusta y reserva; ADMIN anula y aprueba planes); los vencimientos usan `ReservaService.vencer(id, ahora)`
+  con `usuarioId` null.
+- **Reposición por planes de compra** (ADR-010, D8): la política de pedido es propia de la semilla (punto de pedido =
+  demanda esperada del lead time + 7 días; cantidad = 30–60 días de demanda; no usa el ROP ni la sugerencia del
+  sistema). Cada pedido es un plan por producto y día: INVENTARIO lo crea, ADMIN lo aprueba a la misma hora e INVENTARIO
+  lo recibe al llegar (la ENTRADA lleva referencia `PLAN_COMPRA/{id}`). Los pedidos que llegan después de `fin` quedan
+  APROBADOS (en camino). El verificador comprueba que Σ cantidad aprobada de los planes APROBADO por variante coincida
+  con la simulación; el resumen imprime planes creados, recibidos y en camino y las métricas de la analítica de cierre
+  (productos HW/SES, WAPE global, % en alerta con y sin lo en camino).
 - **Reloj simulado (solo en `seed`)**: un `Clock` ajustable marcado `@Primary` reemplaza al del sistema; los servicios y la
   auditoría fechan con él. Solo avanza (retroceder lanza excepción), así el kardex queda cronológico, y vuelve al reloj
   del sistema al terminar. Las operaciones de cada día simulado se ejecutan en orden de hora.
@@ -303,8 +390,8 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. Desde la Fas
 | Convertir reservas en venta | Sí | — | Sí | — |
 | Kardex | Ver | Ver | — | Ver |
 | Alertas | Ver / atender | Ver / atender | Ver | — |
-| Analítica (ABC, ROP, pronóstico) | Sí | Ver | Más vendidos | Ver |
-| Plan de compras | CRUD / aprobar | Crear borrador | — | Ver |
+| Analítica (ABC, ROP, pronóstico, tendencias) | Sí | Ver | Más vendidos | Ver |
+| Plan de compras | CRUD / aprobar / recibir | Crear y editar borrador / recibir | — | Ver |
 | Reportes contables / rentabilidad | Sí | — | — | Sí |
 
 Notas de la matriz (Fase 2): la consulta de inventario actual (stock por variante, sin costos) está abierta a todo
@@ -316,6 +403,11 @@ Atender alertas: ADMIN e INVENTARIO; VENDEDOR solo las ve (incluida la campana).
 
 Notas de la matriz (Fase 5): en Analítica, "Sí" del ADMIN incluye recalcular; INVENTARIO y CONTABILIDAD ven ABC, reorden y
 la última ejecución; VENDEDOR solo ve más vendidos (sin costos). La clase ABC se muestra en inventario a todos los roles.
+
+Notas de la matriz (Fase 6): en Plan de compras, INVENTARIO crea y edita borradores, descarta borradores y recibe pedidos
+(la recepción es una entrada); aprobar y cancelar un plan aprobado: solo ADMIN. CONTABILIDAD ve planes con costos, sin
+escribir. Tendencias y pronóstico: ADMIN, INVENTARIO y CONTABILIDAD; VENDEDOR solo "Más vendidos" (403 en compras,
+tendencias y pronósticos).
 
 ## Trazabilidad con el documento PPI
 
@@ -329,8 +421,8 @@ la última ejecución; VENDEDOR solo ve más vendidos (sin costos). La clase ABC
 | REQ-06 Controlar el acceso y roles de usuario (CU-02) | auth, usuario |
 | REQ-07 Reportes contables | reporte |
 | REQ-08 Gestionar el registro de devoluciones (CU-09) | venta |
-| REQ-09 Tendencias históricas | analitica |
-| REQ-10 Planeación de compras | compra + analitica (pronóstico) |
+| REQ-09 Tendencias históricas (CU-05; Fase 6, PDF en Fase 7) | analitica |
+| REQ-10 Planeación de compras (CU-16, CU-17, CU-18 nuevos; Fase 6, ADR-010) | compra + analitica (pronóstico, sugerencia) + inventario (posición, recepción) |
 | REQ-11 Gestión de productos (CU-11) | catalogo |
 | REQ-12 Registrar y gestionar usuarios (CU-12) | usuario |
 | REQ-13 Gestionar apartados (CU-14, nuevo) | inventario (reservas), venta (conversión) |
@@ -343,7 +435,9 @@ Nota: en el documento PPI, REQ-08 y REQ-09 tienen nombre y descripción cruzados
 - `REQ-xx`: requisitos funcionales (tabla anterior). `RNF-xx`: requisitos no funcionales del documento Word, que allí
   aparecen numerados como REQ-01..REQ-05; aquí se renombran a RNF-01..RNF-05 para no chocar con los funcionales.
 - `CU-xx`: casos de uso. Nuevos, no presentes en el Word: CU-13 "Iniciar sesión" (fase 0, ligado a RNF-02), CU-14
-  "Gestionar apartados" (fase 3, REQ-13) y CU-15 "Clasificar productos (ABC)" (fase 5, REQ-14).
+  "Gestionar apartados" (fase 3, REQ-13), CU-15 "Clasificar productos (ABC)" (fase 5, REQ-14), CU-16 "Consultar el
+  pronóstico de demanda", CU-17 "Gestionar el plan de compras" y CU-18 "Recibir un pedido" (fase 6, REQ-10). Las
+  tendencias históricas (REQ-09) usan el CU-05 del Word; su exportación a PDF es de la fase 7.
 - `NEC-xx`: necesidades del Word, con dos dígitos (NEC-010 del Word es NEC-10). Nueva: NEC-11 "Apartar prendas para
   clientes que reservan por redes sociales" (REQ-13).
 

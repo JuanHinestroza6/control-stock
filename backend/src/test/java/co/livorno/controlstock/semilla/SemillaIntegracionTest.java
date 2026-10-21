@@ -41,7 +41,7 @@ class SemillaIntegracionTest {
 
     private static final LocalDate FIN = LocalDate.of(2025, 12, 31);
     private static final String[] TABLAS = {"usuario", "categoria", "producto", "variante", "movimiento", "venta",
-            "detalle_venta", "devolucion", "reserva", "alerta", "ejecucion_analitica", "analitica_variante"};
+            "detalle_venta", "devolucion", "reserva", "alerta", "ejecucion_analitica", "analitica_variante", "plan_compra", "detalle_plan"};
 
     @Autowired
     GeneradorDatosSemilla generador;
@@ -267,5 +267,135 @@ class SemillaIntegracionTest {
 
         assertThatThrownBy(() -> verificador.verificarCarga(r.inicio(), r.fin()))
                 .isInstanceOf(SemillaAbortadaException.class).hasMessageContaining("usuarios demo");
+    }
+
+    private Map<Long, Integer> enCaminoReal() {
+        Map<Long, Integer> m = new java.util.HashMap<>();
+        jdbc.query("""
+                select d.variante_id, sum(d.cantidad_aprobada) from detalle_plan d
+                join plan_compra p on p.id = d.plan_id where p.estado = 'APROBADO' group by d.variante_id""",
+                rs -> { m.put(rs.getLong(1), rs.getInt(2)); });
+        return m;
+    }
+
+    @Test
+    void generar_alCerrar_hayPlanesAprobadosEnCaminoYNingunoBorradorNiCancelado() {
+        generador.generar();
+
+        assertThat(contar("select count(*) from plan_compra where estado = 'APROBADO'")).isPositive();
+        assertThat(contar("select count(*) from plan_compra where estado = 'RECIBIDO'")).isPositive();
+        assertThat(contar("select count(*) from plan_compra where estado in ('BORRADOR', 'CANCELADO')")).isZero();
+        assertThat(enCaminoReal()).isNotEmpty();
+    }
+
+    @Test
+    void generar_planes_losUsuariosSonLosDemoDeCadaRol() {
+        generador.generar();
+
+        assertThat(contar("""
+                select count(*) from plan_compra p
+                join usuario c on c.id = p.creado_por
+                left join usuario a on a.id = p.aprobado_por
+                left join usuario r on r.id = p.recibido_por
+                where c.email <> 'inventario@livorno.co' or a.email <> 'admin@livorno.co'
+                or (p.estado = 'RECIBIDO' and (r.email is null or r.email <> 'inventario@livorno.co'))
+                or (p.estado = 'APROBADO' and p.recibido_por is not null)""")).isZero();
+        assertThat(contar("""
+                select count(*) from movimiento m join usuario u on u.id = m.usuario_id
+                where m.tipo = 'ENTRADA' and m.referencia_tipo = 'PLAN_COMPRA' and u.email <> 'inventario@livorno.co'"""))
+                .isZero();
+    }
+
+    @Test
+    void verificarEnCamino_conElArregloEsperadoCorrecto_noFalla() {
+        generador.generar();
+
+        verificador.verificarEnCamino(enCaminoReal());
+    }
+
+    @Test
+    void verificarEnCamino_conUnidadesDistintasEnUnaVariante_falla() {
+        generador.generar();
+        Map<Long, Integer> esperado = enCaminoReal();
+        Long id = esperado.keySet().iterator().next();
+        esperado.put(id, esperado.get(id) + 1);
+
+        assertThatThrownBy(() -> verificador.verificarEnCamino(esperado))
+                .isInstanceOf(SemillaAbortadaException.class).hasMessageContaining("en camino de 1 variantes");
+    }
+
+    @Test
+    void verificarEnCamino_conUnaVarianteEsperadaQueNoTienePedido_falla() {
+        generador.generar();
+        Map<Long, Integer> esperado = enCaminoReal();
+        Long otra = jdbc.queryForList("select id from variante order by id", Long.class).stream()
+                .filter(v -> !esperado.containsKey(v)).findFirst().orElseThrow();
+        esperado.put(otra, 5);
+
+        assertThatThrownBy(() -> verificador.verificarEnCamino(esperado))
+                .isInstanceOf(SemillaAbortadaException.class).hasMessageContaining("no coincide");
+    }
+
+    @Test
+    void verificarEnCamino_conUnPedidoRealQueLaSimulacionNoEsperaba_falla() {
+        generador.generar();
+        Map<Long, Integer> esperado = enCaminoReal();
+        esperado.remove(esperado.keySet().iterator().next());
+
+        assertThatThrownBy(() -> verificador.verificarEnCamino(esperado))
+                .isInstanceOf(SemillaAbortadaException.class).hasMessageContaining("no coincide");
+    }
+
+    @Test
+    void generar_verificacionDeEnCaminoFallida_revierteTodaLaCarga() {
+        Map<String, Long> antes = conteos();
+        doThrow(new SemillaAbortadaException("en camino forzado")).when(verificador).verificarEnCamino(any());
+
+        assertThatThrownBy(generador::generar).isInstanceOf(SemillaAbortadaException.class)
+                .hasMessageContaining("en camino forzado");
+
+        assertThat(conteos()).isEqualTo(antes);
+        assertThat(reloj.estaSimulando()).isFalse();
+    }
+
+    @Test
+    void verificarCarga_planEnBorrador_falla() {
+        ResumenSemilla r = generador.generar();
+        jdbc.update("update plan_compra set estado = 'BORRADOR' where id = (select id from (select min(id) id from plan_compra where estado = 'APROBADO') t)");
+
+        assertThatThrownBy(() -> verificador.verificarCarga(r.inicio(), r.fin()))
+                .isInstanceOf(SemillaAbortadaException.class).hasMessageContaining("plan de compras fuera de");
+    }
+
+    @Test
+    void verificarCarga_planRecibidoSinSuEntrada_falla() {
+        ResumenSemilla r = generador.generar();
+        jdbc.update("""
+                update movimiento set referencia_tipo = 'VENTA' where id = (select id from (select min(id) id from movimiento
+                where tipo = 'ENTRADA' and referencia_tipo = 'PLAN_COMPRA') t)""");
+
+        assertThatThrownBy(() -> verificador.verificarCarga(r.inicio(), r.fin()))
+                .isInstanceOf(SemillaAbortadaException.class).hasMessageContaining("plan RECIBIDO sin una ENTRADA");
+    }
+
+    @Test
+    void verificarCarga_entradaSueltaFueraDeUnPlan_falla() {
+        ResumenSemilla r = generador.generar();
+        jdbc.update("""
+                update movimiento set referencia_tipo = null, referencia_id = null, observacion = 'manual'
+                where id = (select id from (select min(id) id from movimiento
+                where tipo = 'ENTRADA' and referencia_tipo = 'PLAN_COMPRA') t)""");
+
+        assertThatThrownBy(() -> verificador.verificarCarga(r.inicio(), r.fin()))
+                .isInstanceOf(SemillaAbortadaException.class).hasMessageContaining("ENTRADA que no viene de un plan");
+    }
+
+    @Test
+    void verificarCarga_planConFechaFueraDelRango_falla() {
+        ResumenSemilla r = generador.generar();
+        jdbc.update("update plan_compra set creado_en = '2030-01-01 10:00:00' where id = (select id from (select min(id) id from plan_compra) t)");
+
+        assertThatThrownBy(() -> verificador.verificarCarga(r.inicio(), r.fin()))
+                .isInstanceOf(SemillaAbortadaException.class).hasMessageContaining("plan_compra con fechas fuera");
     }
 }

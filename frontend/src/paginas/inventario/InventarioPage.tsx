@@ -116,7 +116,16 @@ export function InventarioPage() {
       ocultarEnMovil: true,
     },
     { clave: 'clase', encabezado: 'Clase', celda: (v) => <BadgeClaseAbc clase={v.claseAbc} />, ocultarEnMovil: true },
-    { clave: 'estado', encabezado: 'Estado', celda: (v) => <BadgeStock estado={v.estadoStock} /> },
+    {
+      clave: 'estado',
+      encabezado: 'Estado',
+      celda: (v) => (
+        <div className="flex flex-col items-start gap-1">
+          <BadgeStock estado={v.estadoStock} />
+          {(v.enCamino ?? 0) > 0 && <span className="text-xs text-acento">{v.enCamino} en camino</span>}
+        </div>
+      ),
+    },
     { clave: 'precio', encabezado: 'Precio', celda: (v) => formatearMoneda(v.precioVenta), className: 'text-right', ocultarEnMovil: true },
   ]
   if (puedeMover || verKardex) {

@@ -17,7 +17,8 @@ function ejecucion(extra: Partial<EjecucionAnaliticaResponse> = {}): EjecucionAn
     id: 1, origen: 'NOCTURNA', usuario: null, iniciadaEn: '2026-10-13T07:00:00Z', terminadaEn: '2026-10-13T07:00:05Z',
     estado: 'EXITOSA', fechaCorte: '2026-10-12', duracionMs: 5200, variantesAnalizadas: 299, claseA: 60, claseB: 90, claseC: 149,
     conPuntoReorden: 250, alertasEvaluadas: 299, alertasFallidas: 0, variantesActivas: 298, enAlertaStock: 41,
-    porcentajeAlertaStock: 13.8, sinRotacionActivas: 7, mensaje: null, ...extra,
+    porcentajeAlertaStock: 13.8, sinRotacionActivas: 7, mensaje: null,
+    productosPronosticados: 30, conHoltWinters: 12, conSes: 18, wapeGlobal: 0.123, enAlertaSinTransito: 60, conPedidoEnCamino: 25, ...extra,
   }
 }
 
@@ -46,10 +47,10 @@ beforeEach(() => {
 })
 
 describe('AnaliticaPage - pestañas por rol', () => {
-  it.each<Rol>(['ADMIN', 'INVENTARIO', 'CONTABILIDAD'])('%s ve las tres pestañas', async (rol) => {
+  it.each<Rol>(['ADMIN', 'INVENTARIO', 'CONTABILIDAD'])('%s ve las cinco pestañas', async (rol) => {
     montar(rol)
     const tabs = screen.getAllByRole('tab').map((t) => t.textContent)
-    expect(tabs).toEqual(['Más vendidos', 'Clasificación ABC', 'Punto de reorden'])
+    expect(tabs).toEqual(['Más vendidos', 'Clasificación ABC', 'Punto de reorden', 'Tendencias', 'Pronóstico'])
     expect(await screen.findByText('Última ejecución')).toBeInTheDocument()
   })
 
@@ -65,6 +66,20 @@ describe('AnaliticaPage - pestañas por rol', () => {
     montar('VENDEDOR', null, '/analitica?pestana=abc')
     expect(screen.getByRole('tab', { name: 'Más vendidos', selected: true })).toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: /ABC/ })).not.toBeInTheDocument()
+  })
+
+  it('VENDEDOR no ve Tendencias ni siquiera por la URL, y no consulta tendencias', () => {
+    montar('VENDEDOR', null, '/analitica?pestana=tendencias')
+    expect(screen.queryByRole('tab', { name: 'Tendencias' })).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Más vendidos', selected: true })).toBeInTheDocument()
+    expect(api.obtenerTendencias).not.toHaveBeenCalled()
+  })
+
+  it('VENDEDOR no ve Pronóstico ni siquiera por la URL, y no consulta pronósticos', () => {
+    montar('VENDEDOR', null, '/analitica?pestana=pronostico')
+    expect(screen.queryByRole('tab', { name: 'Pronóstico' })).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Más vendidos', selected: true })).toBeInTheDocument()
+    expect(api.listarPronosticos).not.toHaveBeenCalled()
   })
 
   it('la pestaña activa sale de la URL y cambia al hacer clic', async () => {
@@ -83,6 +98,20 @@ describe('PanelEjecucion', () => {
     expect(screen.getByText('60 / 90 / 149')).toBeInTheDocument()
     expect(screen.getByText(/41 de 298/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /recalcular/i })).not.toBeInTheDocument()
+  })
+
+  it('muestra pronóstico, WAPE y alerta con y sin tránsito', async () => {
+    montar('INVENTARIO')
+    expect(await screen.findByText('30 productos (12 Holt-Winters, 18 SES)')).toBeInTheDocument()
+    expect(screen.getByText('12,3 %')).toBeInTheDocument()
+    expect(screen.getByText(/41 de 298 \(13,8 %\)/)).toBeInTheDocument()
+    expect(screen.getByText(/60 de 298 \(20,1 %\)/)).toBeInTheDocument()
+    expect(screen.getByText('Variantes con pedido en camino').nextElementSibling).toHaveTextContent('25')
+  })
+
+  it('sin pronóstico ni backtest muestra guiones y "Sin backtest"', async () => {
+    montar('INVENTARIO', ejecucion({ productosPronosticados: null, conHoltWinters: null, conSes: null, wapeGlobal: null, enAlertaSinTransito: null, conPedidoEnCamino: null }))
+    expect(await screen.findByText('Sin backtest')).toBeInTheDocument()
   })
 
   it('CONTABILIDAD ve la ejecución pero no Recalcular', async () => {

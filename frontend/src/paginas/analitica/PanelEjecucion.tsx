@@ -40,6 +40,24 @@ function alertaStock(e: EjecucionAnaliticaResponse): string {
   return `${valor(e.enAlertaStock)} de ${valor(e.variantesActivas)}${porcentaje}`
 }
 
+function pronostico(e: EjecucionAnaliticaResponse): string {
+  if (e.productosPronosticados == null) return '—'
+  const hw = e.conHoltWinters ?? 0
+  const ses = e.conSes ?? 0
+  return `${valor(e.productosPronosticados)} productos (${valor(hw)} Holt-Winters, ${valor(ses)} SES)`
+}
+
+function wape(e: EjecucionAnaliticaResponse): string {
+  if (e.wapeGlobal == null) return 'Sin backtest'
+  return `${(e.wapeGlobal * 100).toLocaleString('es-CO', { maximumFractionDigits: 1 })} %`
+}
+
+function alertaSinTransito(e: EjecucionAnaliticaResponse): string {
+  if (e.enAlertaSinTransito == null || e.variantesActivas == null || e.variantesActivas === 0) return '—'
+  const pct = ((e.enAlertaSinTransito * 100) / e.variantesActivas).toLocaleString('es-CO', { maximumFractionDigits: 1 })
+  return `${valor(e.enAlertaSinTransito)} de ${valor(e.variantesActivas)} (${pct} %)`
+}
+
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
   return (
     <div>
@@ -66,6 +84,10 @@ function DetalleEjecucion({ e }: { e: EjecucionAnaliticaResponse }) {
         <Dato etiqueta="Variantes en alerta de stock">{alertaStock(e)}</Dato>
         <Dato etiqueta="Sin rotación activas">{valor(e.sinRotacionActivas)}</Dato>
         <Dato etiqueta="Con punto de reorden">{valor(e.conPuntoReorden)}</Dato>
+        <Dato etiqueta="Pronóstico">{pronostico(e)}</Dato>
+        <Dato etiqueta="WAPE global">{wape(e)}</Dato>
+        <Dato etiqueta="En alerta sin contar lo en camino">{alertaSinTransito(e)}</Dato>
+        <Dato etiqueta="Variantes con pedido en camino">{e.conPedidoEnCamino == null ? '—' : valor(e.conPedidoEnCamino)}</Dato>
       </dl>
       {e.estado === 'FALLIDA' && (
         <p role="alert" className="mt-3 text-sm font-medium text-critico">

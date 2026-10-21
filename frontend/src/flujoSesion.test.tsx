@@ -1,20 +1,19 @@
 import { act, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { type AxiosAdapter, type InternalAxiosRequestConfig } from 'axios'
+import { type InternalAxiosRequestConfig } from 'axios'
 import { afterEach, describe, expect, it } from 'vitest'
 import App from './App'
 import { EVENTO_SESION_EXPIRADA, cliente } from './api/cliente'
 import type { Rol } from './tipos/auth'
+import { soloLogin } from './pruebas/http'
 import { crearSesion, renderizarApp } from './pruebas/render'
 
 const adaptadorOriginal = cliente.defaults.adapter
 
 function loginResponde(rol: Rol) {
-  const adaptador: AxiosAdapter = (config: InternalAxiosRequestConfig) => {
-    const respuesta = { status: 200, data: { ...crearSesion(rol), tipo: 'Bearer' }, statusText: '', headers: {}, config }
-    return Promise.resolve(respuesta)
-  }
-  cliente.defaults.adapter = adaptador
+  cliente.defaults.adapter = soloLogin((config: InternalAxiosRequestConfig) =>
+    Promise.resolve({ status: 200, data: { ...crearSesion(rol), tipo: 'Bearer' }, statusText: '', headers: {}, config }),
+  )
 }
 
 async function iniciarSesion() {

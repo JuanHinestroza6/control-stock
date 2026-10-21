@@ -1,9 +1,10 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { AxiosError, type AxiosAdapter, type InternalAxiosRequestConfig } from 'axios'
+import { AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import { Navigate, Route, Routes } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
 import { cliente } from '../../api/cliente'
+import { soloLogin } from '../../pruebas/http'
 import { crearSesion, renderizarApp } from '../../pruebas/render'
 import { LoginPage } from './LoginPage'
 
@@ -12,14 +13,13 @@ const adaptadorOriginal = cliente.defaults.adapter
 /** Simula la respuesta del backend a nivel de transporte HTTP (el cliente Axios real queda en uso). */
 function responderCon(status: number, data: unknown): { cuerpos: unknown[] } {
   const cuerpos: unknown[] = []
-  const adaptador: AxiosAdapter = (config: InternalAxiosRequestConfig) => {
+  cliente.defaults.adapter = soloLogin((config: InternalAxiosRequestConfig) => {
     cuerpos.push(typeof config.data === 'string' ? JSON.parse(config.data) : config.data)
     const respuesta = { status, data, statusText: '', headers: {}, config }
     return status >= 400
       ? Promise.reject(new AxiosError('fallo', 'ERR_BAD_REQUEST', config, undefined, respuesta))
       : Promise.resolve(respuesta)
-  }
-  cliente.defaults.adapter = adaptador
+  })
   return { cuerpos }
 }
 

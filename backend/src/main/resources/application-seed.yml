@@ -11,7 +11,7 @@ app:
     ejecutar: true
     salir-al-terminar: true
     semilla-aleatoria: 42
-    meses: 24
+    meses: 36
     fecha-fin: # vacía = ayer (America/Bogota); debe ser anterior a hoy
-    tickets-dia-base: 15 # calibrado: unas 12 mil ventas en 24 meses
+    tickets-dia-base: 15 # calibrado: unas 18 mil ventas en 36 meses
     password: ${SEED_PASSWORD:} # obligatoria; misma política que las contraseñas (12-72 caracteres)

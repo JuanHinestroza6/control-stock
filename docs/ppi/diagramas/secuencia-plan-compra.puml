@@ -1,0 +1,88 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam linetype ortho
+title Secuencia: sugerir -> aprobar -> recibir un plan de compras (REQ-10)
+
+actor "Encargado de inventario" as Inv
+actor "Administrador" as Adm
+participant "Frontend\n(/compras)" as FE
+participant "PlanCompraController" as Ctl
+participant "PlanCompraService" as Plan
+participant "SugerenciaCompraAnalitica\n(puerto FuenteSugerenciaCompra)" as Sug
+participant "OperacionInventarioService" as Op
+participant "MovimientoService" as Mov
+participant "AlertaListener" as Lis
+participant "AlertaService" as Ale
+database "MySQL" as BD
+
+== 1. Sugerir (BORRADOR) ==
+Inv -> FE : "Sugerir plan" (categoría opcional)
+FE -> Ctl : POST /api/compras/planes/sugerido
+Ctl -> Plan : crearSugerido(request)\n@PreAuthorize ADMIN, INVENTARIO
+activate Plan
+Plan -> Sug : sugerir(categoriaId)
+Sug -> BD : lee ROP, disponible, pronóstico y\nen camino (solo lectura)
+Sug --> Plan : líneas (s, S) con justificación
+Plan -> BD : variantes ya en otro BORRADOR -> omitidas
+Plan -> Plan : prioriza (agotadas, clase ABC, faltante relativo)\ny toma las primeras 300 (excluidasPorTope)
+Plan -> BD : INSERT plan BORRADOR (origen SUGERIDO) y líneas
+Plan --> Ctl : detalle + omitidas + excluidasPorTope
+deactivate Plan
+Ctl --> FE : 201
+note right of Plan : No toca stock. Sin candidatas -> 422.
+
+== 2. Editar el borrador (opcional) ==
+Inv -> FE : ajusta cantidades, quita o agrega líneas
+FE -> Ctl : PUT /api/compras/planes/{id} (versión)
+Ctl -> Plan : actualizar(id, request)
+Plan -> BD : bloquea el plan; versión vieja -> 409
+
+== 3. Aprobar (BORRADOR -> APROBADO) ==
+Adm -> FE : "Aprobar"
+FE -> Ctl : POST /api/compras/planes/{id}/aprobar (versión)
+Ctl -> Plan : aprobar(id, request)\n@PreAuthorize ADMIN
+activate Plan
+Plan -> BD : bloquea el plan (PESSIMISTIC_WRITE)\nverifica BORRADOR, versión y variantes activas
+Plan -> BD : estado = APROBADO, aprobadoEn, aprobadoPor
+loop por cada línea
+  Plan -> Plan : publica PosicionCambiada(varianteId)
+end
+Plan --> Ctl : detalle (en camino)
+deactivate Plan
+Ctl --> FE : 200
+...commit de la transacción...
+Lis -> Ale : evaluar(varianteId) por línea\n(AFTER_COMMIT, REQUIRES_NEW)
+Ale -> BD : posición = disponible + en camino\nSTOCK_BAJO se cierra si supera el umbral\n(AGOTADO se mantiene: depende del disponible)
+
+== 4. Recibir (APROBADO -> RECIBIDO) ==
+Inv -> FE : informa cantidad recibida y costo por línea
+FE -> Ctl : POST /api/compras/planes/{id}/recibir
+Ctl -> Plan : recibir(id, request)\n@PreAuthorize ADMIN, INVENTARIO
+activate Plan
+Plan -> BD : bloquea el plan; verifica APROBADO y\nque vengan todas las líneas una sola vez
+Plan -> Op : registrarEntradaDePlan(planId, líneas con cantidad > 0)
+activate Op
+Op -> BD : actualiza precioCompra del producto\n(último costo > 0; mismo costo por producto)
+loop por variante, en orden de id
+  Op -> Mov : registrar(ENTRADA, referencia PLAN_COMPRA/{id})
+  Mov -> BD : actualiza stockFisico (@Version) e INSERT movimiento
+  Mov -> Mov : publica StockCambiado(varianteId)
+end
+Op --> Plan : movimientos
+deactivate Op
+Plan -> BD : líneas con cantidadRecibida y costoRecibido;\nestado = RECIBIDO, recibidoEn, recibidoPor
+Plan -> Plan : líneas recibidas en 0 -> publica PosicionCambiada
+Plan --> Ctl : detalle
+deactivate Plan
+Ctl --> FE : 200
+...commit de la transacción...
+Lis -> Ale : evaluar(varianteId)\n(StockCambiado y PosicionCambiada, AFTER_COMMIT)
+Ale -> BD : abre o cierra AGOTADO, SIN_ROTACION o STOCK_BAJO\nlo no recibido deja de estar en camino
+
+note over Plan, Mov
+  Toda la recepción es una transacción: si una entrada falla (p. ej. costos distintos
+  para un mismo producto, 422) no se guarda nada y el plan sigue APROBADO.
+  Un fallo del listener se registra en el log y nunca llega al usuario.
+end note
+@enduml

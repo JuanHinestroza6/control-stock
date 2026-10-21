@@ -5,3 +5,4 @@
 - [Decisiones Fase 3](project_decisiones_fase3.md) — aprobadas: reservas con lock de fila, conversión en módulo venta, alertas AFTER_COMMIT, V11–V12
 - [Decisiones Fase 4](project_decisiones_fase4.md) — aprobadas: módulo semilla, RelojSimulado @Primary, tx única, alertas al final, IDENTITY sin batch
 - [Decisiones Fase 5](project_decisiones_fase5.md) — aprobadas: ABC 12 m, ROP normal/Poisson sin piso, updatable=false, SIN_ROTACION por producto, meta alertas a fase 6
+- [Decisiones Fase 6](project_decisiones_fase6.md) — aprobadas D1–D8, HW multiplicativo, punto de corte antes de semilla 36 m, posición, CANCELADO, puertos, V15–V16

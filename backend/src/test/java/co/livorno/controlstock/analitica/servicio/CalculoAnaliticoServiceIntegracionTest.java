@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
 
 import co.livorno.controlstock.TestcontainersConfiguration;
+import co.livorno.controlstock.analitica.calculo.PronosticoMensual;
 import co.livorno.controlstock.analitica.modelo.EjecucionAnalitica;
 import co.livorno.controlstock.analitica.modelo.OrigenEjecucion;
 import co.livorno.controlstock.analitica.repositorio.AnaliticaVarianteRepository;
@@ -16,6 +17,7 @@ import co.livorno.controlstock.inventario.servicio.MovimientoService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -414,6 +416,63 @@ class CalculoAnaliticoServiceIntegracionTest {
             assertThat(error).isNull();
             Map<String, Object> v = variante(id);
             assertThat(v.get("punto_reorden")).isEqualTo(21);
+            assertThat(v.get("clase_abc")).isEqualTo("A");
+            assertThat(v.get("stock_fisico")).isEqualTo(9);
+            assertThat(((Number) v.get("version")).longValue()).isEqualTo(versionInicial + 1);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void calcularYAplicar_ventaConcurrenteConPronostico_ventaPasaSin409YRopConFuentePronostico() throws Exception {
+        // dado: una variante con ventas y pronóstico (10 u/día) y stock 10; el hilo A la carga antes del cálculo
+        Long p = producto("C", true);
+        Long id = variante(p, "M", CREADA, true, 10);
+        ventasV1(id);
+        Long ejecucion = nuevaEjecucion();
+        long versionInicial = ((Number) variante(id).get("version")).longValue();
+        CountDownLatch cargada = new CountDownLatch(1);
+        CountDownLatch calculado = new CountDownLatch(1);
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        try {
+            Future<Throwable> hiloA = pool.submit(() -> {
+                try {
+                    transaccion.executeWithoutResult(estado -> {
+                        variantes.findById(id).orElseThrow(); // entidad con puntoReorden null en memoria
+                        cargada.countDown();
+                        try {
+                            if (!calculado.await(60, TimeUnit.SECONDS)) {
+                                throw new IllegalStateException("tiempo agotado");
+                            }
+                        } catch (InterruptedException e) {
+                            throw new IllegalStateException(e);
+                        }
+                        movimientos.registrar(new SolicitudMovimiento(id, TipoMovimiento.VENTA, 1, null, usuarioId,
+                                null, null, null));
+                    });
+                    return null;
+                } catch (Throwable t) {
+                    return t;
+                }
+            });
+
+            // cuando: B calcula y confirma mientras A espera, y luego A registra la venta
+            assertThat(cargada.await(60, TimeUnit.SECONDS)).isTrue();
+            servicio.calcularYAplicar(CORTE, ejecucion, Map.of(id, new PronosticoMensual(
+                    YearMonth.of(2020, 6), List.of(new BigDecimal("300")))));
+            Integer rop = (Integer) variante(id).get("punto_reorden");
+            assertThat(rop).isNotNull().isGreaterThan(100); // μL = 10 u/día × 10 días = 100 + stock de seguridad
+            assertThat(fila(id).get("fuente_demanda")).isEqualTo("PRONOSTICO");
+            assertThat(fila(id).get("punto_reorden")).isEqualTo(rop);
+            assertThat(((Number) variante(id).get("version")).longValue()).isEqualTo(versionInicial);
+            calculado.countDown();
+            Throwable error = hiloA.get(60, TimeUnit.SECONDS);
+
+            // entonces: la venta pasó sin 409, el ROP y la clase del cálculo siguen, y la versión solo subió por la venta
+            assertThat(error).isNull();
+            Map<String, Object> v = variante(id);
+            assertThat(v.get("punto_reorden")).isEqualTo(rop);
             assertThat(v.get("clase_abc")).isEqualTo("A");
             assertThat(v.get("stock_fisico")).isEqualTo(9);
             assertThat(((Number) v.get("version")).longValue()).isEqualTo(versionInicial + 1);

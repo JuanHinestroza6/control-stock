@@ -56,6 +56,7 @@ public class ConsultaAnaliticaService {
     private final EjecucionAnaliticaRepository ejecuciones;
     private final UsuarioRepository usuarios;
     private final PropiedadesAnalitica propiedades;
+    private final co.livorno.controlstock.inventario.servicio.ConsultaPedidosEnCamino pedidos;
 
     public Page<AbcVarianteResponse> listarAbc(ClaseAbc clase, Long categoriaId, String q, Pageable pageable) {
         Ordenamiento.validar(pageable, ORDEN_ABC);
@@ -68,9 +69,11 @@ public class ConsultaAnaliticaService {
             MetodoReorden metodo, Boolean enAlerta, Pageable pageable) {
         Ordenamiento.validar(pageable, ORDEN_REORDEN);
         int modoAlerta = enAlerta == null ? 0 : enAlerta ? 1 : 2;
+        Map<Long, Long> enCamino = pedidos.enCaminoPorVariante();
         return instantanea.consultarReorden(clase != null ? Character.valueOf(clase.name().charAt(0)) : null, categoriaId,
                 ProductoRepository.patronContiene(q), metodo, modoAlerta,
-                traducir(pageable, "sku")).map(ReordenVarianteResponse::de);
+                traducir(pageable, "sku"))
+                .map(a -> ReordenVarianteResponse.de(a, enCamino.getOrDefault(a.getVariante().getId(), 0L)));
     }
 
     public ResumenAbcResponse resumenAbc() {

@@ -1,6 +1,7 @@
 package co.livorno.controlstock.analitica.repositorio;
 
 import co.livorno.controlstock.analitica.modelo.AnaliticaVariante;
+import co.livorno.controlstock.analitica.modelo.EnCaminoVariante;
 import co.livorno.controlstock.analitica.modelo.MetodoReorden;
 import java.util.List;
 import org.springframework.data.domain.Page;
@@ -54,11 +55,13 @@ public interface AnaliticaVarianteRepository extends JpaRepository<AnaliticaVari
             @Param("patron") String patron, Pageable pageable);
 
     /**
-     * Página del punto de reorden. {@code modoAlerta}: 0 = sin filtro, 1 = solo con disponible ≤ umbral efectivo
-     * (ROP, o stock mínimo si no hay), 2 = solo con disponible > umbral efectivo.
+     * Página del punto de reorden. {@code modoAlerta}: 0 = sin filtro, 1 = en alerta (AGOTADO: disponible 0; STOCK_BAJO:
+     * posición = disponible + en camino ≤ umbral efectivo, ROP o stock mínimo si no hay), 2 = sin alerta de stock.
+     * El en camino sale de {@link EnCaminoVariante} (planes APROBADO, ADR-010).
      */
     @Query(value = """
             select a from AnaliticaVariante a join fetch a.variante v join fetch v.producto p join fetch p.categoria c
+            left join EnCaminoVariante e on e.varianteId = v.id
             where v.activo = true and p.activo = true
               and (:clase is null or a.claseAbc = :clase)
               and (:categoriaId is null or c.id = :categoriaId)
@@ -66,11 +69,16 @@ public interface AnaliticaVarianteRepository extends JpaRepository<AnaliticaVari
                    or p.nombre like :patron escape '!')
               and (:metodo is null or a.metodoReorden = :metodo)
               and (:modoAlerta = 0
-                   or (:modoAlerta = 1 and v.stockFisico - v.stockReservado <= coalesce(a.puntoReorden, v.stockMinimo))
-                   or (:modoAlerta = 2 and v.stockFisico - v.stockReservado > coalesce(a.puntoReorden, v.stockMinimo)))
+                   or (:modoAlerta = 1 and (v.stockFisico - v.stockReservado = 0
+                        or v.stockFisico - v.stockReservado + coalesce(e.cantidad, 0L)
+                           <= coalesce(a.puntoReorden, v.stockMinimo)))
+                   or (:modoAlerta = 2 and v.stockFisico - v.stockReservado > 0
+                       and v.stockFisico - v.stockReservado + coalesce(e.cantidad, 0L)
+                           > coalesce(a.puntoReorden, v.stockMinimo)))
             """,
             countQuery = """
             select count(a) from AnaliticaVariante a join a.variante v join v.producto p join p.categoria c
+            left join EnCaminoVariante e on e.varianteId = v.id
             where v.activo = true and p.activo = true
               and (:clase is null or a.claseAbc = :clase)
               and (:categoriaId is null or c.id = :categoriaId)
@@ -78,8 +86,12 @@ public interface AnaliticaVarianteRepository extends JpaRepository<AnaliticaVari
                    or p.nombre like :patron escape '!')
               and (:metodo is null or a.metodoReorden = :metodo)
               and (:modoAlerta = 0
-                   or (:modoAlerta = 1 and v.stockFisico - v.stockReservado <= coalesce(a.puntoReorden, v.stockMinimo))
-                   or (:modoAlerta = 2 and v.stockFisico - v.stockReservado > coalesce(a.puntoReorden, v.stockMinimo)))
+                   or (:modoAlerta = 1 and (v.stockFisico - v.stockReservado = 0
+                        or v.stockFisico - v.stockReservado + coalesce(e.cantidad, 0L)
+                           <= coalesce(a.puntoReorden, v.stockMinimo)))
+                   or (:modoAlerta = 2 and v.stockFisico - v.stockReservado > 0
+                       and v.stockFisico - v.stockReservado + coalesce(e.cantidad, 0L)
+                           > coalesce(a.puntoReorden, v.stockMinimo)))
             """)
     Page<AnaliticaVariante> consultarReorden(@Param("clase") Character clase, @Param("categoriaId") Long categoriaId,
             @Param("patron") String patron, @Param("metodo") MetodoReorden metodo, @Param("modoAlerta") int modoAlerta,
@@ -94,4 +106,19 @@ public interface AnaliticaVarianteRepository extends JpaRepository<AnaliticaVari
             group by a.claseAbc
             """)
     List<ResumenClaseFila> resumenPorClase();
+
+    /**
+     * Universo de la sugerencia de compra: variantes activas de productos activos (categoría opcional), por id, con
+     * la demanda media histórica de la última instantánea si existe.
+     */
+    @Query("""
+            select new co.livorno.controlstock.analitica.repositorio.VarianteSugerible(
+                v.id, v.puntoReorden, v.stockMinimo, v.stockFisico - v.stockReservado, p.leadTimeDias, p.loteMinimo,
+                a.demandaMedia, v.claseAbc)
+            from Variante v join v.producto p left join AnaliticaVariante a on a.varianteId = v.id
+            where v.activo = true and p.activo = true
+              and (:categoriaId is null or p.categoria.id = :categoriaId)
+            order by v.id
+            """)
+    List<VarianteSugerible> sugeribles(@Param("categoriaId") Long categoriaId);
 }

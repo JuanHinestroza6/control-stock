@@ -55,6 +55,10 @@ export function AlertasPage() {
     { clave: 'tipo', encabezado: 'Alerta', celda: (a) => (
         <div className="flex flex-col items-start gap-1">
           <BadgeTipoAlerta tipo={a.tipo} />
+          {a.tipo === 'STOCK_BAJO' && (
+            <span className="text-xs text-oxford/70">Posición (disponible + en camino) ≤ umbral</span>
+          )}
+          {a.tipo === 'AGOTADO' && <span className="text-xs text-oxford/70">Sin unidades disponibles</span>}
           {a.tipo === 'SIN_ROTACION' && <span className="text-xs text-oxford/70">El producto no registra ventas en el periodo configurado (60 días por defecto)</span>}
         </div>
       ),

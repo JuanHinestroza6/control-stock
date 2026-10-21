@@ -2,11 +2,16 @@ import type {
   EjecucionAnaliticaResponse,
   FiltrosAbc,
   FiltrosMasVendidos,
+  FiltrosPronosticos,
   FiltrosReorden,
+  FiltrosTendencias,
   MasVendidosResponse,
   PaginaAbc,
+  PaginaPronosticos,
   PaginaReorden,
+  PronosticoDetalleResponse,
   ResumenAbcResponse,
+  TendenciaResponse,
 } from '../tipos/analitica'
 import { cliente } from './cliente'
 
@@ -79,5 +84,38 @@ export async function obtenerUltimaEjecucion(): Promise<EjecucionAnaliticaRespon
 
 export async function recalcularAnalitica(): Promise<EjecucionAnaliticaResponse> {
   const { data } = await cliente.post<EjecucionAnaliticaResponse>('/analitica/recalcular')
+  return data
+}
+
+export function parametrosTendencias(f: FiltrosTendencias): Params {
+  const params: Params = {}
+  if (f.desde) params.desde = f.desde
+  if (f.hasta) params.hasta = f.hasta
+  if (f.categoriaId !== undefined) params.categoriaId = f.categoriaId
+  if (f.productoId !== undefined) params.productoId = f.productoId
+  return params
+}
+
+export function parametrosPronosticos(f: FiltrosPronosticos): Params {
+  const params: Params = {}
+  if (f.categoriaId !== undefined) params.categoriaId = f.categoriaId
+  if (f.q?.trim()) params.q = f.q.trim()
+  if (f.metodo) params.metodo = f.metodo
+  agregarPaginacion(params, f)
+  return params
+}
+
+export async function obtenerTendencias(filtros: FiltrosTendencias): Promise<TendenciaResponse> {
+  const { data } = await cliente.get<TendenciaResponse>('/analitica/tendencias', { params: parametrosTendencias(filtros) })
+  return data
+}
+
+export async function listarPronosticos(filtros: FiltrosPronosticos): Promise<PaginaPronosticos> {
+  const { data } = await cliente.get<PaginaPronosticos>('/analitica/pronosticos', { params: parametrosPronosticos(filtros) })
+  return data
+}
+
+export async function obtenerPronostico(productoId: number): Promise<PronosticoDetalleResponse> {
+  const { data } = await cliente.get<PronosticoDetalleResponse>(`/analitica/pronosticos/${productoId}`)
   return data
 }

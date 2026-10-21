@@ -4,10 +4,13 @@ import co.livorno.controlstock.analitica.calculo.CalculadoraReorden;
 import co.livorno.controlstock.analitica.calculo.ClasificacionAbc;
 import co.livorno.controlstock.analitica.calculo.ClasificadorAbc;
 import co.livorno.controlstock.analitica.calculo.IngresoVariante;
+import co.livorno.controlstock.analitica.calculo.PronosticoMensual;
+import co.livorno.controlstock.analitica.calculo.ReordenConFuente;
 import co.livorno.controlstock.analitica.calculo.ResultadoReorden;
 import co.livorno.controlstock.analitica.calculo.SerieDemanda;
 import co.livorno.controlstock.analitica.config.PropiedadesAnalitica;
 import co.livorno.controlstock.analitica.modelo.AnaliticaVariante;
+import co.livorno.controlstock.analitica.modelo.FuenteDemanda;
 import co.livorno.controlstock.analitica.repositorio.AnaliticaVarianteRepository;
 import co.livorno.controlstock.analitica.repositorio.ConsultasVentaAnalitica;
 import co.livorno.controlstock.analitica.repositorio.DemandaDiaVariante;
@@ -64,10 +67,19 @@ public class CalculoAnaliticoService {
         this.clock = clock;
     }
 
-    /** Calcula y aplica con corte = hoy según el {@code Clock} (America/Bogota). */
+    /** Calcula y aplica con corte = hoy y sin pronóstico (ROP histórico en todas las variantes). */
     @Transactional
     public ResultadoCalculo calcularYAplicar(Long ejecucionId) {
-        return ejecutar(LocalDate.now(clock), ejecucionId);
+        return ejecutar(LocalDate.now(clock), ejecucionId, Map.of());
+    }
+
+    /**
+     * Calcula y aplica con corte = hoy según el {@code Clock} (America/Bogota), usando el pronóstico en memoria: las
+     * variantes presentes en {@code pronosticos} usan fuente PRONOSTICO; las demás, HISTORICA (ADR-010, decisión 3).
+     */
+    @Transactional
+    public ResultadoCalculo calcularYAplicar(Long ejecucionId, Map<Long, PronosticoMensual> pronosticos) {
+        return ejecutar(LocalDate.now(clock), ejecucionId, pronosticos);
     }
 
     /**
@@ -78,12 +90,20 @@ public class CalculoAnaliticoService {
      */
     @Transactional
     public ResultadoCalculo calcularYAplicar(LocalDate corte, Long ejecucionId) {
-        return ejecutar(corte, ejecucionId);
+        return ejecutar(corte, ejecucionId, Map.of());
     }
 
-    private ResultadoCalculo ejecutar(LocalDate corte, Long ejecucionId) {
+    /** Igual que {@link #calcularYAplicar(LocalDate, Long)} con el pronóstico en memoria. */
+    @Transactional
+    public ResultadoCalculo calcularYAplicar(LocalDate corte, Long ejecucionId,
+            Map<Long, PronosticoMensual> pronosticos) {
+        return ejecutar(corte, ejecucionId, pronosticos);
+    }
+
+    private ResultadoCalculo ejecutar(LocalDate corte, Long ejecucionId, Map<Long, PronosticoMensual> pronosticos) {
         Objects.requireNonNull(corte, "corte");
         Objects.requireNonNull(ejecucionId, "ejecucionId");
+        Objects.requireNonNull(pronosticos, "pronosticos");
         LocalDateTime ahora = LocalDateTime.now(clock);
 
         // 1. Lecturas
@@ -119,7 +139,9 @@ public class CalculoAnaliticoService {
             ClasificacionAbc abc = clases.get(v.id());
             SerieDemanda serie = SerieDemanda.construir(demanda.getOrDefault(v.id(), Map.of()),
                     v.creadoEn().toLocalDate(), corte, propiedades.ventanaDemandaDias());
-            ResultadoReorden rop = calculadora.calcular(serie, v.leadTimeDias(), abc.clase());
+            ReordenConFuente conFuente = calculadora.calcular(serie, v.leadTimeDias(), abc.clase(),
+                    pronosticos.get(v.id()), corte);
+            ResultadoReorden rop = conFuente.reorden();
             switch (abc.clase()) {
                 case 'A' -> a++;
                 case 'B' -> b++;
@@ -129,11 +151,15 @@ public class CalculoAnaliticoService {
                 conRop++;
             }
             VentaNetaVariante venta = ventas.get(v.id());
-            filas.add(new AnaliticaVariante(v.id(), ejecucionId,
+            AnaliticaVariante fila = new AnaliticaVariante(v.id(), ejecucionId,
                     venta == null ? 0 : Math.toIntExact(venta.unidadesNetas()), abc.ingresoNeto(),
                     abc.participacion(), abc.acumulado(), abc.posicion(), abc.clase(), rop.diasHistoria(),
                     rop.demandaMedia(), rop.desviacion(), rop.leadTimeDias(), rop.nivelServicio(), rop.z(),
-                    rop.stockSeguridad(), rop.puntoReorden(), rop.metodo(), ahora));
+                    rop.stockSeguridad(), rop.puntoReorden(), rop.metodo(), ahora);
+            if (conFuente.fuente() == FuenteDemanda.PRONOSTICO) {
+                fila.usarPronostico(conFuente.demandaLeadTime(), conFuente.tasaPronosticada());
+            }
+            filas.add(fila);
         }
 
         // 3. Escrituras. Primero los UPDATE dirigidos y solo después la instantánea: el INSERT de analitica_variante

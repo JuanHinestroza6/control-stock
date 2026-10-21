@@ -19,7 +19,8 @@ function fila(extra: Partial<ReordenVarianteResponse> = {}): ReordenVarianteResp
   return {
     varianteId: 1, sku: 'LIV001-M-NEG', productoNombre: 'Camiseta Oversize', categoria: { id: 2, nombre: 'Camisetas' }, talla: 'M', color: 'NEGRO',
     claseAbc: 'A', diasHistoria: 90, demandaMedia: 1.5, desviacion: 0.8, leadTimeDias: 15, nivelServicio: 0.95, z: 1.65, stockSeguridad: 5.1,
-    puntoReorden: 28, metodo: 'NORMAL', stockMinimo: 5, umbralEfectivo: 28, fuenteUmbral: 'ROP', stockDisponible: 10, estadoStock: 'BAJO', ...extra,
+    puntoReorden: 28, metodo: 'NORMAL', stockMinimo: 5, umbralEfectivo: 28, fuenteUmbral: 'ROP', stockDisponible: 10, estadoStock: 'BAJO',
+    fuenteDemanda: 'HISTORICA', demandaLeadTime: null, tasaPronosticada: null, enCamino: 0, posicion: 10, ...extra,
   }
 }
 
@@ -107,6 +108,34 @@ describe('PestanaReorden', () => {
     expect(within(tabla).queryByText('0,0')).not.toBeInTheDocument()
   })
 
+  it('muestra en camino, posición y fuente de la demanda', async () => {
+    montar('ADMIN', resumen(), pagina([fila({ enCamino: 40, posicion: 50, fuenteDemanda: 'PRONOSTICO' })]))
+    const tabla = await screen.findByRole('table')
+    expect(within(tabla).getByText('Pronóstico')).toBeInTheDocument()
+    expect(within(tabla).getByText('40')).toBeInTheDocument()
+    expect(within(tabla).getByText('50')).toBeInTheDocument()
+  })
+
+  it('"Solo en alerta" envía enAlerta=true y muestra tal cual la página del servidor', async () => {
+    montar('ADMIN', resumen(), pagina([fila({ varianteId: 1, sku: 'BAJA-1' })]))
+    await screen.findByText('BAJA-1')
+    // El servidor devuelve ahora solo lo que está en alerta por posición; el cliente no filtra de nuevo.
+    vi.mocked(api.listarReorden).mockResolvedValue(
+      pagina(
+        [
+          fila({ varianteId: 2, sku: 'ALERTA-2', stockDisponible: 10, enCamino: 40, posicion: 50, umbralEfectivo: 60 }),
+          fila({ varianteId: 3, sku: 'AGOTADA-3', stockDisponible: 0, enCamino: 40, posicion: 40, umbralEfectivo: 28, estadoStock: 'AGOTADO' }),
+        ],
+        { totalElements: 45, totalPages: 3 },
+      ),
+    )
+    await userEvent.click(screen.getByLabelText('Solo en alerta'))
+    await waitFor(() => expect(ultimaLlamada().enAlerta).toBe(true))
+    expect(await screen.findByText('ALERTA-2')).toBeInTheDocument()
+    expect(screen.getByText('AGOTADA-3')).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
   it('la ayuda con la fórmula se muestra al desplegar', async () => {
     montar()
     await screen.findByText('Camiseta Oversize')
@@ -114,6 +143,8 @@ describe('PestanaReorden', () => {
     expect(screen.getByText(/ROP = ⌈d̄·L \+ z·σ·√L⌉/)).toBeVisible()
     expect(screen.getByText(/A 95 %, B 90 %, C 80 %/)).toBeVisible()
     expect(screen.getByText(/se recalcula cada noche/)).toBeVisible()
+    expect(screen.getByText(/Fuente de la demanda:/)).toBeVisible()
+    expect(screen.getByText(/posición = disponible \+ unidades en camino/)).toBeVisible()
   })
 
   it('sin ejecución muestra el aviso y no consulta la lista', async () => {

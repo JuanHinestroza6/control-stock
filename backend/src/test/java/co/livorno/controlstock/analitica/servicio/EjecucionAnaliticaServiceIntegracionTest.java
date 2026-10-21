@@ -3,6 +3,7 @@ package co.livorno.controlstock.analitica.servicio;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 
@@ -64,6 +65,9 @@ class EjecucionAnaliticaServiceIntegracionTest {
 
     @AfterEach
     void limpiar() {
+        jdbc.update("DELETE FROM pronostico");
+        jdbc.update("DELETE FROM analitica_producto_mes");
+        jdbc.update("DELETE FROM analitica_producto");
         jdbc.update("DELETE FROM analitica_variante WHERE ejecucion_id > ?", idEjecucionBase);
         for (Long v : variantesCreadas) {
             jdbc.update("DELETE FROM movimiento WHERE variante_id = ?", v);
@@ -160,7 +164,7 @@ class EjecucionAnaliticaServiceIntegracionTest {
         Long p = producto();
         Long v = variante(p, "S");
         jdbc.update("UPDATE variante SET punto_reorden = 7, clase_abc = 'B' WHERE id = ?", v);
-        doThrow(new IllegalStateException("fallo forzado con detalle interno")).when(calculo).calcularYAplicar(anyLong());
+        doThrow(new IllegalStateException("fallo forzado con detalle interno")).when(calculo).calcularYAplicar(anyLong(), anyMap());
 
         // cuando
         EjecucionAnalitica e = servicio.ejecutar(OrigenEjecucion.NOCTURNA, null);
@@ -199,7 +203,7 @@ class EjecucionAnaliticaServiceIntegracionTest {
         Long p = producto();
         Long v1 = variante(p, "S");
         Long v2 = variante(p, "M");
-        doThrow(new IllegalStateException("boom")).when(alertas).evaluar(v1);
+        doThrow(new IllegalStateException("boom")).when(alertas).evaluar(org.mockito.ArgumentMatchers.eq(v1), org.mockito.ArgumentMatchers.anyLong());
 
         // cuando
         EjecucionAnalitica e = servicio.ejecutar(OrigenEjecucion.NOCTURNA, null);
@@ -237,7 +241,7 @@ class EjecucionAnaliticaServiceIntegracionTest {
             dentro.countDown();
             soltar.await(30, TimeUnit.SECONDS);
             return inv.callRealMethod();
-        }).when(calculo).calcularYAplicar(anyLong());
+        }).when(calculo).calcularYAplicar(anyLong(), anyMap());
         ExecutorService hilo = Executors.newSingleThreadExecutor();
         try {
             Future<EjecucionAnalitica> primera = hilo.submit(() -> servicio.ejecutar(OrigenEjecucion.NOCTURNA, null));

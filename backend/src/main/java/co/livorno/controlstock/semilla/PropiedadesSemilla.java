@@ -13,7 +13,7 @@ public record PropiedadesSemilla(
         @DefaultValue("true") boolean ejecutar,
         @DefaultValue("true") boolean salirAlTerminar,
         @DefaultValue("42") long semillaAleatoria,
-        @DefaultValue("24") int meses,
+        @DefaultValue("36") int meses,
         LocalDate fechaFin,
         @DefaultValue("15") int ticketsDiaBase,
         String password) {

@@ -1,0 +1,195 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+title Diagrama de clases - Fase 6 (módulo compra y sus puertos con inventario y analitica)
+
+package "catalogo" {
+  class Variante {
+    id: Long
+    sku: String
+    stockFisico: int
+    stockReservado: int
+    stockMinimo: int
+    puntoReorden: Integer
+    version: long
+  }
+  class Producto {
+    id: Long
+    precioCompra: BigDecimal
+    leadTimeDias: int
+    loteMinimo: int
+  }
+}
+
+package "inventario" {
+  interface ConsultaPedidosEnCamino <<puerto>> {
+    enCamino(varianteId: Long): long
+    enCaminoPorVariante(): Map<Long, Long>
+  }
+  class OperacionInventarioService {
+    registrarEntradaDePlan(planId: Long, lineas: List<LineaEntradaRequest>, observacion: String): List<MovimientoResponse>
+  }
+  class MovimientoService {
+    registrar(solicitud: SolicitudMovimiento): Movimiento
+  }
+  class PosicionCambiada <<evento, record>> {
+    varianteId: Long
+  }
+  class StockCambiado <<evento, record>> {
+    varianteId: Long
+  }
+  class AlertaListener {
+    alCambiarStock(StockCambiado)
+    alCambiarPosicion(PosicionCambiada)
+  }
+  class AlertaService {
+    evaluar(varianteId: Long)
+  }
+}
+
+package "compra" {
+  package "modelo" {
+    enum EstadoPlan {
+      BORRADOR
+      APROBADO
+      RECIBIDO
+      CANCELADO
+    }
+    enum OrigenPlan {
+      SUGERIDO
+      MANUAL
+    }
+    class PlanCompra {
+      id: Long
+      estado: EstadoPlan
+      origen: OrigenPlan
+      observacion: String
+      creadoEn: LocalDateTime
+      creadoPor: Long
+      aprobadoEn: LocalDateTime
+      aprobadoPor: Long
+      recibidoEn: LocalDateTime
+      recibidoPor: Long
+      canceladoEn: LocalDateTime
+      canceladoPor: Long
+      motivoCancelacion: String
+      ejecucionId: Long
+      version: int
+      actualizadoEn: LocalDateTime
+      {static} manual(observacion, ahora, usuarioId): PlanCompra
+      {static} sugerido(observacion, ejecucionId, ahora, usuarioId): PlanCompra
+      numero(): String
+      agregarLinea(variante, cantidadSugerida, cantidadAprobada, costoEstimado, justificacion): DetallePlan
+      aprobar(ahora, usuarioId)
+      cancelar(motivo, ahora, usuarioId)
+      recibir(ahora, usuarioId)
+    }
+    class DetallePlan {
+      id: Long
+      cantidadSugerida: Integer
+      cantidadAprobada: int
+      costoEstimado: BigDecimal
+      justificacion: String
+      cantidadRecibida: Integer
+      costoRecibido: BigDecimal
+      registrarRecepcion(cantidad, costo)
+    }
+  }
+
+  package "repositorio" {
+    interface PlanCompraRepository
+    interface DetallePlanRepository {
+      enCamino(varianteId: Long): long
+      enCaminoPorVariante(): List<EnCaminoVariante>
+      varianteIdsEnBorrador(ids): List<Long>
+    }
+  }
+
+  package "servicio" {
+    interface FuenteSugerenciaCompra <<puerto>> {
+      sugerir(categoriaId: Long): Sugerencia
+    }
+    class PlanCompraService {
+      crear(request): PlanCompraDetalleResponse
+      crearSugerido(request): PlanCompraDetalleResponse
+      actualizar(id, request): PlanCompraDetalleResponse
+      aprobar(id, request): PlanCompraDetalleResponse
+      cancelar(id, request): PlanCompraDetalleResponse
+      recibir(id, request): PlanCompraDetalleResponse
+      listar(estado, pageable): Page<PlanCompraResumenResponse>
+      obtener(id): PlanCompraDetalleResponse
+    }
+    class PedidosEnCaminoJpa
+  }
+
+  package "web" {
+    class PlanCompraController {
+      listar(estado, pageable)
+      obtener(id)
+      crear(request)
+      sugerir(request)
+      actualizar(id, request)
+      aprobar(id, request)
+      cancelar(id, request)
+      recibir(id, request)
+    }
+  }
+}
+
+package "analitica" {
+  class SugerenciaCompraAnalitica {
+    sugerir(categoriaId: Long): Sugerencia
+  }
+  class CalculadoraSugerenciaCompra <<utilidad>> {
+    sugerir(insumos: List<InsumoSugerencia>, corte: LocalDate): List<LineaSugerencia>
+  }
+  class PronosticoRepository
+  class EjecucionAnaliticaService {
+    ejecutar(origen, usuarioId): EjecucionAnalitica
+  }
+}
+
+PlanCompra "1" *--> "1..300" DetallePlan : lineas
+PlanCompra --> EstadoPlan
+PlanCompra --> OrigenPlan
+DetallePlan "*" --> "1" Variante
+Variante "*" --> "1" Producto
+
+PlanCompraController --> PlanCompraService
+PlanCompraService --> PlanCompraRepository
+PlanCompraService --> DetallePlanRepository
+PlanCompraService --> FuenteSugerenciaCompra : sugerir
+PlanCompraService --> OperacionInventarioService : registrarEntradaDePlan
+PlanCompraService ..> PosicionCambiada : publica al aprobar\no cancelar un APROBADO
+PedidosEnCaminoJpa --> DetallePlanRepository
+
+' Puertos (inversión de dependencia)
+PedidosEnCaminoJpa ..|> ConsultaPedidosEnCamino : implementa
+SugerenciaCompraAnalitica ..|> FuenteSugerenciaCompra : implementa
+SugerenciaCompraAnalitica --> CalculadoraSugerenciaCompra
+SugerenciaCompraAnalitica --> PronosticoRepository
+SugerenciaCompraAnalitica --> ConsultaPedidosEnCamino : en camino por variante
+EjecucionAnaliticaService --> ConsultaPedidosEnCamino
+AlertaService --> ConsultaPedidosEnCamino : posición = disponible + en camino
+
+OperacionInventarioService --> MovimientoService : ENTRADA\nPLAN_COMPRA/{id}
+MovimientoService ..> StockCambiado : publica
+AlertaListener ..> StockCambiado : AFTER_COMMIT
+AlertaListener ..> PosicionCambiada : AFTER_COMMIT
+AlertaListener --> AlertaService : evaluar (REQUIRES_NEW)
+
+note bottom of PlanCompraService
+  compra depende de catalogo, inventario, usuario y comun; NO depende de venta ni de analitica.
+  inventario no depende de compra (puerto ConsultaPedidosEnCamino, implementado en compra).
+  Ningún módulo salvo semilla depende de analitica (puerto FuenteSugerenciaCompra, implementado allí).
+  El plan nunca asigna stockFisico ni stockReservado: solo MovimientoService (regla de oro 1).
+  Orden de bloqueo: plan -> variantes por id. @Version en PlanCompra.
+end note
+note right of PlanCompra
+  en camino = Σ cantidadAprobada de las líneas de planes APROBADO.
+  analitica también lee esa suma con una vista de solo lectura
+  (analitica.modelo.EnCaminoVariante) para filtrar por posición.
+end note
+@enduml

@@ -28,13 +28,21 @@ public record EjecucionAnaliticaResponse(
         Integer enAlertaStock,
         BigDecimal porcentajeAlertaStock,
         Integer sinRotacionActivas,
-        String mensaje) {
+        String mensaje,
+        Integer productosPronosticados,
+        Integer conHoltWinters,
+        Integer conSes,
+        BigDecimal wapeGlobal,
+        Integer enAlertaSinTransito,
+        Integer conPedidoEnCamino) {
 
     public static EjecucionAnaliticaResponse de(EjecucionAnalitica e, String nombreUsuario) {
         return new EjecucionAnaliticaResponse(e.getId(), e.getOrigen(), nombreUsuario, e.getIniciadaEn(),
                 e.getTerminadaEn(), e.getEstado(), e.getFechaCorte(), e.getDuracionMs(), e.getVariantesAnalizadas(),
                 e.getClaseA(), e.getClaseB(), e.getClaseC(), e.getConPuntoReorden(), e.getAlertasEvaluadas(),
                 e.getAlertasFallidas(), e.getVariantesActivas(), e.getEnAlertaStock(),
-                e.getPorcentajeAlertaStock(), e.getSinRotacionActivas(), e.getMensaje());
+                e.getPorcentajeAlertaStock(), e.getSinRotacionActivas(), e.getMensaje(),
+                e.getProductosPronosticados(), e.getConHoltWinters(), e.getConSes(), e.getWapeGlobal(),
+                e.getEnAlertaSinTransito(), e.getConPedidoEnCamino());
     }
 }

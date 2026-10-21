@@ -18,6 +18,8 @@ spring:
           time_zone: America/Bogota
         # Actualiza filas en orden de PK: evita deadlocks entre ventas de varias líneas (ADR-006)
         order_updates: true
+        # Carga por lotes las asociaciones LAZY (líneas de plan, variante, producto): evita N+1 en listados
+        default_batch_fetch_size: 50
         query:
           # El kardex es inmutable: un UPDATE/DELETE masivo sobre una entidad @Immutable falla en vez de ignorarse
           immutable_entity_update_query_handling_mode: exception
@@ -68,6 +70,8 @@ app:
       dias: 90 # retención tras cerrar la reserva
   alertas:
     sin-rotacion-dias: 60 # SIN_ROTACION: producto sin ventas no anuladas en estos dias (ADR-009)
+  compras: # plan de compras (ADR-010)
+    periodo-revision-dias: 30 # R: días de demanda que cubre la sugerencia tras el lead time
   analitica: # ABC y punto de reorden (ADR-009)
     cron: "0 0 2 * * *" # 02:00 America/Bogota, antes de la anonimizacion de las 02:30
     ventana-abc-dias: 365 # ventana movil del ABC (ingreso neto)
@@ -80,3 +84,9 @@ app:
       a: {nivel-servicio: 0.95, z: 1.65}
       b: {nivel-servicio: 0.90, z: 1.28}
       c: {nivel-servicio: 0.80, z: 0.84}
+  pronostico: # pronóstico de demanda mensual (ADR-010)
+    meses-historia: 36
+    disponibilidad-minima: 0.5 # piso al corregir la demanda por agotados
+    ventana-mezcla-dias: 180 # participación de cada variante en su producto
+    horizonte: 3 # mes actual y los dos siguientes
+    meses-backtest: 6

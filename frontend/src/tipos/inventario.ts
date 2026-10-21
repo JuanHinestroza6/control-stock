@@ -33,6 +33,8 @@ export interface InventarioItemResponse {
   estadoStock: EstadoStock
   precioVenta: number
   activo: boolean
+  /** Fase 6: unidades en planes APROBADOS; opcional hasta que el backend lo envíe. */
+  enCamino?: number | null
 }
 
 export interface FiltrosInventario extends ParametrosPagina {

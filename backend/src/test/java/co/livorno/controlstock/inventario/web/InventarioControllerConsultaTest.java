@@ -60,7 +60,7 @@ class InventarioControllerConsultaTest {
         // dado
         var item = new InventarioItemResponse(7L, "LIV001-M-NEG", 3L, "LIV001", "Camiseta",
                 new CategoriaRef(2L, "Camisetas"), Talla.M, "NEGRO", 5, 3, 2, 2, null, "B", EstadoStock.BAJO,
-                new BigDecimal("59900.00"), true);
+                new BigDecimal("59900.00"), true, 4L);
         when(servicio.listar(eq("liv"), eq(2L), eq(EstadoStock.BAJO), eq(true), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(item)));
 

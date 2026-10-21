@@ -13,7 +13,7 @@ import { useCategorias } from '../../hooks/useCategorias'
 import { useSesion } from '../../hooks/useSesion'
 import { mensajeError } from '../../lib/errores'
 import { puedeRecalcularAnalitica } from '../../lib/permisos'
-import type { ClaseAbc, MetodoReorden, ReordenVarianteResponse } from '../../tipos/analitica'
+import type { ClaseAbc, FuenteDemanda, MetodoReorden, ReordenVarianteResponse } from '../../tipos/analitica'
 
 const TAMANO_PAGINA = 20
 const RETARDO_BUSQUEDA_MS = 300
@@ -31,6 +31,8 @@ const METODOS: Record<MetodoReorden, { etiqueta: string; tono: TonoBadge }> = {
   SIN_HISTORIA: { etiqueta: 'Sin historia', tono: 'alerta' },
 }
 const OPCIONES_METODO = (Object.keys(METODOS) as MetodoReorden[]).map((m) => ({ valor: m, etiqueta: METODOS[m].etiqueta }))
+
+const FUENTES: Record<FuenteDemanda, string> = { PRONOSTICO: 'Pronóstico', HISTORICA: 'Histórica' }
 
 const num2 = new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const num1 = new Intl.NumberFormat('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
@@ -74,7 +76,15 @@ const COLUMNAS: Columna<ReordenVarianteResponse>[] = [
     ),
     className: 'text-right',
   },
+  {
+    clave: 'fuente',
+    encabezado: 'Fuente de demanda',
+    celda: (f) => (f.fuenteDemanda ? FUENTES[f.fuenteDemanda] : '—'),
+    ocultarEnMovil: true,
+  },
   { clave: 'disponible', encabezado: 'Disponible', celda: (f) => f.stockDisponible, className: 'text-right tabular-nums' },
+  { clave: 'camino', encabezado: 'En camino', celda: (f) => entero.format(f.enCamino ?? 0), className: 'text-right tabular-nums' },
+  { clave: 'posicion', encabezado: 'Posición', celda: (f) => entero.format(f.posicion ?? f.stockDisponible), className: 'text-right font-medium tabular-nums' },
   { clave: 'estado', encabezado: 'Estado', celda: (f) => <BadgeStock estado={f.estadoStock} /> },
 ]
 
@@ -100,6 +110,14 @@ function AyudaFormula() {
         <p>
           <strong>Sin demanda:</strong> si no hubo ventas, el ROP es 0 y solo se alerta al agotarse. <strong>Sin historia:</strong> con menos de 30 días de
           historia no hay ROP y se usa el stock mínimo como umbral.
+        </p>
+        <p>
+          <strong>Fuente de la demanda:</strong> con "Pronóstico", la demanda esperada durante el lead time (d̄·L) sale de la tasa diaria pronosticada de
+          la variante; con "Histórica", de las ventas de los últimos 90 días. La desviación σ siempre sale de las ventas observadas.
+        </p>
+        <p>
+          <strong>Posición e "En alerta":</strong> posición = disponible + unidades en camino (planes de compra aprobados). Una variante está en alerta si
+          está agotada (disponible 0) o si su posición es menor o igual al umbral. El estado de stock sigue calculándose sobre el disponible.
         </p>
         <p>La analítica se recalcula cada noche; el ADMIN también puede recalcularla desde el panel superior.</p>
       </div>

@@ -37,6 +37,20 @@ class DependenciasEntreModulosTest {
             .because("venta ya depende de inventario; Reserva.ventaId es un Long (ADR-007)");
 
     @ArchTest
+    static final ArchRule modulosBaseNoDependenDeCompra = noClasses()
+            .that().resideInAnyPackage("co.livorno.controlstock.catalogo..", "co.livorno.controlstock.inventario..",
+                    "co.livorno.controlstock.venta..", "co.livorno.controlstock.usuario..")
+            .should().dependOnClassesThat().resideInAPackage("co.livorno.controlstock.compra..")
+            .because("inventario consulta lo que viene en camino por ConsultaPedidosEnCamino (ADR-010)");
+
+    @ArchTest
+    static final ArchRule compraNoDependeDeVentaNiAnalitica = noClasses()
+            .that().resideInAPackage("co.livorno.controlstock.compra..")
+            .should().dependOnClassesThat().resideInAnyPackage("co.livorno.controlstock.venta..",
+                    "co.livorno.controlstock.analitica..")
+            .because("compra pide la sugerencia por FuenteSugerenciaCompra, implementada en analitica (ADR-010)");
+
+    @ArchTest
     static final ArchRule nadieFueraDeSemillaDependeDeSemilla = noClasses()
             .that().resideOutsideOfPackage("co.livorno.controlstock.semilla..")
             .should().dependOnClassesThat().resideInAPackage("co.livorno.controlstock.semilla..")

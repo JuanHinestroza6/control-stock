@@ -75,6 +75,17 @@ public class VerificadorConsistencia {
                 select count(*) from reserva where (estado = 'CONVERTIDA' and venta_id is null)
                 or (estado = 'VENCIDA' and cerrada_por is not null) or (estado = 'ACTIVA' and cerrada_en is not null)
                 or (estado <> 'ACTIVA' and cerrada_en is null)""");
+        reglas.put("plan de compras fuera de RECIBIDO o APROBADO", """
+                select count(*) from plan_compra where estado not in ('RECIBIDO', 'APROBADO')""");
+        reglas.put("plan RECIBIDO sin una ENTRADA por línea recibida", """
+                select count(*) from plan_compra p where p.estado = 'RECIBIDO' and
+                (select count(*) from movimiento m where m.tipo = 'ENTRADA' and m.referencia_tipo = 'PLAN_COMPRA'
+                 and m.referencia_id = p.id) <> (select count(*) from detalle_plan d where d.plan_id = p.id
+                 and d.cantidad_recibida > 0)""");
+        reglas.put("ENTRADA que no viene de un plan de compras", """
+                select count(*) from movimiento m where m.tipo = 'ENTRADA'
+                and (m.referencia_tipo is null or m.referencia_tipo <> 'PLAN_COMPRA') and m.observacion not like
+                'Stock inicial%'""");
         reglas.put("usuarios demo con rol distinto, inactivos o con cambio forzado", """
                 select case when count(*) = 4 and sum(case
                   when (email = 'admin@livorno.co' and rol = 'ADMIN')
@@ -93,7 +104,7 @@ public class VerificadorConsistencia {
                 fallos.add(nombre + " (" + filas + ")");
             }
         });
-        for (String tabla : List.of("movimiento:fecha", "venta:fecha", "devolucion:fecha", "reserva:creada_en")) {
+        for (String tabla : List.of("movimiento:fecha", "venta:fecha", "devolucion:fecha", "reserva:creada_en", "plan_compra:creado_en")) {
             String[] partes = tabla.split(":");
             Long fuera = jdbc.queryForObject("select count(*) from " + partes[0] + " where " + partes[1]
                     + " < ? or " + partes[1] + " > ?", Long.class, desde, hasta);
@@ -103,6 +114,30 @@ public class VerificadorConsistencia {
         }
         if (!fallos.isEmpty()) {
             throw new SemillaAbortadaException("Verificación de consistencia fallida: " + String.join("; ", fallos));
+        }
+    }
+
+    /**
+     * Lo en camino (Σ cantidad aprobada de las líneas de planes APROBADO) por variante coincide con la simulación.
+     * {@code esperado}: variante id → unidades en camino según el simulador (solo las mayores a 0).
+     */
+    public void verificarEnCamino(Map<Long, Integer> esperado) {
+        Map<Long, Long> real = new java.util.HashMap<>();
+        jdbc.query("""
+                select d.variante_id, sum(d.cantidad_aprobada) from detalle_plan d
+                join plan_compra p on p.id = d.plan_id where p.estado = 'APROBADO' group by d.variante_id""",
+                rs -> { real.put(rs.getLong(1), rs.getLong(2)); });
+        long distintas = 0;
+        java.util.Set<Long> ids = new java.util.HashSet<>(real.keySet());
+        ids.addAll(esperado.keySet());
+        for (Long id : ids) {
+            if (real.getOrDefault(id, 0L) != esperado.getOrDefault(id, 0).longValue()) {
+                distintas++;
+            }
+        }
+        if (distintas > 0) {
+            throw new SemillaAbortadaException("Verificación de consistencia fallida: lo en camino de " + distintas
+                    + " variantes no coincide con la simulación.");
         }
     }
 

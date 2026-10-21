@@ -43,11 +43,13 @@ class AlertaServiceTest {
     @Mock co.livorno.controlstock.usuario.repositorio.UsuarioRepository usuarios;
     @Mock co.livorno.controlstock.inventario.repositorio.MovimientoRepository movimientos;
 
+    @Mock co.livorno.controlstock.inventario.servicio.ConsultaPedidosEnCamino pedidos;
+
     AlertaService servicio;
 
     @BeforeEach
     void preparar() {
-        servicio = new AlertaService(variantes, alertas, RELOJ, usuarios, movimientos, 60);
+        servicio = new AlertaService(variantes, alertas, RELOJ, usuarios, movimientos, pedidos, 60);
     }
 
     /** Producto creado ayer (menos de 60 días: nunca SIN_ROTACION). */
@@ -86,6 +88,69 @@ class AlertaServiceTest {
         verify(alertas).cerrarActiva(ID, TipoAlerta.AGOTADO, AHORA);
         verify(alertas, never()).cerrarActiva(ID, TipoAlerta.STOCK_BAJO, AHORA);
         verify(alertas).abrirOActualizar(ID, "STOCK_BAJO", AHORA);
+    }
+
+    @Test
+    void evaluar_posicionSobreElUmbral_cierraStockBajoYNoAbreNinguna() {
+        variante(8, 3); // disponible 5 = stockMinimo, pero hay 4 en camino: posición 9 > 5
+        when(pedidos.enCamino(ID)).thenReturn(4L);
+
+        servicio.evaluar(ID);
+
+        verify(alertas).cerrarActiva(ID, TipoAlerta.STOCK_BAJO, AHORA);
+        verify(alertas, never()).abrirOActualizar(any(), any(), any());
+    }
+
+    @Test
+    void evaluar_posicionIgualAlUmbral_mantieneStockBajo() {
+        variante(5, 2); // disponible 3, 2 en camino: posición 5 = stockMinimo
+        when(pedidos.enCamino(ID)).thenReturn(2L);
+
+        servicio.evaluar(ID);
+
+        verify(alertas).abrirOActualizar(ID, "STOCK_BAJO", AHORA);
+    }
+
+    @Test
+    void evaluar_agotadoConPedidoEnCamino_sigueAgotado() {
+        variante(4, 4);
+        when(pedidos.enCamino(ID)).thenReturn(100L);
+
+        servicio.evaluar(ID);
+
+        verify(alertas).abrirOActualizar(ID, "AGOTADO", AHORA);
+        verify(alertas, never()).abrirOActualizar(ID, "STOCK_BAJO", AHORA);
+    }
+
+    @Test
+    void evaluar_conEnCaminoConocido_noConsultaElPuerto() {
+        variante(8, 3);
+
+        servicio.evaluar(ID, 4L);
+
+        verify(pedidos, never()).enCamino(any());
+        verify(alertas, never()).abrirOActualizar(any(), any(), any());
+    }
+
+    @Test
+    void tipoStock_conEnCamino_usaLaPosicionSoloParaStockBajo() {
+        Variante v = new Variante(producto(), "LIV001-M-NEG", Talla.M, "NEGRO", 5);
+        v.aplicarMovimiento(3, 0);
+        assertThat(AlertaService.tipoStock(v, 0)).isEqualTo(TipoAlerta.STOCK_BAJO);
+        assertThat(AlertaService.tipoStock(v, 3)).isNull();
+        Variante sin = new Variante(producto(), "LIV001-M-AZU", Talla.M, "AZUL", 5);
+        assertThat(AlertaService.tipoStock(sin, 50)).isEqualTo(TipoAlerta.AGOTADO);
+    }
+
+    @Test
+    void listener_posicionCambiada_evaluaYElFalloNoSePropaga() {
+        AlertaService roto = org.mockito.Mockito.mock(AlertaService.class);
+        doThrow(new IllegalStateException("fallo simulado")).when(roto).evaluar(ID);
+        AlertaListener listener = new AlertaListener(roto);
+
+        listener.alCambiarPosicion(new co.livorno.controlstock.inventario.evento.PosicionCambiada(ID));
+
+        verify(roto).evaluar(ID);
     }
 
     @Test
@@ -287,5 +352,49 @@ class AlertaServiceTest {
 
         verify(roto, org.mockito.Mockito.times(2)).evaluar(ID);
         verifyNoMoreInteractions(roto);
+    }
+
+    @Test
+    void evaluar_sinRotacionConPedidoEnCamino_sigueSinRotacion() {
+        // dado: producto viejo sin ventas, disponible 8 y 100 en camino (posicion muy sobre el umbral)
+        Variante v = variante(8, 0);
+        org.springframework.test.util.ReflectionTestUtils.setField(v.getProducto(), "creadoEn", AHORA.minusDays(90));
+
+        servicio.evaluar(ID, 100L);
+
+        // entonces: SIN_ROTACION no depende de lo que viene en camino
+        verify(alertas).abrirOActualizar(ID, "SIN_ROTACION", AHORA);
+    }
+
+    @Test
+    void evaluar_conPuntoDeReorden_laPosicionSeComparaContraElRop() {
+        Variante v = variante(10, 0);
+        org.springframework.test.util.ReflectionTestUtils.setField(v, "puntoReorden", 12);
+        when(pedidos.enCamino(ID)).thenReturn(2L); // posicion 12 = ROP (stockMinimo 5 no cuenta)
+
+        servicio.evaluar(ID);
+
+        verify(alertas).abrirOActualizar(ID, "STOCK_BAJO", AHORA);
+    }
+
+    @Test
+    void evaluar_conPuntoDeReordenYPosicionSobreElRop_noAbreStockBajo() {
+        Variante v = variante(10, 0);
+        org.springframework.test.util.ReflectionTestUtils.setField(v, "puntoReorden", 12);
+
+        servicio.evaluar(ID, 3L); // posicion 13 > 12
+
+        verify(alertas, never()).abrirOActualizar(any(), any(), any());
+    }
+
+    @Test
+    void evaluar_varianteInactivaConPedidoEnCamino_noAbreAlertaNiConsultaElPuerto() {
+        Variante v = variante(0, 0);
+        v.desactivar();
+
+        servicio.evaluar(ID, 50L);
+
+        verify(alertas, never()).abrirOActualizar(any(), any(), any());
+        verify(pedidos, never()).enCamino(any());
     }
 }

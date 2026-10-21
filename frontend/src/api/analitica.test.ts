@@ -78,3 +78,31 @@ describe('useRecalcular', () => {
     expect(claves.map((k) => qc.getQueryState([k])?.isInvalidated)).toEqual([true, true, true, false])
   })
 })
+
+describe('tendencias y pronósticos (fase 6)', () => {
+  it('parametrosTendencias omite indefinidos y conserva el resto', () => {
+    expect(api.parametrosTendencias({})).toEqual({})
+    expect(api.parametrosTendencias({ desde: '2025-01', hasta: '2026-09', categoriaId: 2, productoId: 7 })).toEqual({
+      desde: '2025-01', hasta: '2026-09', categoriaId: 2, productoId: 7,
+    })
+  })
+  it('parametrosPronosticos recorta q y arma paginación', () => {
+    expect(api.parametrosPronosticos({ q: '  ' })).toEqual({})
+    expect(api.parametrosPronosticos({ q: ' liv ', metodo: 'HOLT_WINTERS', categoriaId: 1, page: 1, size: 20, sort: 'nombre,asc' })).toEqual({
+      q: 'liv', metodo: 'HOLT_WINTERS', categoriaId: 1, page: 1, size: 20, sort: 'nombre,asc',
+    })
+  })
+  it('usa las rutas del contrato de tendencias y pronósticos', async () => {
+    const v = capturar()
+    await api.obtenerTendencias({ productoId: 3 })
+    await api.listarPronosticos({ size: 10 })
+    await api.obtenerPronostico(42)
+    expect(v.map((x) => `${x.method} ${x.url}`)).toEqual([
+      'get /analitica/tendencias',
+      'get /analitica/pronosticos',
+      'get /analitica/pronosticos/42',
+    ])
+    expect(v[0].params).toEqual({ productoId: 3 })
+    expect(v[1].params).toEqual({ size: 10 })
+  })
+})

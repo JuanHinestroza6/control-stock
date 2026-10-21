@@ -1,0 +1,36 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+title Máquina de estados: Plan de compras (REQ-10, ADR-010)
+
+[*] --> BORRADOR : crear (MANUAL) o sugerir (SUGERIDO)\nADMIN, INVENTARIO\n(no toca stock)
+
+BORRADOR --> BORRADOR : editar líneas y observación\n(@Version: versión vieja -> 409)
+BORRADOR --> APROBADO : aprobar (solo ADMIN)\nvariantes y productos activos, versión vigente\npublica PosicionCambiada por línea
+BORRADOR --> CANCELADO : cancelar(motivo 5-200)\nADMIN o INVENTARIO
+
+APROBADO --> RECIBIDO : recibir (ADMIN, INVENTARIO)\nuna ENTRADA por línea con cantidad > 0\nreferencia PLAN_COMPRA/{id}
+APROBADO --> CANCELADO : cancelar(motivo 5-200)\nsolo ADMIN (INVENTARIO: 403)\npublica PosicionCambiada por línea
+
+RECIBIDO --> [*]
+CANCELADO --> [*]
+
+note right of APROBADO
+  Estado "en camino": las líneas aportan su
+  cantidadAprobada a la posición de inventario
+  (disponible + en camino). Llegada esperada =
+  aprobadoEn + max(leadTimeDias); la interfaz
+  marca "atrasado" si ya pasó.
+end note
+
+note bottom of BORRADOR
+  Toda transición bloquea la fila del plan
+  (PESSIMISTIC_WRITE) y verifica el estado; si no
+  corresponde: 409 "El plan PC-000012 ya está APROBADO."
+  RECIBIDO y CANCELADO son finales.
+  Recibir con todas las líneas en 0 -> 422 (usar Cancelar).
+  La recepción se permite sobre variantes inactivas.
+end note
+@enduml

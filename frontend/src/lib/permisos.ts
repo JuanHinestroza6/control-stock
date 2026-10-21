@@ -1,4 +1,5 @@
 import type { Rol } from '../tipos/auth'
+import type { EstadoPlan } from '../tipos/compras'
 
 /** Crear/editar catálogo (categorías, productos, variantes): ADMIN e INVENTARIO (docs/dominio.md). */
 export function puedeEditarCatalogo(rol: Rol | undefined): boolean {
@@ -53,4 +54,36 @@ export function puedeVerAnaliticaCompleta(rol: Rol | undefined): boolean {
 /** Recalcular la analítica: solo ADMIN. */
 export function puedeRecalcularAnalitica(rol: Rol | undefined): boolean {
   return rol === 'ADMIN'
+}
+
+/** Ver tendencias y pronóstico: ADMIN, INVENTARIO y CONTABILIDAD (VENDEDOR 403). */
+export function puedeVerPronostico(rol: Rol | undefined): boolean {
+  return rol === 'ADMIN' || rol === 'INVENTARIO' || rol === 'CONTABILIDAD'
+}
+
+/** Ver planes de compra (con costos): ADMIN, INVENTARIO y CONTABILIDAD. */
+export function puedeVerCompras(rol: Rol | undefined): boolean {
+  return rol === 'ADMIN' || rol === 'INVENTARIO' || rol === 'CONTABILIDAD'
+}
+
+/** Crear y editar borradores (sugerido o manual): ADMIN e INVENTARIO. */
+export function puedeGestionarPlanes(rol: Rol | undefined): boolean {
+  return rol === 'ADMIN' || rol === 'INVENTARIO'
+}
+
+/** Aprobar un plan: solo ADMIN. */
+export function puedeAprobarPlan(rol: Rol | undefined): boolean {
+  return rol === 'ADMIN'
+}
+
+/** Recibir un plan aprobado (genera entradas): ADMIN e INVENTARIO. */
+export function puedeRecibirPlan(rol: Rol | undefined): boolean {
+  return rol === 'ADMIN' || rol === 'INVENTARIO'
+}
+
+/** Cancelar: ADMIN en BORRADOR o APROBADO; INVENTARIO solo descarta BORRADOR. */
+export function puedeCancelarPlan(rol: Rol | undefined, estado: EstadoPlan): boolean {
+  if (rol === 'ADMIN') return estado === 'BORRADOR' || estado === 'APROBADO'
+  if (rol === 'INVENTARIO') return estado === 'BORRADOR'
+  return false
 }

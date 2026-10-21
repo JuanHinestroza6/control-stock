@@ -1,6 +1,6 @@
 ---
 name: project-patrones-recurrentes
-description: Errores que el equipo repite (collation, IAE=500, ADR≠código, concurrencia sin prueba, ArchUnit vacua, cast en JPQL, @Size antes de strip, listener sin bloqueo, locks implícitos de InnoDB por FK y UPDATE con subconsulta, tipos TS no nulos)
+description: Errores que el equipo repite (versión optimista tomada de la prop refrescada, tope limit(N) por id, collation, IAE=500, ADR≠código, concurrencia sin prueba, ArchUnit vacua, cast en JPQL, @Size antes de strip, listener sin bloqueo, locks implícitos de InnoDB por FK y UPDATE con subconsulta, tipos TS no nulos)
 metadata:
   type: project
 ---
@@ -56,3 +56,13 @@ Fase 5 (rama fase-5-analitica, 2026-10-14), sin críticos; 847 pruebas, 0 skippe
 15. Tipos TS no nulos para campos que el backend devuelve null (stockSeguridad en SIN_HISTORIA) → Intl.format(null)="0".
 Se repitieron el 6 (regla ArchUnit solo mira @Query de @Modifying; JdbcTemplate la evade), el 7 (cast(enum as string))
 y el 9 (SIN_ROTACION cruza variantes del producto bajo el bloqueo de una sola variante).
+
+Fase 6 (rama fase-6-prediccion-compras, 2026-10-21), sin críticos:
+16. Formularios con `version` optimista que toman la versión de la consulta refrescada (prop) y no la versión sobre la
+    que se editó: tras un 409 + "recargar" (o cualquier refetch) el guardado sobrescribe cambios ajenos sin 409. Pedir
+    versión base en estado + fusión a 3 vías (base/mía/vigente) con conflictos marcados.
+17. Topes de tamaño (`limit(300)`) aplicados sobre listas ordenadas por id en vez de por prioridad de negocio, y sin
+    informar lo que quedó fuera.
+Se repitió el 14a con otra forma: inserts analíticos con FK a `producto` (S) antes de las variantes vs la entrada que
+actualiza `producto.precioCompra` (X) después de las variantes. También: un "bug conocido" del equipo (no se puede
+vaciar la observación del plan) no se reproducía en el código; verificar antes de confirmar pendientes heredados.

@@ -64,4 +64,27 @@ public class RegistroEjecucionService {
         e.fallar(LocalDateTime.now(clock), mensaje, medido);
         return e;
     }
+
+    /** Guarda los agregados del pronóstico apenas termina su paso (transacción propia). */
+    @Transactional
+    public void registrarPronostico(Long id, ResultadoPronosticoGuardado pronostico) {
+        EjecucionAnalitica e = ejecuciones.findById(id).orElseThrow();
+        e.registrarPronostico(pronostico.productosPronosticados(), pronostico.conHoltWinters(), pronostico.conSes(),
+                pronostico.wapeGlobal());
+    }
+
+    /** Guarda la métrica contrafactual de alertas y las variantes con pedido en camino (transacción propia). */
+    @Transactional
+    public void registrarPosicion(Long id, int enAlertaSinTransito, int conPedidoEnCamino) {
+        EjecucionAnalitica e = ejecuciones.findById(id).orElseThrow();
+        e.registrarPosicion(enAlertaSinTransito, conPedidoEnCamino);
+    }
+
+    /** Cierra FALLIDA conservando también los conteos del cálculo (el ABC + ROP se aplicó; falló el pronóstico). */
+    @Transactional
+    public EjecucionAnalitica fallarConResultado(Long id, String mensaje, ResultadoEjecucion resultado) {
+        EjecucionAnalitica e = ejecuciones.findById(id).orElseThrow();
+        e.fallarConResultado(LocalDateTime.now(clock), mensaje, resultado);
+        return e;
+    }
 }

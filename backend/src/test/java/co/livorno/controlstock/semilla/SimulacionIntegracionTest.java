@@ -68,6 +68,23 @@ class SimulacionIntegracionTest {
         assertThat(r.dias()).isEqualTo(92);
         assertThat(r.ventas()).isGreaterThan(300);
         assertThat(r.entradas()).isPositive();
+
+        // reposición por planes de compra reales (D8): creados = recibidos + en camino, referencias a PLAN_COMPRA
+        assertThat(r.planesCreados()).isEqualTo(contar("select count(*) from plan_compra"));
+        assertThat(r.planesRecibidos()).isEqualTo(r.entradas())
+                .isEqualTo(contar("select count(*) from plan_compra where estado = 'RECIBIDO'"));
+        assertThat(r.planesEnCamino()).isEqualTo(contar("select count(*) from plan_compra where estado = 'APROBADO'"));
+        assertThat(r.planesEnCamino()).as("pedidos que llegan después de fin").isPositive();
+        assertThat(r.unidadesEnCamino()).isEqualTo(contar("""
+                select coalesce(sum(d.cantidad_aprobada), 0) from detalle_plan d
+                join plan_compra p on p.id = d.plan_id where p.estado = 'APROBADO'"""));
+        assertThat(contar("select count(*) from movimiento where tipo = 'ENTRADA' and referencia_tipo = 'PLAN_COMPRA'"))
+                .isPositive();
+        assertThat(contar("""
+                select count(*) from plan_compra p join usuario c on c.id = p.creado_por
+                left join usuario a on a.id = p.aprobado_por
+                where c.rol <> 'INVENTARIO' or a.rol <> 'ADMIN'""")).isZero();
+        assertThat(resumen.texto()).contains("planes de compra:").contains("Holt-Winters");
         assertThat(r.devoluciones()).isPositive();
         assertThat(r.ajustes()).isPositive();
         assertThat(r.alzasDePrecio()).isEqualTo(1);

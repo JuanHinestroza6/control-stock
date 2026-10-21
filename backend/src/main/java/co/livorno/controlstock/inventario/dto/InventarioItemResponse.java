@@ -24,14 +24,17 @@ public record InventarioItemResponse(
         String claseAbc,
         EstadoStock estadoStock,
         BigDecimal precioVenta,
-        boolean activo) {
+        boolean activo,
+        long enCamino) {
 
-    public static InventarioItemResponse de(Variante v) {
+    /** {@code enCamino}: unidades en planes de compra APROBADOS (ADR-010). */
+    public static InventarioItemResponse de(Variante v, long enCamino) {
         return new InventarioItemResponse(v.getId(), v.getSku(), v.getProducto().getId(),
                 v.getProducto().getCodigo(), v.getProducto().getNombre(),
                 CategoriaRef.de(v.getProducto().getCategoria()), v.getTalla(), v.getColor(), v.getStockFisico(),
                 v.getStockReservado(), v.getStockDisponible(), v.getStockMinimo(), v.getPuntoReorden(),
                 v.getClaseAbc() != null ? v.getClaseAbc().toString() : null,
-                v.estadoStock(), v.getProducto().getPrecioVenta(), v.isActivo());
+                v.estadoStock(), v.getProducto().getPrecioVenta(), v.isActivo(),
+                enCamino);
     }
 }

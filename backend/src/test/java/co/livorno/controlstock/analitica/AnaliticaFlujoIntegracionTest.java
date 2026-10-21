@@ -150,6 +150,9 @@ class AnaliticaFlujoIntegracionTest {
     @AfterEach
     void limpiar() {
         reloj.volverAlPresente();
+        jdbc.update("DELETE FROM pronostico");
+        jdbc.update("DELETE FROM analitica_producto_mes");
+        jdbc.update("DELETE FROM analitica_producto");
         String variantes = "(SELECT id FROM variante WHERE producto_id IN (" + csv(productos) + "))";
         if (!productos.isEmpty()) {
             String detalles = "(SELECT id FROM detalle_venta WHERE variante_id IN " + variantes + ")";

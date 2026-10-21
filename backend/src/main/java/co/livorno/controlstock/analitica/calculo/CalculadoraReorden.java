@@ -2,9 +2,11 @@ package co.livorno.controlstock.analitica.calculo;
 
 import co.livorno.controlstock.analitica.config.PropiedadesAnalitica;
 import co.livorno.controlstock.analitica.config.PropiedadesAnalitica.ParametrosClase;
+import co.livorno.controlstock.analitica.modelo.FuenteDemanda;
 import co.livorno.controlstock.analitica.modelo.MetodoReorden;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.Objects;
 
 /**
@@ -22,6 +24,16 @@ import java.util.Objects;
  * Sin piso de stockMinimo (D2) y sin loteMinimo. μL se calcula como Σ serie × L / n para no acumular error de
  * redondeo (30 u en 45 días con L = 15 da exactamente 5). La frontera μL ≥ umbral y el {@code ceil} toleran 1e-9:
  * un valor que en aritmética exacta es entero (por ejemplo μL = 30 con s = 0) no sube una unidad por el redondeo.
+ *
+ * <p>Desde la fase 6 (ADR-010, decisión 3) hay una sobrecarga con el pronóstico de la variante:
+ * <pre>
+ * μL = Σ_{i=0..L−1} tasa(corte + i)      tasa = pronóstico del mes del día / días del mes (horizonte agotado → último)
+ * s  = desviación de la serie diaria observada de 90 días (la misma de la fase 5)
+ * n &lt; historiaMinima → SIN_HISTORIA ; μL = 0 → SIN_DEMANDA ; μL ≥ 5 → NORMAL ceil(μL + z·s·√L) ; μL &lt; 5 → POISSON
+ * Sin pronóstico (null) → fórmula de la fase 5, fuente HISTORICA.
+ * </pre>
+ * Ejemplo: octubre 31 (1/día), noviembre 60 (2/día); corte 25-oct, L = 15 → μL = 7 × 1 + 8 × 2 = 23; s = 1,2, clase A →
+ * SS = 1,65 × 1,2 × √15 = 7,67 → ROP = ceil(30,67) = 31.
  */
 public final class CalculadoraReorden {
 
@@ -40,10 +52,52 @@ public final class CalculadoraReorden {
      * @throws IllegalArgumentException si el lead time es negativo
      */
     public ResultadoReorden calcular(SerieDemanda serie, int leadTimeDias, Character clase) {
+        validar(serie, leadTimeDias);
+        return decidir(muHistorica(serie, leadTimeDias), serie.total() == 0, serie, leadTimeDias, clase);
+    }
+
+    /**
+     * ROP con la fuente de la demanda (ADR-010, decisión 3). Con {@code pronostico} null usa la fórmula de la fase 5 y
+     * devuelve el mismo {@link ResultadoReorden} que {@link #calcular(SerieDemanda, int, Character)}.
+     *
+     * @param serie       serie diaria observada de 90 días (n y s salen siempre de ella)
+     * @param pronostico  pronóstico mensual de la variante (desagregado), o null si el producto no tiene pronóstico
+     * @param corte       primer día del lead time (hoy; la ventana observada termina el día anterior)
+     * @throws IllegalArgumentException si el lead time es negativo
+     */
+    public ReordenConFuente calcular(SerieDemanda serie, int leadTimeDias, Character clase,
+            PronosticoMensual pronostico, LocalDate corte) {
+        if (pronostico == null) {
+            ResultadoReorden r = calcular(serie, leadTimeDias, clase);
+            BigDecimal mu = r.metodo() == MetodoReorden.SIN_HISTORIA ? null
+                    : escala(muHistorica(serie, leadTimeDias), 2);
+            return new ReordenConFuente(r, FuenteDemanda.HISTORICA, mu, null);
+        }
+        validar(serie, leadTimeDias);
+        Objects.requireNonNull(corte, "corte");
+        double mu = pronostico.demanda(corte, leadTimeDias);
+        double tasa = leadTimeDias > 0 ? mu / leadTimeDias : pronostico.tasaDiaria(corte);
+        // Sin demanda: el pronóstico del lead time es 0 (con L = 0, la tasa del día del corte).
+        boolean sinDemanda = (leadTimeDias > 0 ? mu : tasa) <= TOLERANCIA;
+        ResultadoReorden r = decidir(sinDemanda ? 0.0 : mu, sinDemanda, serie, leadTimeDias, clase);
+        return new ReordenConFuente(r, FuenteDemanda.PRONOSTICO, escala(mu, 2), escala(tasa, 4));
+    }
+
+    private static void validar(SerieDemanda serie, int leadTimeDias) {
         Objects.requireNonNull(serie, "serie");
         if (leadTimeDias < 0) {
             throw new IllegalArgumentException("El lead time no puede ser negativo: " + leadTimeDias);
         }
+    }
+
+    /** μL histórica = Σ serie × L / n (0 sin historia). */
+    private static double muHistorica(SerieDemanda serie, int leadTimeDias) {
+        return serie.dias() == 0 ? 0.0 : (double) serie.total() * leadTimeDias / serie.dias();
+    }
+
+    /** Reglas comunes a ambas fuentes, dados μL y si la fuente no tiene demanda. */
+    private ResultadoReorden decidir(double mu, boolean sinDemanda, SerieDemanda serie, int leadTimeDias,
+            Character clase) {
         ParametrosClase parametros = propiedades.parametrosDe(clase);
         int n = serie.dias();
         BigDecimal media = escala(serie.media(), 4);
@@ -53,12 +107,10 @@ public final class CalculadoraReorden {
             return resultado(null, MetodoReorden.SIN_HISTORIA, serie, media, desviacion, leadTimeDias, parametros,
                     null);
         }
-        if (serie.total() == 0) {
+        if (sinDemanda) {
             return resultado(0, MetodoReorden.SIN_DEMANDA, serie, media, desviacion, leadTimeDias, parametros,
                     BigDecimal.ZERO.setScale(2));
         }
-
-        double mu = (double) serie.total() * leadTimeDias / n;
         if (mu >= umbralPoisson - TOLERANCIA) {
             double ss = parametros.z().doubleValue() * serie.desviacion() * Math.sqrt(leadTimeDias);
             int rop = (int) Math.ceil(mu + ss - TOLERANCIA);

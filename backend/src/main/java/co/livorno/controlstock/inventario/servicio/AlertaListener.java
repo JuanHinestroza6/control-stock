@@ -2,6 +2,7 @@ package co.livorno.controlstock.inventario.servicio;
 
 import co.livorno.controlstock.catalogo.evento.UmbralCambiado;
 import co.livorno.controlstock.catalogo.evento.VarianteDesactivada;
+import co.livorno.controlstock.inventario.evento.PosicionCambiada;
 import co.livorno.controlstock.inventario.evento.StockCambiado;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,12 @@ public class AlertaListener {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void alCambiarUmbral(UmbralCambiado evento) {
+        evaluar(evento.varianteId());
+    }
+
+    /** Aprobar un plan o cancelar uno APROBADO cambia lo que viene en camino sin mover stock (ADR-010). */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void alCambiarPosicion(PosicionCambiada evento) {
         evaluar(evento.varianteId());
     }
 
