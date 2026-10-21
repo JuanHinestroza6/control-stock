@@ -18,6 +18,8 @@ spring:
           time_zone: America/Bogota
         # Actualiza filas en orden de PK: evita deadlocks entre ventas de varias líneas (ADR-006)
         order_updates: true
+        # Carga por lotes las asociaciones LAZY (líneas de plan, variante, producto): evita N+1 en listados
+        default_batch_fetch_size: 50
         query:
           # El kardex es inmutable: un UPDATE/DELETE masivo sobre una entidad @Immutable falla en vez de ignorarse
           immutable_entity_update_query_handling_mode: exception
