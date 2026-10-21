@@ -203,7 +203,7 @@ class EjecucionAnaliticaServiceIntegracionTest {
         Long p = producto();
         Long v1 = variante(p, "S");
         Long v2 = variante(p, "M");
-        doThrow(new IllegalStateException("boom")).when(alertas).evaluar(v1);
+        doThrow(new IllegalStateException("boom")).when(alertas).evaluar(org.mockito.ArgumentMatchers.eq(v1), org.mockito.ArgumentMatchers.anyLong());
 
         // cuando
         EjecucionAnalitica e = servicio.ejecutar(OrigenEjecucion.NOCTURNA, null);

@@ -31,7 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Evalúa las alertas de una variante. AGOTADO, SIN_ROTACION y STOCK_BAJO son excluyentes con esa prioridad: AGOTADO si
- * disponible = 0; SIN_ROTACION si el producto no vende hace N días (ADR-009); STOCK_BAJO si disponible &le; umbral.
+ * disponible = 0; SIN_ROTACION si el producto no vende hace N días (ADR-009); STOCK_BAJO si 0 &lt; disponible y la
+ * posición (disponible + en camino, ADR-010) es &le; umbral. AGOTADO sigue sobre el disponible.
  */
 @Service
 public class AlertaService {
@@ -42,15 +43,17 @@ public class AlertaService {
     private final UsuarioRepository usuarios;
     private final MovimientoRepository movimientos;
     private final int diasSinRotacion;
+    private final ConsultaPedidosEnCamino pedidos;
 
     public AlertaService(VarianteRepository variantes, AlertaRepository alertas, Clock clock,
-            UsuarioRepository usuarios, MovimientoRepository movimientos,
+            UsuarioRepository usuarios, MovimientoRepository movimientos, ConsultaPedidosEnCamino pedidos,
             @Value("${app.alertas.sin-rotacion-dias:60}") int diasSinRotacion) {
         this.variantes = variantes;
         this.alertas = alertas;
         this.clock = clock;
         this.usuarios = usuarios;
         this.movimientos = movimientos;
+        this.pedidos = pedidos;
         this.diasSinRotacion = diasSinRotacion;
     }
 
@@ -103,6 +106,19 @@ public class AlertaService {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW, isolation = Isolation.READ_COMMITTED)
     public void evaluar(Long varianteId) {
+        evaluarConPosicion(varianteId, null);
+    }
+
+    /**
+     * Igual que {@link #evaluar(Long)} pero con las unidades en camino ya conocidas: la re-evaluación masiva las trae
+     * en lote (una consulta para todas las variantes) en vez de consultar variante por variante.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, isolation = Isolation.READ_COMMITTED)
+    public void evaluar(Long varianteId, long enCamino) {
+        evaluarConPosicion(varianteId, enCamino);
+    }
+
+    private void evaluarConPosicion(Long varianteId, Long enCaminoConocido) {
         // Bloquea la variante: dos evaluaciones simultáneas se serializan y la última ve el stock final confirmado.
         // READ_COMMITTED: cada lectura ve lo último confirmado y no hay bloqueos de hueco (menos interbloqueos).
         Variante v = variantes.bloquearPorId(varianteId).orElse(null);
@@ -112,25 +128,26 @@ public class AlertaService {
         LocalDateTime ahora = LocalDateTime.now(clock);
         Producto producto = v.getProducto();
         boolean activa = v.isActivo() && producto.isActivo();
+        long enCamino = !activa ? 0L : enCaminoConocido != null ? enCaminoConocido : pedidos.enCamino(varianteId);
 
         // Una venta reciente del producto cierra la SIN_ROTACION de todas sus variantes (también al anular una venta
         // se recalcula: la anulada ya no cuenta).
         boolean ventaReciente = activa && ventaReciente(producto, ahora);
-        TipoAlerta vigente = aplicar(varianteId, v, producto, activa, ventaReciente, ahora);
+        TipoAlerta vigente = aplicar(varianteId, v, producto, activa, ventaReciente, enCamino, ahora);
         // Carrera con la venta de otra talla: si ella confirmó y cerró las SIN_ROTACION del producto antes de que
         // esta transacción insertara la suya, nadie la cerraría. Se relee lo confirmado tras abrirla y, si ya hay
         // venta, se corrige. Queda una ventana de milisegundos entre esta relectura y el commit (ver ADR-009).
         if (vigente == TipoAlerta.SIN_ROTACION && ventaReciente(producto, ahora)) {
-            aplicar(varianteId, v, producto, activa, true, ahora);
+            aplicar(varianteId, v, producto, activa, true, enCamino, ahora);
         }
     }
 
     private TipoAlerta aplicar(Long varianteId, Variante v, Producto producto, boolean activa, boolean ventaReciente,
-            LocalDateTime ahora) {
+            long enCamino, LocalDateTime ahora) {
         if (ventaReciente) {
             cerrarSinRotacionDeProducto(producto.getId(), ahora);
         }
-        TipoAlerta vigente = activa ? calcularTipo(v, producto, ahora, ventaReciente) : null;
+        TipoAlerta vigente = activa ? calcularTipo(v, producto, ahora, ventaReciente, enCamino) : null;
         for (TipoAlerta tipo : TipoAlerta.values()) {
             if (tipo != vigente) {
                 alertas.cerrarActiva(varianteId, tipo, ahora);
@@ -166,7 +183,7 @@ public class AlertaService {
             return null;
         }
         LocalDateTime ahora = LocalDateTime.now(clock);
-        return calcularTipo(v, producto, ahora, ventaReciente(producto, ahora));
+        return calcularTipo(v, producto, ahora, ventaReciente(producto, ahora), pedidos.enCamino(varianteId));
     }
 
     private boolean ventaReciente(Producto producto, LocalDateTime ahora) {
@@ -174,14 +191,15 @@ public class AlertaService {
     }
 
     /** Prioridad AGOTADO &gt; SIN_ROTACION &gt; STOCK_BAJO (excluyentes). Variante y producto ya verificados activos. */
-    private TipoAlerta calcularTipo(Variante v, Producto producto, LocalDateTime ahora, boolean ventaReciente) {
+    private TipoAlerta calcularTipo(Variante v, Producto producto, LocalDateTime ahora, boolean ventaReciente,
+            long enCamino) {
         if (v.getStockDisponible() <= 0) {
             return TipoAlerta.AGOTADO;
         }
         if (!ventaReciente && sinRotacionAbrible(v, producto, ahora)) {
             return TipoAlerta.SIN_ROTACION;
         }
-        return tipoStock(v);
+        return tipoStock(v, enCamino);
     }
 
     /** El producto existe hace al menos N días y la SIN_ROTACION no fue atendida a mano en este episodio. */
@@ -198,11 +216,19 @@ public class AlertaService {
 
     /** AGOTADO / STOCK_BAJO / null según el stock solamente (igual que {@code Variante.estadoStock()}). */
     static TipoAlerta tipoStock(Variante v) {
+        return tipoStock(v, 0L);
+    }
+
+    /**
+     * AGOTADO si disponible = 0 (el pedido en camino no se puede vender); STOCK_BAJO si 0 &lt; disponible y
+     * {@code disponible + enCamino} &le; umbral (ADR-010).
+     */
+    static TipoAlerta tipoStock(Variante v, long enCamino) {
         int disponible = v.getStockDisponible();
         if (disponible <= 0) {
             return TipoAlerta.AGOTADO;
         }
         int umbral = v.getPuntoReorden() != null ? v.getPuntoReorden() : v.getStockMinimo();
-        return disponible <= umbral ? TipoAlerta.STOCK_BAJO : null;
+        return disponible + enCamino <= umbral ? TipoAlerta.STOCK_BAJO : null;
     }
 }

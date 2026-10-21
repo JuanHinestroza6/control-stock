@@ -32,7 +32,9 @@ public record EjecucionAnaliticaResponse(
         Integer productosPronosticados,
         Integer conHoltWinters,
         Integer conSes,
-        BigDecimal wapeGlobal) {
+        BigDecimal wapeGlobal,
+        Integer enAlertaSinTransito,
+        Integer conPedidoEnCamino) {
 
     public static EjecucionAnaliticaResponse de(EjecucionAnalitica e, String nombreUsuario) {
         return new EjecucionAnaliticaResponse(e.getId(), e.getOrigen(), nombreUsuario, e.getIniciadaEn(),
@@ -40,6 +42,7 @@ public record EjecucionAnaliticaResponse(
                 e.getClaseA(), e.getClaseB(), e.getClaseC(), e.getConPuntoReorden(), e.getAlertasEvaluadas(),
                 e.getAlertasFallidas(), e.getVariantesActivas(), e.getEnAlertaStock(),
                 e.getPorcentajeAlertaStock(), e.getSinRotacionActivas(), e.getMensaje(),
-                e.getProductosPronosticados(), e.getConHoltWinters(), e.getConSes(), e.getWapeGlobal());
+                e.getProductosPronosticados(), e.getConHoltWinters(), e.getConSes(), e.getWapeGlobal(),
+                e.getEnAlertaSinTransito(), e.getConPedidoEnCamino());
     }
 }

@@ -222,6 +222,11 @@ public class PlanCompraService {
         }
         plan.recibir(ahora, usuarioActual.id());
         planes.saveAndFlush(plan);
+        // Las líneas con cantidad > 0 ya publicaron StockCambiado (entrada); las de 0 no mueven stock pero dejan de
+        // estar en camino: se re-evalúa su posición.
+        request.lineas().stream().filter(l -> l.cantidadRecibida() == 0)
+                .map(l -> porDetalle.get(l.detalleId()).getVariante().getId()).sorted()
+                .forEach(vid -> eventos.publishEvent(new PosicionCambiada(vid)));
         return detalle(plan, ahora);
     }
 

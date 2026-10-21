@@ -6,6 +6,7 @@ import co.livorno.controlstock.analitica.modelo.OrigenEjecucion;
 import co.livorno.controlstock.analitica.modelo.ResultadoEjecucion;
 import co.livorno.controlstock.analitica.repositorio.ConsultasEstadoAlertas;
 import co.livorno.controlstock.inventario.servicio.AlertaService;
+import co.livorno.controlstock.inventario.servicio.ConsultaPedidosEnCamino;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
@@ -33,16 +34,19 @@ public class EjecucionAnaliticaService {
     private final CalculoAnaliticoService calculo;
     private final AlertaService alertas;
     private final ConsultasEstadoAlertas estado;
+    private final ConsultaPedidosEnCamino pedidos;
     private final Clock clock;
     private final AtomicBoolean enCurso = new AtomicBoolean(false);
 
     public EjecucionAnaliticaService(RegistroEjecucionService registro, PronosticoService pronostico,
-            CalculoAnaliticoService calculo, AlertaService alertas, ConsultasEstadoAlertas estado, Clock clock) {
+            CalculoAnaliticoService calculo, AlertaService alertas, ConsultasEstadoAlertas estado,
+            ConsultaPedidosEnCamino pedidos, Clock clock) {
         this.registro = registro;
         this.pronostico = pronostico;
         this.calculo = calculo;
         this.alertas = alertas;
         this.estado = estado;
+        this.pedidos = pedidos;
         this.clock = clock;
     }
 
@@ -60,6 +64,19 @@ public class EjecucionAnaliticaService {
             return ejecutarConGuardia(origen, usuarioId);
         } finally {
             enCurso.set(false);
+        }
+    }
+
+    /** Métrica contrafactual (ADR-010); un fallo aquí no debe tumbar la ejecución. */
+    private void registrarPosicion(Long id, Map<Long, Long> enCamino) {
+        try {
+            Map<Long, Long> mapa = enCamino != null ? enCamino : pedidos.enCaminoPorVariante();
+            java.util.Set<Long> activas = estado.idsVariantesActivas();
+            int conPedido = (int) mapa.entrySet().stream()
+                    .filter(e -> e.getValue() != null && e.getValue() > 0 && activas.contains(e.getKey())).count();
+            registro.registrarPosicion(id, estado.enAlertaSinTransito(), conPedido);
+        } catch (RuntimeException e) {
+            log.warn("No se pudo registrar la métrica de posición de la ejecución {}", id, e);
         }
     }
 
@@ -92,9 +109,20 @@ public class EjecucionAnaliticaService {
         int evaluadas = 0;
         int fallidas = 0;
         List<Long> ids = estado.idsTodasLasVariantes();
+        // Lo que viene en camino se trae en lote (una consulta); si falla, cada variante lo consulta por su cuenta.
+        Map<Long, Long> enCamino = null;
+        try {
+            enCamino = pedidos.enCaminoPorVariante();
+        } catch (RuntimeException e) {
+            log.warn("No se pudo leer lo que viene en camino en lote; se consultará variante por variante", e);
+        }
         for (Long varianteId : ids) {
             try {
-                alertas.evaluar(varianteId);
+                if (enCamino != null) {
+                    alertas.evaluar(varianteId, enCamino.getOrDefault(varianteId, 0L));
+                } else {
+                    alertas.evaluar(varianteId);
+                }
                 evaluadas++;
             } catch (RuntimeException e) {
                 fallidas++;
@@ -106,6 +134,7 @@ public class EjecucionAnaliticaService {
         int activas = estado.variantesActivas();
         int enAlerta = estado.enAlertaStock();
         int sinRotacion = estado.sinRotacionActivas();
+        registrarPosicion(id, enCamino);
         if (calculado == null) {
             log.warn("Ejecución analítica {} FALLIDA ({} alertas evaluadas, {} fallidas)", id, evaluadas, fallidas);
             return registro.fallar(id, MENSAJE_CALCULO_FALLIDO,

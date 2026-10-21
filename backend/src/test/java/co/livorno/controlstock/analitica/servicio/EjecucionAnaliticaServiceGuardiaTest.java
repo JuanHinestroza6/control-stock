@@ -27,7 +27,8 @@ class EjecucionAnaliticaServiceGuardiaTest {
     private final ConsultasEstadoAlertas estado = mock(ConsultasEstadoAlertas.class);
     private final Clock clock = Clock.fixed(Instant.parse("2026-10-14T07:00:00Z"), ZoneId.of("America/Bogota"));
     private final EjecucionAnaliticaService servicio =
-            new EjecucionAnaliticaService(registro, pronostico, calculo, alertas, estado, clock);
+            new EjecucionAnaliticaService(registro, pronostico, calculo, alertas, estado,
+                    mock(co.livorno.controlstock.inventario.servicio.ConsultaPedidosEnCamino.class), clock);
 
     @Test
     void ejecutar_falloInesperadoFueraDelCalculo_liberaLaGuardia() {
@@ -100,5 +101,28 @@ class EjecucionAnaliticaServiceGuardiaTest {
                 any(ResultadoEjecucion.class));
         org.mockito.Mockito.verify(registro, org.mockito.Mockito.never()).fallarConResultado(anyLong(), any(), any());
         org.mockito.Mockito.verify(registro, org.mockito.Mockito.never()).terminar(anyLong(), any());
+    }
+
+    @Test
+    void ejecutar_siLaLecturaEnLoteDeEnCaminoFalla_evaluaVarianteAVarianteSinEnCaminoConocido() {
+        // dado: el puerto lanza en lote
+        var pedidos = mock(co.livorno.controlstock.inventario.servicio.ConsultaPedidosEnCamino.class);
+        when(pedidos.enCaminoPorVariante()).thenThrow(new IllegalStateException("lote roto"));
+        var servicioLote = new EjecucionAnaliticaService(registro, pronostico, calculo, alertas, estado, pedidos, clock);
+        when(registro.iniciar(any(), any(), any())).thenReturn(1L);
+        when(estado.idsTodasLasVariantes()).thenReturn(List.of(7L, 8L));
+        when(pronostico.calcularYGuardar(anyLong()))
+                .thenReturn(new ResultadoPronosticoGuardado(java.util.Map.of(), 0, 0, 0, null));
+        when(calculo.calcularYAplicar(anyLong(), any())).thenReturn(new ResultadoCalculo(0, 0, 0, 0, 0));
+        when(registro.terminar(anyLong(), any(ResultadoEjecucion.class))).thenReturn(mock(EjecucionAnalitica.class));
+
+        // cuando
+        servicioLote.ejecutar(OrigenEjecucion.NOCTURNA, null);
+
+        // entonces: cae a evaluar(id) por variante, nunca a la sobrecarga con en camino
+        org.mockito.Mockito.verify(alertas).evaluar(7L);
+        org.mockito.Mockito.verify(alertas).evaluar(8L);
+        org.mockito.Mockito.verify(alertas, org.mockito.Mockito.never()).evaluar(anyLong(), anyLong());
+        org.mockito.Mockito.verify(registro).terminar(anyLong(), any(ResultadoEjecucion.class));
     }
 }

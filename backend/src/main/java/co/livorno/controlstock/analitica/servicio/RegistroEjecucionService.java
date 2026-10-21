@@ -73,6 +73,13 @@ public class RegistroEjecucionService {
                 pronostico.wapeGlobal());
     }
 
+    /** Guarda la métrica contrafactual de alertas y las variantes con pedido en camino (transacción propia). */
+    @Transactional
+    public void registrarPosicion(Long id, int enAlertaSinTransito, int conPedidoEnCamino) {
+        EjecucionAnalitica e = ejecuciones.findById(id).orElseThrow();
+        e.registrarPosicion(enAlertaSinTransito, conPedidoEnCamino);
+    }
+
     /** Cierra FALLIDA conservando también los conteos del cálculo (el ABC + ROP se aplicó; falló el pronóstico). */
     @Transactional
     public EjecucionAnalitica fallarConResultado(Long id, String mensaje, ResultadoEjecucion resultado) {

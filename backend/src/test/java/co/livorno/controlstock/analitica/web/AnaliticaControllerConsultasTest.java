@@ -80,7 +80,7 @@ class AnaliticaControllerConsultasTest {
     private static EjecucionAnaliticaResponse ejecucion() {
         return new EjecucionAnaliticaResponse(5L, OrigenEjecucion.MANUAL, "Ana", LocalDateTime.of(2026, 10, 14, 9, 0),
                 LocalDateTime.of(2026, 10, 14, 9, 1), EstadoEjecucion.EXITOSA, LocalDate.of(2026, 10, 14), 1200L, 299,
-                20, 60, 219, 150, 299, 0, 299, 141, new BigDecimal("47.2"), 3, null, 30, 0, 30, new BigDecimal("0.2100"));
+                20, 60, 219, 150, 299, 0, 299, 141, new BigDecimal("47.2"), 3, null, 30, 0, 30, new BigDecimal("0.2100"), 150, 4);
     }
 
     private void prepararLectura() {
@@ -97,7 +97,7 @@ class AnaliticaControllerConsultasTest {
                         new BigDecimal("0.950"), new BigDecimal("1.65"), new BigDecimal("5.10"), 28,
                         MetodoReorden.NORMAL, 2, 28, FuenteUmbral.ROP, 10, EstadoStock.BAJO,
                         co.livorno.controlstock.analitica.modelo.FuenteDemanda.PRONOSTICO, new BigDecimal("22.50"),
-                        new BigDecimal("1.5000")))));
+                        new BigDecimal("1.5000"), 6L, 16L))));
         when(consulta.ultimaEjecucion()).thenReturn(Optional.of(ejecucion()));
     }
 
@@ -235,15 +235,16 @@ class AnaliticaControllerConsultasTest {
         // dado: EN_CURSO sin conteos y FALLIDA solo con la metrica de alertas (contrato de tipos/analitica.ts)
         var enCurso = new EjecucionAnaliticaResponse(8L, OrigenEjecucion.NOCTURNA, null,
                 LocalDateTime.of(2026, 10, 14, 2, 0), null, EstadoEjecucion.EN_CURSO, LocalDate.of(2026, 10, 14),
-                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
         var fallida = new EjecucionAnaliticaResponse(9L, OrigenEjecucion.MANUAL, "Ana",
                 LocalDateTime.of(2026, 10, 14, 2, 0), LocalDateTime.of(2026, 10, 14, 2, 1), EstadoEjecucion.FALLIDA,
                 LocalDate.of(2026, 10, 14), 500L, null, null, null, null, null, null, null, 299, 141,
-                new BigDecimal("47.16"), 3, "Fallo el calculo", null, null, null, null);
+                new BigDecimal("47.16"), 3, "Fallo el calculo", null, null, null, null, null, null);
         String[] campos = {"id", "origen", "usuario", "iniciadaEn", "terminadaEn", "estado", "fechaCorte", "duracionMs",
             "variantesAnalizadas", "claseA", "claseB", "claseC", "conPuntoReorden", "alertasEvaluadas",
             "alertasFallidas", "variantesActivas", "enAlertaStock", "porcentajeAlertaStock", "sinRotacionActivas",
-            "mensaje", "productosPronosticados", "conHoltWinters", "conSes", "wapeGlobal"};
+            "mensaje", "productosPronosticados", "conHoltWinters", "conSes", "wapeGlobal",
+            "enAlertaSinTransito", "conPedidoEnCamino"};
 
         // cuando / entonces: las 20 claves existen (null explicito), ni mas ni menos
         when(consulta.ultimaEjecucion()).thenReturn(Optional.of(enCurso));
