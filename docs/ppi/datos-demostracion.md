@@ -1,8 +1,11 @@
-# Datos de demostración (Fases 4 y 5)
+# Datos de demostración (Fases 4, 5 y 6)
 
 > Sección nueva del documento PPI. Implementada en la Fase 4 (rama `fase-4-datos-semilla`, corrida real T1 del
-> 2026-10-13) y actualizada en la Fase 5 (rama `fase-5-analitica`, corrida real T2 del 2026-10-15, que reemplaza las
-> cifras de T1). Decisiones en ADR-008 y ADR-009.
+> 2026-10-13), actualizada en la Fase 5 (rama `fase-5-analitica`, corrida real T2 del 2026-10-15, que reemplaza las
+> cifras de T1) y en la Fase 6 (rama `fase-6-prediccion-compras`: 36 meses de historia, reposición mediante planes de
+> compra reales, pedidos en camino al cerrar y pronóstico). Las cifras de la corrida T2 de la Fase 6 están
+> **pendientes de T2**: la prueba real la ejecuta el equipo después de esta documentación. Decisiones en ADR-008, ADR-009
+> y ADR-010.
 
 | Campo | Contenido |
 |---|---|
@@ -12,7 +15,8 @@
 
 ## Propósito
 
-El módulo genera 24 meses de historia de operación de Livorno Clothing para tres fines: alimentar la analítica
+El módulo genera 36 meses de historia de operación de Livorno Clothing (24 hasta la Fase 5; el cambio a 36 se hizo para que
+Holt-Winters tenga datos suficientes, ya que la serie mensual completa de la semilla pasa de 23 a 35 meses) para tres fines: alimentar la analítica
 (clasificación ABC, punto de reorden y pronóstico de demanda), disponer de datos creíbles para la sustentación y
 ejercitar los requisitos funcionales sobre un volumen realista. Los datos no son de referencia y no se incluyen en las
 migraciones.
@@ -21,11 +25,11 @@ migraciones.
 |---|---|
 | REQ-01 Visualizar stock y atributos | Inventario de 299 variantes con estados de stock variados |
 | REQ-02 Registrar operaciones de stock | Kardex encadenado con entradas, ventas, ajustes, devoluciones y reservas |
-| REQ-04 Alertas de nivel mínimo | Alertas AGOTADO y STOCK_BAJO activas al final de la carga |
+| REQ-04 Alertas de nivel mínimo | Alertas AGOTADO, STOCK_BAJO y SIN_ROTACION activas al final de la carga; STOCK_BAJO por posición de inventario con pedidos en camino |
 | REQ-05 Identificar Productos de Mayor Venta | Concentración de ventas tipo Pareto |
 | REQ-14 Clasificación ABC | Ingreso de 12 meses para las clases A, B y C |
-| REQ-09 Tendencias históricas | Estacionalidad y crecimiento a lo largo de 24 meses |
-| REQ-10 Planeación de compras | Historia de demanda y reposiciones con tiempo de entrega |
+| REQ-09 Tendencias históricas | Estacionalidad y crecimiento a lo largo de 36 meses, con comparación interanual |
+| REQ-10 Planeación de compras | Pronóstico SES y Holt-Winters sobre 35 meses completos, reposiciones mediante planes de compra reales (creados, aprobados y recibidos) y pedidos aprobados que quedan en camino al cierre |
 | REQ-13 Gestionar apartados | Reservas en los cuatro estados |
 
 ## Procedimiento de generación
@@ -41,8 +45,9 @@ migraciones.
   Al final se verifica la consistencia (stock igual a la suma del kardex por variante, reservado igual a la suma de
   reservas ACTIVAS, ningún valor negativo); si falla, se revierte.
 - **Alertas y analítica al final.** El listener de alertas por evento se apaga durante la carga. Tras confirmarla, la
-  semilla ejecuta la analítica completa con el reloj real (origen SEMILLA): clasificación ABC, punto de reorden y
-  alertas de todas las variantes. Si esa ejecución falla, la carga queda confirmada y se recupera con "Recalcular" como
+  semilla ejecuta la analítica completa con el reloj real (origen SEMILLA): pronóstico de demanda (SES o Holt-Winters
+  por producto, con backtesting), clasificación ABC, punto de reorden con pronóstico y alertas de todas las variantes
+  (STOCK_BAJO por posición, con los pedidos en camino). Si esa ejecución falla, la carga queda confirmada y se recupera con "Recalcular" como
   ADMIN.
 - **Protecciones.** Si ya existen ventas, el generador registra que hay datos y no hace nada; si hay productos o
   movimientos pero no ventas, aborta con un mensaje claro; no se ejecuta con el perfil `prod`. La aplicación termina al
@@ -62,8 +67,17 @@ migraciones.
 - **Distribución de Pareto por grupos.** Los 30 productos se ordenan por rango y se agrupan en cabeza (20 %: 6 productos),
   medio y cola. Los 6 productos de cabeza concentran aproximadamente el 78 % de las unidades, con un perfil decreciente
   dentro del grupo. En la simulación, el 20 % superior alcanzó el 77,6 % de las unidades y el producto mayor el 15,7 %.
-- **Reposición por tiempo de entrega.** La reposición se dispara cuando el disponible no cubre la demanda esperada
-  durante el tiempo de entrega del producto más 7 días de seguridad. Cuando aun así falta stock, la venta se pierde.
+- **Reposición por tiempo de entrega.** La reposición se dispara cuando la posición (disponible más lo que ya viene en
+  camino) no cubre la demanda esperada durante el tiempo de entrega del producto más 7 días de seguridad. Cuando aun así
+  falta stock, la venta se pierde.
+- **Reposición mediante planes de compra reales (Fase 6, ADR-010).** Desde la Fase 6 la reposición ya no es una entrada
+  directa: el encargado de inventario crea un plan de compras, el administrador lo aprueba y el encargado de inventario
+  lo recibe cuando llega (fecha de la simulación más el tiempo de entrega del producto), con los mismos servicios que usa
+  la API; la recepción genera las entradas por `MovimientoService` con referencia `PLAN_COMPRA/{id}`. La semilla tiene su
+  propia política de pedido (no ejecuta la sugerencia del sistema, que exigiría correr la analítica dentro de la
+  simulación). Un pedido cuya llegada cae después del último día simulado queda **APROBADO (en camino)** al terminar, de
+  modo que la posición de inventario del cierre sea coherente; el verificador comprueba que lo que está en camino coincide
+  con lo que simuló el generador.
 - **Casos para la analítica.** Un producto descontinuado (LIV017, jean skinny, queda inactivo) y tres productos
   estancados (LIV004, LIV026 y LIV030) que no venden en los últimos 90 días de la historia, para ejercitar la alerta
   SIN_ROTACION de la Fase 5. En la Fase 5 se ajustó la semilla: en la primera corrida de T2 los estancados seguían
@@ -80,7 +94,49 @@ migraciones.
 4. Arrancar con normalidad usando el perfil `dev`.
 5. Para regenerar, se borra la base (`docker compose down -v`); el código no borra datos porque el kardex es inmutable.
 
-## Resultados de la corrida real T2 (2026-10-15)
+## Resultados de la corrida real T2 de la Fase 6 (semilla de 36 meses)
+
+**Pendiente de T2.** La prueba real la ejecuta el equipo con base vacía y `SEED_PASSWORD` en `.env`; estas cifras
+reemplazarán a las de la corrida de la Fase 5 (que se conserva abajo como referencia). Las estimaciones de ADR-010 son
+solo previsiones: la carga sube de cerca de 2 minutos a entre 3,5 y 4 minutos.
+
+| Indicador | Resultado T2 (Fase 6) | Referencia: T2 de la Fase 5 (24 meses) |
+|---|---|---|
+| Meses de historia / meses completos | 36 / 35 (por diseño) | 24 / 23 |
+| Tiempo de carga con perfiles `dev,seed` | pendiente de T2 | 129,99 s |
+| Ventas registradas (de ellas, anuladas) | pendiente de T2 | 12.227 (91 anuladas) |
+| Unidades en ventas registradas | pendiente de T2 | 18.810 |
+| Ingreso (ventas registradas) | pendiente de T2 | $2.224.875.800 |
+| Devoluciones | pendiente de T2 | 607 |
+| Reservas (activas) | pendiente de T2 | 96 (14 activas) |
+| Productos / variantes (activas) | pendiente de T2 | 30 / 299 (291 activas) |
+| Planes de compra: creados / recibidos / en camino | pendiente de T2 | no existían |
+| Unidades en camino al cierre | pendiente de T2 | no existían |
+| Segunda ejecución | pendiente de T2 (debe detectar datos y no crear nada) | Detectó datos y no creó nada |
+
+### Pronóstico y analítica sobre los datos de demostración (Fase 6)
+
+Ejecución analítica de origen SEMILLA: estado y duración pendientes de T2 (meta del recálculo manual con pronóstico menor
+que 8 s).
+
+| Indicador | Resultado |
+|---|---|
+| Productos pronosticados | pendiente de T2 |
+| Productos con Holt-Winters / con SES (y motivos sin Holt-Winters) | pendiente de T2 |
+| WAPE global del pronóstico | pendiente de T2 |
+| Clase ABC (A / B / C) | pendiente de T2 |
+| Método del punto de reorden (NORMAL / POISSON / SIN_DEMANDA / SIN_HISTORIA) y fuente (PRONOSTICO / HISTORICA) | pendiente de T2 |
+| Variantes con pedido en camino | pendiente de T2 |
+| Alertas activas (AGOTADO / STOCK_BAJO / SIN_ROTACION) | pendiente de T2 |
+| Variantes en alerta de stock, con posición | pendiente de T2 (meta de ~10 % a 15 %; T2 de la Fase 5: 34,4 %) |
+| Variantes en alerta de stock si no se contara lo que viene en camino (contrafactual) | pendiente de T2 |
+
+Qué se espera comprobar (sin cifras): que los productos de cabeza, con 35 meses y sin meses en 0, compitan con
+Holt-Winters y los de cola, con meses en 0, usen SES; que las alertas STOCK_BAJO bajen respecto de la métrica
+contrafactual por los pedidos en camino; y que AGOTADO siga pesando cerca de 9 %, de modo que la meta efectiva sea de
+~11 % a 17 % y se explique con el desglose.
+
+## Resultados de la corrida real T2 de la Fase 5 (2026-10-15, semilla de 24 meses)
 
 Reemplaza a la corrida T1 de la Fase 4 (2026-10-13), cuyos resultados se conservan abajo solo como referencia. La
 semilla se ajustó para los productos estancados, por lo que las cifras cambian respecto de T1 (misma semilla 42; fecha
@@ -168,10 +224,17 @@ inventario (disponible más pedidos aprobados en camino).
 ## Limitaciones
 
 - **Demanda censurada.** Las ventas perdidas por falta de stock no quedan registradas como demanda; el pronóstico de la
-  Fase 6 debe tenerlo en cuenta.
+  Fase 6 la corrige con la disponibilidad reconstruida desde el kardex (`observada / max(disponibilidad, 0,5)`), con el
+  riesgo de sobreestimar si el quiebre se debió a falta de demanda.
+- **Política de pedido propia.** La reposición de la semilla no sigue la sugerencia (s, S) del sistema, por lo que los
+  planes de la demostración no reflejan lo que el sistema propondría hoy.
+- **El backtest no cubre noviembre y diciembre.** Con los seis meses evaluados de abril a septiembre, el WAPE puede
+  subestimar el error de los picos (riesgo aceptado, ADR-010).
 - **Reservas activas efímeras.** Las 14 reservas ACTIVAS (13 en T1) vencen a los pocos días de la carga; conviene regenerar la
   base la víspera de la sustentación con una fecha final fija.
 - **Datos de clientes ficticios.** Los nombres y contactos de las reservas no corresponden a personas reales.
 - **Sin historial previo de alertas.** Solo quedan las alertas ACTIVAS correspondientes al stock final.
-- **Alertas elevadas.** Con el punto de reorden de la Fase 5 el 34,4 % de las variantes queda en alerta de stock; se
-  reduce en la Fase 6 con la posición de inventario.
+- **Alertas elevadas.** Con el punto de reorden de la Fase 5 el 34,4 % de las variantes quedaba en alerta de stock; la
+  Fase 6 lo reduce con la posición de inventario (cifra pendiente de T2).
+- **Pedidos en camino efímeros.** Los planes APROBADO que quedan en camino al cierre de la carga dependen de la fecha
+  final; conviene regenerar la base la víspera de la sustentación.

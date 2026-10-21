@@ -302,7 +302,7 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. Desde la Fas
 - **Método**: SES u **Holt-Winters multiplicativo** (m = 12), elegido por backtesting con origen móvil (cortes n − 6 y
   n − 3, 3 meses cada uno, WAPE sobre 6 puntos; empate < 0,001 → SES). HW solo compite con n ≥ 30 meses, sin ningún mes
   en 0 y con nivel positivo; si no, SES y se guarda el motivo (`POCA_HISTORIA`, `MES_EN_CERO`, `NIVEL_NO_POSITIVO`).
-  Menos de 3 meses → SIN_HISTORIA (sin pronóstico; ROP y sugerencia usan la demanda histórica); 3–8 meses → SES sin backtest.
+  Menos de 3 meses → SIN_HISTORIA (sin pronóstico; ROP y sugerencia usan la demanda histórica); 3–8 meses → SES sin backtest; 9–29 meses → SES con backtest (WAPE) y motivo `POCA_HISTORIA`.
 - **Desagregación**: el pronóstico del producto se reparte a sus variantes activas por su participación de 180 días,
   corregida por días con stock. Se guardan filas por producto (`variante_id` null) y por variante.
 - **Regla de oro 1 intacta**: el pronóstico nunca toca stock. Las filas de `pronostico` se insertan en orden ascendente
@@ -421,8 +421,8 @@ tendencias y pronósticos).
 | REQ-06 Controlar el acceso y roles de usuario (CU-02) | auth, usuario |
 | REQ-07 Reportes contables | reporte |
 | REQ-08 Gestionar el registro de devoluciones (CU-09) | venta |
-| REQ-09 Tendencias históricas (Fase 6) | analitica |
-| REQ-10 Planeación de compras (Fase 6, ADR-010) | compra + analitica (pronóstico, sugerencia) + inventario (posición, recepción) |
+| REQ-09 Tendencias históricas (CU-05; Fase 6, PDF en Fase 7) | analitica |
+| REQ-10 Planeación de compras (CU-16, CU-17, CU-18 nuevos; Fase 6, ADR-010) | compra + analitica (pronóstico, sugerencia) + inventario (posición, recepción) |
 | REQ-11 Gestión de productos (CU-11) | catalogo |
 | REQ-12 Registrar y gestionar usuarios (CU-12) | usuario |
 | REQ-13 Gestionar apartados (CU-14, nuevo) | inventario (reservas), venta (conversión) |
@@ -435,7 +435,9 @@ Nota: en el documento PPI, REQ-08 y REQ-09 tienen nombre y descripción cruzados
 - `REQ-xx`: requisitos funcionales (tabla anterior). `RNF-xx`: requisitos no funcionales del documento Word, que allí
   aparecen numerados como REQ-01..REQ-05; aquí se renombran a RNF-01..RNF-05 para no chocar con los funcionales.
 - `CU-xx`: casos de uso. Nuevos, no presentes en el Word: CU-13 "Iniciar sesión" (fase 0, ligado a RNF-02), CU-14
-  "Gestionar apartados" (fase 3, REQ-13) y CU-15 "Clasificar productos (ABC)" (fase 5, REQ-14).
+  "Gestionar apartados" (fase 3, REQ-13), CU-15 "Clasificar productos (ABC)" (fase 5, REQ-14), CU-16 "Consultar el
+  pronóstico de demanda", CU-17 "Gestionar el plan de compras" y CU-18 "Recibir un pedido" (fase 6, REQ-10). Las
+  tendencias históricas (REQ-09) usan el CU-05 del Word; su exportación a PDF es de la fase 7.
 - `NEC-xx`: necesidades del Word, con dos dígitos (NEC-010 del Word es NEC-10). Nueva: NEC-11 "Apartar prendas para
   clientes que reservan por redes sociales" (REQ-13).
 
