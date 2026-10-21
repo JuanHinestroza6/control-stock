@@ -85,6 +85,17 @@ public class OperacionInventarioService {
             productos.putIfAbsent(p.getId(), p);
         }
 
+        // Orden de bloqueo producto → variante (el mismo que usa el pronóstico por sus FK): el precioCompra se
+        // actualiza y se envía a la base ANTES de los movimientos; así nunca se toma el producto con variantes ya
+        // bloqueadas (interbloqueo con el pronóstico). Productos por id, como el orden de las variantes.
+        productos.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(e -> {
+            BigDecimal costo = costoPorProducto.get(e.getKey());
+            if (costo.signum() > 0) {
+                e.getValue().actualizarPrecioCompra(costo);
+            }
+        });
+        variantes.flush();
+
         UsuarioAutenticado usuario = usuarioActual.obtener();
         List<MovimientoResponse> respuesta = new ArrayList<>();
         // Orden por varianteId (como la venta): mismo orden de bloqueo entre transacciones concurrentes
@@ -95,12 +106,6 @@ public class OperacionInventarioService {
                     linea.cantidad(), linea.costoUnitario(), usuario.id(), referenciaTipo, referenciaId, observacion));
             respuesta.add(MovimientoResponse.de(m, usuario.nombre()));
         }
-        productos.forEach((id, producto) -> {
-            BigDecimal costo = costoPorProducto.get(id);
-            if (costo.signum() > 0) {
-                producto.actualizarPrecioCompra(costo);
-            }
-        });
         return respuesta;
     }
 

@@ -53,6 +53,7 @@ class PlanCompraRecepcionIntegracionTest {
     @Autowired PlanCompraService servicio;
     @Autowired JdbcTemplate jdbc;
     @Autowired ApplicationEvents eventos;
+    @Autowired co.livorno.controlstock.analitica.servicio.PronosticoService pronosticos;
 
     private final List<Long> productos = new ArrayList<>();
     private final List<Long> idsVariantes = new ArrayList<>();
@@ -461,6 +462,43 @@ class PlanCompraRecepcionIntegracionTest {
             assertThat(entradas).isZero();
             assertThat(fisico(v1)).isEqualTo(7);
         }
+        assertThat(sumaKardex(v1)).isEqualTo(fisico(v1));
+    }
+
+    @Test
+    void recibirYPronosticoConcurrentes_terminanSinInterbloqueo() throws Exception {
+        // dado: un producto con historia (el pronóstico toma su fila y las de sus variantes por las FK) y una
+        // ejecución analítica para el pronóstico
+        jdbc.update("UPDATE producto SET creado_en = DATE_SUB(NOW(6), INTERVAL 2 YEAR) WHERE id = ?", pA);
+        jdbc.update("INSERT INTO ejecucion_analitica (origen, iniciada_en, terminada_en, estado, fecha_corte)"
+                + " VALUES ('NOCTURNA', NOW(6), NOW(6), 'EXITOSA', CURDATE())");
+        Long ejecucionId = jdbc.queryForObject("SELECT MAX(id) FROM ejecucion_analitica", Long.class);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            for (int i = 0; i < 6; i++) {
+                PlanCompraDetalleResponse a = planAprobado();
+                var recepcion = recepcion(a, 3, 2, "21000.00");
+                CountDownLatch salida = new CountDownLatch(1);
+
+                // cuando: recepción (entrada + precioCompra) y pronóstico (inserts con FK a producto y variante)
+                Future<Object> recibir = pool.submit(tarea(salida, () -> servicio.recibir(a.id(), recepcion)));
+                Future<Object> pronostico = pool.submit(tarea(salida,
+                        () -> pronosticos.calcularYGuardar(ejecucionId)));
+                salida.countDown();
+
+                // entonces: ambas terminan sin interbloqueo (sin excepción y dentro del plazo)
+                recibir.get(60, java.util.concurrent.TimeUnit.SECONDS);
+                pronostico.get(60, java.util.concurrent.TimeUnit.SECONDS);
+                assertThat(servicio.obtener(a.id()).estado()).isEqualTo(EstadoPlan.RECIBIDO);
+            }
+        } finally {
+            pool.shutdownNow();
+            jdbc.update("DELETE FROM pronostico");
+            jdbc.update("DELETE FROM analitica_producto_mes");
+            jdbc.update("DELETE FROM analitica_producto");
+            jdbc.update("DELETE FROM ejecucion_analitica WHERE id = ?", ejecucionId);
+        }
+        assertThat(fisico(v1)).isEqualTo(7 + 6 * 3);
         assertThat(sumaKardex(v1)).isEqualTo(fisico(v1));
     }
 
