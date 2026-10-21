@@ -317,6 +317,21 @@ class PlanCompraServiceIntegracionTest {
     }
 
     @Test
+    void actualizar_conObservacionNull_vaciaLaObservacion() {
+        // dado: un borrador con observación
+        PlanCompraDetalleResponse creado = crearBasico();
+        assertThat(creado.observacion()).isNotNull();
+
+        // cuando: se guarda con observacion null
+        PlanCompraDetalleResponse r = servicio.actualizar(creado.id(), new ActualizarPlanRequest(creado.version(),
+                null, List.of(linea(v1, 10), linea(v2, 5))));
+
+        // entonces
+        assertThat(r.observacion()).isNull();
+        assertThat(servicio.obtener(creado.id()).observacion()).isNull();
+    }
+
+    @Test
     void actualizar_versionVieja_lanza409YNoCambiaNada() {
         PlanCompraDetalleResponse creado = crearBasico();
         servicio.actualizar(creado.id(), new ActualizarPlanRequest(creado.version(), "Primera edición",
