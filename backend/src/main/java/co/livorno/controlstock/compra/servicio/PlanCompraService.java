@@ -8,6 +8,7 @@ import co.livorno.controlstock.compra.dto.AprobarPlanRequest;
 import co.livorno.controlstock.compra.dto.CancelarPlanRequest;
 import co.livorno.controlstock.compra.dto.LineaRecepcionRequest;
 import co.livorno.controlstock.compra.dto.RecibirPlanRequest;
+import co.livorno.controlstock.compra.dto.SugerirPlanRequest;
 import co.livorno.controlstock.inventario.dto.LineaEntradaRequest;
 import co.livorno.controlstock.inventario.evento.PosicionCambiada;
 import co.livorno.controlstock.inventario.servicio.OperacionInventarioService;
@@ -69,6 +70,7 @@ public class PlanCompraService {
     private final Clock clock;
     private final OperacionInventarioService operaciones;
     private final ApplicationEventPublisher eventos;
+    private final FuenteSugerenciaCompra fuenteSugerencia;
 
     @Transactional
     public PlanCompraDetalleResponse crear(CrearPlanRequest request) {
@@ -79,6 +81,52 @@ public class PlanCompraService {
         agregarLineas(plan, request.lineas(), Map.of());
         planes.saveAndFlush(plan);
         return detalle(plan, ahora);
+    }
+
+    /**
+     * Plan BORRADOR de origen SUGERIDO con lo que pide el puerto de sugerencia (ADR-010): omite las variantes que ya
+     * están en otro BORRADOR (las informa en {@code omitidas}), topa cada línea en 100.000 y el plan en 300 líneas
+     * (las que sobran vuelven a ser candidatas en la siguiente sugerencia). Sin nada que reponer, 422. No toca stock.
+     */
+    @Transactional
+    public PlanCompraDetalleResponse crearSugerido(SugerirPlanRequest request) {
+        String observacion = normalizarObservacion(request == null ? null : request.observacion());
+        Long categoriaId = request == null ? null : request.categoriaId();
+        FuenteSugerenciaCompra.Sugerencia sugerencia = fuenteSugerencia.sugerir(categoriaId);
+        List<FuenteSugerenciaCompra.LineaSugerida> candidatas = sugerencia.lineas();
+        Set<Long> enBorrador = candidatas.isEmpty() ? Set.of()
+                : new HashSet<>(detalles.varianteIdsEnBorrador(candidatas.stream().map(l -> l.varianteId()).toList()));
+        List<FuenteSugerenciaCompra.LineaSugerida> nuevas = candidatas.stream()
+                .filter(l -> !enBorrador.contains(l.varianteId())).limit(MAX_LINEAS).toList();
+        List<String> omitidas = enBorrador.isEmpty() ? List.of()
+                : variantes.findAllById(new java.util.TreeSet<>(enBorrador)).stream().map(Variante::getSku).sorted()
+                        .toList();
+        if (nuevas.isEmpty()) {
+            throw new ExcepcionNegocio(omitidas.isEmpty() ? "No hay variantes por reponer."
+                    : "No hay variantes por reponer: las " + omitidas.size()
+                            + " candidatas ya están en otro plan en borrador (" + String.join(", ", omitidas) + ").");
+        }
+        LocalDateTime ahora = LocalDateTime.now(clock);
+        PlanCompra plan = PlanCompra.sugerido(observacion, sugerencia.ejecucionId(), ahora, usuarioActual.id());
+        Map<Long, Variante> porId = new HashMap<>();
+        for (Variante v : variantes.findAllById(nuevas.stream().map(l -> l.varianteId()).toList())) {
+            porId.put(v.getId(), v);
+        }
+        for (FuenteSugerenciaCompra.LineaSugerida l : nuevas) {
+            Variante v = porId.get(l.varianteId());
+            if (v == null || !v.isActivo() || !v.getProducto().isActivo()) {
+                continue;
+            }
+            int cantidad = Math.min(l.cantidad(), DetallePlan.CANTIDAD_MAXIMA);
+            String justificacion = l.justificacion() == null || l.justificacion().length() <= 255
+                    ? l.justificacion() : l.justificacion().substring(0, 255);
+            plan.agregarLinea(v, cantidad, cantidad, v.getProducto().getPrecioCompra(), justificacion);
+        }
+        if (plan.getLineas().isEmpty()) {
+            throw new ExcepcionNegocio("No hay variantes por reponer.");
+        }
+        planes.saveAndFlush(plan);
+        return detalle(plan, ahora, omitidas);
     }
 
     @Transactional
@@ -256,11 +304,15 @@ public class PlanCompraService {
     }
 
     private PlanCompraDetalleResponse detalle(PlanCompra plan, LocalDateTime ahora) {
+        return detalle(plan, ahora, null);
+    }
+
+    private PlanCompraDetalleResponse detalle(PlanCompra plan, LocalDateTime ahora, List<String> omitidas) {
         Map<Long, Long> enCamino = new HashMap<>();
         for (EnCaminoVariante e : detalles.enCaminoPorVariante()) {
             enCamino.put(e.varianteId(), e.unidades());
         }
-        return PlanCompraDetalleResponse.de(plan, nombres(List.of(plan)), enCamino, ahora, null);
+        return PlanCompraDetalleResponse.de(plan, nombres(List.of(plan)), enCamino, ahora, omitidas);
     }
 
     private Map<Long, String> nombres(List<PlanCompra> lista) {

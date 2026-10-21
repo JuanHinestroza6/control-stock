@@ -68,6 +68,8 @@ app:
       dias: 90 # retención tras cerrar la reserva
   alertas:
     sin-rotacion-dias: 60 # SIN_ROTACION: producto sin ventas no anuladas en estos dias (ADR-009)
+  compras: # plan de compras (ADR-010)
+    periodo-revision-dias: 30 # R: días de demanda que cubre la sugerencia tras el lead time
   analitica: # ABC y punto de reorden (ADR-009)
     cron: "0 0 2 * * *" # 02:00 America/Bogota, antes de la anonimizacion de las 02:30
     ventana-abc-dias: 365 # ventana movil del ABC (ingreso neto)
