@@ -13,7 +13,7 @@ import { useCategorias } from '../../hooks/useCategorias'
 import { useSesion } from '../../hooks/useSesion'
 import { mensajeError } from '../../lib/errores'
 import { puedeRecalcularAnalitica } from '../../lib/permisos'
-import type { ClaseAbc, MetodoReorden, ReordenVarianteResponse } from '../../tipos/analitica'
+import type { ClaseAbc, FuenteDemanda, MetodoReorden, ReordenVarianteResponse } from '../../tipos/analitica'
 
 const TAMANO_PAGINA = 20
 const RETARDO_BUSQUEDA_MS = 300
@@ -31,6 +31,14 @@ const METODOS: Record<MetodoReorden, { etiqueta: string; tono: TonoBadge }> = {
   SIN_HISTORIA: { etiqueta: 'Sin historia', tono: 'alerta' },
 }
 const OPCIONES_METODO = (Object.keys(METODOS) as MetodoReorden[]).map((m) => ({ valor: m, etiqueta: METODOS[m].etiqueta }))
+
+const FUENTES: Record<FuenteDemanda, string> = { PRONOSTICO: 'Pronóstico', HISTORICA: 'Histórica' }
+
+/** Alerta de stock según la posición (ADR-010): AGOTADO con disponible 0; STOCK_BAJO con 0 < disponible y posición ≤ umbral. */
+function enAlertaPorPosicion(f: ReordenVarianteResponse): boolean {
+  if (f.stockDisponible === 0) return true
+  return (f.posicion ?? f.stockDisponible) <= f.umbralEfectivo
+}
 
 const num2 = new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const num1 = new Intl.NumberFormat('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
@@ -74,7 +82,15 @@ const COLUMNAS: Columna<ReordenVarianteResponse>[] = [
     ),
     className: 'text-right',
   },
+  {
+    clave: 'fuente',
+    encabezado: 'Fuente de demanda',
+    celda: (f) => (f.fuenteDemanda ? FUENTES[f.fuenteDemanda] : '—'),
+    ocultarEnMovil: true,
+  },
   { clave: 'disponible', encabezado: 'Disponible', celda: (f) => f.stockDisponible, className: 'text-right tabular-nums' },
+  { clave: 'camino', encabezado: 'En camino', celda: (f) => entero.format(f.enCamino ?? 0), className: 'text-right tabular-nums' },
+  { clave: 'posicion', encabezado: 'Posición', celda: (f) => entero.format(f.posicion ?? f.stockDisponible), className: 'text-right font-medium tabular-nums' },
   { clave: 'estado', encabezado: 'Estado', celda: (f) => <BadgeStock estado={f.estadoStock} /> },
 ]
 
@@ -100,6 +116,14 @@ function AyudaFormula() {
         <p>
           <strong>Sin demanda:</strong> si no hubo ventas, el ROP es 0 y solo se alerta al agotarse. <strong>Sin historia:</strong> con menos de 30 días de
           historia no hay ROP y se usa el stock mínimo como umbral.
+        </p>
+        <p>
+          <strong>Fuente de la demanda:</strong> con "Pronóstico", la demanda esperada durante el lead time (d̄·L) sale de la tasa diaria pronosticada de
+          la variante; con "Histórica", de las ventas de los últimos 90 días. La desviación σ siempre sale de las ventas observadas.
+        </p>
+        <p>
+          <strong>Posición e "En alerta":</strong> posición = disponible + unidades en camino (planes de compra aprobados). Una variante está en alerta si
+          está agotada (disponible 0) o si su posición es menor o igual al umbral. El estado de stock sigue calculándose sobre el disponible.
         </p>
         <p>La analítica se recalcula cada noche; el ADMIN también puede recalcularla desde el panel superior.</p>
       </div>
@@ -163,6 +187,8 @@ export function PestanaReorden() {
 
   const hayFiltros = q !== '' || clase !== '' || categoriaId !== '' || metodo !== '' || enAlerta
   const pag = lista.data
+  // El backend filtra por disponible <= umbral (superconjunto de la alerta por posición); aquí se descartan las que tienen pedido en camino suficiente.
+  const filas = pag ? (enAlerta ? pag.content.filter(enAlertaPorPosicion) : pag.content) : []
   const reiniciar = (set: (v: string) => void) => (e: { target: { value: string } }) => {
     set(e.target.value)
     setPagina(0)
@@ -209,11 +235,16 @@ export function PestanaReorden() {
         <EstadoCarga />
       ) : lista.isError && !pag ? (
         <EstadoError mensaje={mensajeError(lista.error)} onReintentar={() => void lista.refetch()} />
-      ) : pag && pag.content.length === 0 ? (
+      ) : pag && filas.length === 0 && pag.page.totalPages <= pag.page.number + 1 ? (
         <EstadoVacio mensaje={hayFiltros ? 'Ninguna variante coincide con los filtros.' : 'No hay puntos de reorden calculados.'} />
       ) : pag ? (
         <>
-          <Tabla columnas={COLUMNAS} filas={pag.content} claveFila={(f) => f.varianteId} descripcion="Punto de reorden por variante" />
+          {filas.length === 0 && (
+            <p role="status" className="text-sm text-oxford/70">
+              Las variantes de esta página tienen pedidos en camino que cubren su umbral. Revisa la página siguiente.
+            </p>
+          )}
+          <Tabla columnas={COLUMNAS} filas={filas} claveFila={(f) => f.varianteId} descripcion="Punto de reorden por variante" />
           <Paginacion pagina={pag.page} onCambiar={setPagina} />
         </>
       ) : null}

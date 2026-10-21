@@ -29,6 +29,11 @@ function montar(rol: Rol, lista: AlertaResponse[] = [alerta(1)]) {
 beforeEach(() => vi.resetAllMocks())
 
 describe('AlertasPage', () => {
+  it('STOCK_BAJO explica que la condición es la posición contra el umbral', async () => {
+    montar('ADMIN', [alerta(1, { tipo: 'STOCK_BAJO', stockDisponible: 4 })])
+    expect(await screen.findByText(/Posición \(disponible \+ en camino\) ≤ umbral/)).toBeInTheDocument()
+  })
+
   it('lista las activas por defecto', async () => {
     montar('ADMIN')
     expect(await screen.findByText('LIV001-S-NEG · S · NEGRO')).toBeInTheDocument()
