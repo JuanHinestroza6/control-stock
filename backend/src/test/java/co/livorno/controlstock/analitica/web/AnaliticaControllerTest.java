@@ -48,6 +48,8 @@ class AnaliticaControllerTest {
     @MockitoBean co.livorno.controlstock.analitica.servicio.ConsultaAnaliticaService consulta;
     @MockitoBean co.livorno.controlstock.analitica.servicio.RecalculoAnaliticoService recalculo;
     @MockitoBean co.livorno.controlstock.usuario.repositorio.UsuarioRepository usuarioRepository;
+    @MockitoBean co.livorno.controlstock.analitica.servicio.TendenciasService tendencias;
+    @MockitoBean co.livorno.controlstock.analitica.servicio.ConsultaPronosticoService pronosticos;
 
     private static Authentication como(String rol) {
         var principal = new UsuarioAutenticado(1L, "u@livorno.test", "U", rol);

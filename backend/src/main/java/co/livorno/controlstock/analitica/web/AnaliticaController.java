@@ -5,6 +5,12 @@ import co.livorno.controlstock.analitica.dto.AgrupacionRanking;
 import co.livorno.controlstock.analitica.dto.CriterioRanking;
 import co.livorno.controlstock.analitica.dto.EjecucionAnaliticaResponse;
 import co.livorno.controlstock.analitica.dto.MasVendidosResponse;
+import co.livorno.controlstock.analitica.dto.PronosticoDetalleResponse;
+import co.livorno.controlstock.analitica.dto.PronosticoProductoResponse;
+import co.livorno.controlstock.analitica.dto.TendenciaResponse;
+import co.livorno.controlstock.analitica.modelo.MetodoPronostico;
+import co.livorno.controlstock.analitica.servicio.ConsultaPronosticoService;
+import co.livorno.controlstock.analitica.servicio.TendenciasService;
 import co.livorno.controlstock.analitica.dto.ReordenVarianteResponse;
 import co.livorno.controlstock.analitica.dto.ResumenAbcResponse;
 import co.livorno.controlstock.analitica.modelo.ClaseAbc;
@@ -22,6 +28,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -35,6 +42,8 @@ public class AnaliticaController {
     private final MasVendidosService masVendidosService;
     private final ConsultaAnaliticaService consultaService;
     private final RecalculoAnaliticoService recalculoService;
+    private final TendenciasService tendenciasService;
+    private final ConsultaPronosticoService pronosticoService;
 
     @GetMapping("/mas-vendidos")
     @PreAuthorize("hasAnyRole('ADMIN','INVENTARIO','VENDEDOR','CONTABILIDAD')")
@@ -81,6 +90,32 @@ public class AnaliticaController {
     public ResponseEntity<EjecucionAnaliticaResponse> ultimaEjecucion() {
         return consultaService.ultimaEjecucion().map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @GetMapping("/tendencias")
+    @PreAuthorize("hasAnyRole('ADMIN','INVENTARIO','CONTABILIDAD')")
+    public TendenciaResponse tendencias(
+            @RequestParam(required = false) String desde,
+            @RequestParam(required = false) String hasta,
+            @RequestParam(required = false) Long categoriaId,
+            @RequestParam(required = false) Long productoId) {
+        return tendenciasService.consultar(desde, hasta, categoriaId, productoId);
+    }
+
+    @GetMapping("/pronosticos")
+    @PreAuthorize("hasAnyRole('ADMIN','INVENTARIO','CONTABILIDAD')")
+    public Page<PronosticoProductoResponse> pronosticos(
+            @RequestParam(required = false) Long categoriaId,
+            @RequestParam(required = false) @Size(max = 60, message = "La búsqueda no puede superar 60 caracteres") String q,
+            @RequestParam(required = false) MetodoPronostico metodo,
+            @PageableDefault(size = 20, sort = "codigo") Pageable pageable) {
+        return pronosticoService.listar(categoriaId, q, metodo, pageable);
+    }
+
+    @GetMapping("/pronosticos/{productoId}")
+    @PreAuthorize("hasAnyRole('ADMIN','INVENTARIO','CONTABILIDAD')")
+    public PronosticoDetalleResponse pronostico(@PathVariable Long productoId) {
+        return pronosticoService.detalle(productoId);
     }
 
     @PostMapping("/recalcular")

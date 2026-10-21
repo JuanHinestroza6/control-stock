@@ -146,7 +146,9 @@ class ReglasArquitecturaTest {
         "co.livorno.controlstock.analitica.repositorio.ConsultasVentaAnalitica",
         "co.livorno.controlstock.analitica.repositorio.ConsultasEstadoAlertas",
         "co.livorno.controlstock.analitica.repositorio.ConsultasDemandaMensual",
-        "co.livorno.controlstock.analitica.repositorio.ConsultasDisponibilidad"};
+        "co.livorno.controlstock.analitica.repositorio.ConsultasDisponibilidad",
+        "co.livorno.controlstock.analitica.repositorio.ConsultasTendencias",
+        "co.livorno.controlstock.analitica.repositorio.ConsultasPronostico"};
 
     private static final Set<String> TIPOS_JDBC = Set.of("org.springframework.jdbc.core.JdbcTemplate",
             "org.springframework.jdbc.core.JdbcOperations",
@@ -164,6 +166,8 @@ class ReglasArquitecturaTest {
             .and().doNotHaveFullyQualifiedName(CLASES_JDBC_DE_LECTURA[1])
             .and().doNotHaveFullyQualifiedName(CLASES_JDBC_DE_LECTURA[2])
             .and().doNotHaveFullyQualifiedName(CLASES_JDBC_DE_LECTURA[3])
+            .and().doNotHaveFullyQualifiedName(CLASES_JDBC_DE_LECTURA[4])
+            .and().doNotHaveFullyQualifiedName(CLASES_JDBC_DE_LECTURA[5])
             .and().resideOutsideOfPackage("co.livorno.controlstock.semilla..")
             .should().dependOnClassesThat(DescribedPredicate.describe("son JdbcTemplate, NamedParameterJdbcTemplate"
                     + " o JdbcClient", (JavaClass c) -> TIPOS_JDBC.contains(c.getName())))
