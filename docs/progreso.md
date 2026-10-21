@@ -147,6 +147,13 @@ Referencia: % de variantes en alerta de stock fase 4 47 %, fase 5 34,4 %; meta ~
 - Las pruebas que borran variantes deben borrar antes `alerta` y `reserva`; las de semilla usan `LimpiezaSemilla`.
 - Las reservas ACTIVAS de la semilla vencen a los pocos días: regenerar la víspera de una demo.
 - CI fijado en `ubuntu-24.04`; el limitador de login es en memoria (`getRemoteAddr()`).
+- CI de la fase 6 (2026-10-21): el job Backend se cancelaba a los ~11 min por falta de memoria del runner: cada contexto
+  de prueba con Testcontainers mantiene un MySQL propio y la caché de contextos de Spring (32) llegaba a ~20 MySQL vivos.
+  Se fijó `spring.test.context.cache.maxSize=8` (`backend/src/test/resources/spring.properties`). Antes: hasta 20
+  contenedores (CI), suite 10 min 35 s en CI y ~14 min en local; después: máximo 8 contenedores vivos y 13 min 08 s en
+  local (1269/1269). Si se agregan pruebas con `@MockitoBean`/`@MockitoSpyBean` (contexto nuevo), vigilar ese número.
+- Frontend: las pruebas que simulan el login con un adaptador de Axios deben usar `soloLogin` (`src/pruebas/http.ts`);
+  un falso que responde lo mismo a todo rompe la página destino según el tiempo (falló en CI con `/compras`).
 - Frontend: en dos corridas apareció 1 fallo intermitente que no se reprodujo en 7 corridas seguidas; probablemente
   carga de la máquina con Maven en paralelo. Si reaparece, guardar la salida de `npx vitest run --reporter=verbose`.
 - Fase 6: el IDE volvió a compilar en `target/` ("Unresolved compilation problems"); revisar que Java › Autobuild siga
