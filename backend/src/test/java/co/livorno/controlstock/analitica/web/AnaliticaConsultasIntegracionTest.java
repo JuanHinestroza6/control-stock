@@ -53,6 +53,7 @@ class AnaliticaConsultasIntegracionTest {
 
     private final List<Long> productos = new ArrayList<>();
     private final List<Long> variantes = new ArrayList<>();
+    private final List<Long> planes = new ArrayList<>();
     private long idEjecucionBase;
     private Long usuarioId;
     private Long ejecucionManual;
@@ -100,17 +101,32 @@ class AnaliticaConsultasIntegracionTest {
         jdbc.update("DELETE FROM analitica_producto");
         jdbc.update("DELETE FROM analitica_variante WHERE ejecucion_id > ?", idEjecucionBase);
         for (Long v : variantes) {
+            jdbc.update("DELETE FROM detalle_plan WHERE variante_id = ?", v);
             jdbc.update("DELETE FROM movimiento WHERE variante_id = ?", v);
             jdbc.update("DELETE FROM alerta WHERE variante_id = ?", v);
             jdbc.update("DELETE FROM reserva WHERE variante_id = ?", v);
             jdbc.update("DELETE FROM analitica_variante WHERE variante_id = ?", v);
             jdbc.update("DELETE FROM variante WHERE id = ?", v);
         }
+        for (Long plan : planes) {
+            jdbc.update("DELETE FROM plan_compra WHERE id = ?", plan);
+        }
         for (Long p : productos) {
             jdbc.update("DELETE FROM producto WHERE id = ?", p);
         }
         jdbc.update("DELETE FROM ejecucion_analitica WHERE id > ?", idEjecucionBase);
         jdbc.update("DELETE FROM usuario WHERE id = ?", usuarioId);
+    }
+
+    private void pedido(String estado, Long varianteId, int cantidad) {
+        jdbc.update("INSERT INTO plan_compra (estado, origen, creado_en, creado_por, aprobado_en, aprobado_por, version,"
+                + " actualizado_en)"
+                + " VALUES (?, 'MANUAL', NOW(6), ?, IF(? = 'APROBADO', NOW(6), NULL), IF(? = 'APROBADO', ?, NULL), 0, NOW(6))",
+                estado, usuarioId, estado, estado, usuarioId);
+        Long plan = jdbc.queryForObject("SELECT MAX(id) FROM plan_compra", Long.class);
+        planes.add(plan);
+        jdbc.update("INSERT INTO detalle_plan (plan_id, variante_id, cantidad_aprobada, costo_estimado)"
+                + " VALUES (?, ?, ?, 10.00)", plan, varianteId, cantidad);
     }
 
     private Long producto(String marca, boolean activo) {
@@ -258,6 +274,49 @@ class AnaliticaConsultasIntegracionTest {
                         .with(authentication(como("ADMIN"))))
                 .andExpect(jsonPath("$.page.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].varianteId").value(v2));
+    }
+
+    @Test
+    void reorden_enAlerta_usaLaPosicionConLoQueVieneEnCamino() throws Exception {
+        // v1: disponible 5 <= ROP 10, pero con 6 en camino la posición es 11 > 10: ya no está en alerta
+        pedido("APROBADO", v1, 6);
+        // un borrador no cuenta como en camino: v2 (disponible 8, mínimo 3) sigue sin alerta
+        pedido("BORRADOR", v2, 1);
+        mvc.perform(get("/api/analitica/reorden").param("q", sufijo).param("enAlerta", "true")
+                        .with(authentication(como("ADMIN"))))
+                .andExpect(jsonPath("$.page.totalElements").value(0))
+                .andExpect(jsonPath("$.content.length()").value(0));
+        mvc.perform(get("/api/analitica/reorden").param("q", sufijo).param("enAlerta", "false")
+                        .with(authentication(como("ADMIN"))))
+                .andExpect(jsonPath("$.page.totalElements").value(2));
+    }
+
+    @Test
+    void reorden_enAlerta_pedidoInsuficienteNoQuitaLaAlerta() throws Exception {
+        pedido("APROBADO", v1, 5); // posición 10 <= 10
+        mvc.perform(get("/api/analitica/reorden").param("q", sufijo).param("enAlerta", "true")
+                        .with(authentication(como("ADMIN"))))
+                .andExpect(jsonPath("$.page.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].varianteId").value(v1));
+    }
+
+    @Test
+    void reorden_enAlerta_agotadoConPedidoEnCaminoSiAparece() throws Exception {
+        Long productoId = jdbc.queryForObject("SELECT producto_id FROM variante WHERE id = ?", Long.class, v1);
+        Long agotada = variante(productoId, "XL", true, 0, 3);
+        instantanea.save(fila(agotada, jdbc.queryForObject("SELECT MAX(id) FROM ejecucion_analitica", Long.class), 5,
+                1, "10.00", "0.010000", "1.000000", 'C', null, MetodoReorden.SIN_HISTORIA,
+                LocalDateTime.of(2026, 10, 14, 2, 0)));
+        pedido("APROBADO", agotada, 500); // posición enorme, pero AGOTADO se mide sobre el disponible
+        pedido("APROBADO", v1, 6);        // v1 sale de la alerta
+        mvc.perform(get("/api/analitica/reorden").param("q", sufijo).param("enAlerta", "true")
+                        .with(authentication(como("ADMIN"))))
+                .andExpect(jsonPath("$.page.totalElements").value(1))
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].varianteId").value(agotada));
+        mvc.perform(get("/api/analitica/reorden").param("q", sufijo).param("enAlerta", "false")
+                        .with(authentication(como("ADMIN"))))
+                .andExpect(jsonPath("$.page.totalElements").value(2));
     }
 
     @Test
