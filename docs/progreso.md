@@ -5,8 +5,8 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
 ## Estado actual
 
 - Semana: 4
-- Fase en curso: 6 — Predicción y compras **terminada en código y documentación** (rama `fase-6-prediccion-compras`,
-  PR abierto sin merge); falta la prueba T2 real del usuario (guía abajo)
+- Fase en curso: 6 — Predicción y compras **terminada**; T2 real por API y base de datos hecha (2026-10-21). Rama
+  `fase-6-prediccion-compras`, PR #10 abierto sin merge; falta la revisión visual del usuario por la interfaz
 - Última actualización: 2026-10-21
 
 ## Hecho
@@ -44,23 +44,40 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
 - [x] Fase 6 — PPI: fichas REQ-09 (CU-05) y REQ-10 (CU-16, CU-17, CU-18 nuevos), REQ-04 con posición, datos de
       demostración con 36 meses; diagramas de estados, clases de `compra` y secuencia sugerir → aprobar → recibir.
       Backend 1269/1269, frontend 592/592
+- [x] Fase 6 — T2 real (2026-10-21, por API y base de datos; la revisión visual la hace el usuario después): carga de 36
+      meses en 4 min 26 s; 20.281 ventas (139 anuladas), 2.817 unidades perdidas; planes 3.673 creados / 3.575 recibidos
+      / 98 en camino (1.060 u.); analítica SEMILLA EXITOSA en 6,5 s; ABC A 78 / B 82 / C 131; ROP NORMAL 42, POISSON 222,
+      SIN_DEMANDA 27, fuente PRONOSTICO en las 291; pronóstico HW 7 (LIV001, 002, 009, 014, 018, 020, 027) / SES 22
+      (9 por MES_EN_CERO), WAPE global 18,3 % (HW medio 17,1 %, SES 42,0 %); alertas AGOTADO 26, STOCK_BAJO 16,
+      SIN_ROTACION 18; **14,4 % de variantes en alerta de stock** (meta 10–15 % cumplida; sin tránsito 38,8 %; fase 5
+      34,4 %; fase 4 47 %); 101 variantes con pedido en camino. Recalcular 6,46 s (meta < 8 s). Matriz de roles por API
+      correcta; ciclo sugerir (PC-003674, 20 líneas) → aprobar (ADMIN; INVENTARIO 403) → recibir: 20 ENTRADAS
+      `PLAN_COMPRA/3674`, stock y en camino coherentes (LIV002-L-BLA: físico 10 → 25, en camino 0 → 15 → 0); STOCK_BAJO
+      16 → 0. Segunda carga sin borrar: no hizo nada. Observación: la corrección por agotados recupera ≈ 0,3× de las
+      unidades perdidas (esperado 0,5×–2×)
 
 ## En curso
 
-- [ ] Fase 6 — PR de `fase-6-prediccion-compras` hacia main (sin merge) y prueba T2 real del usuario
+- [ ] Fase 6 — revisión visual del usuario (paso 4 de la guía T2, por la interfaz) y merge del PR #10
 
 ## Próximos pasos
 
-1. El usuario corre la T2 (guía abajo); con sus cifras se completan los "pendiente de T2" de REQ-04, REQ-10 y
-   `datos-demostracion.md` (`documentador-ppi`) y se hace el merge del PR.
-2. Completar en REQ-09 y REQ-10 stakeholder, necesidad, prioridad y el título de CU-05 (quedaron "[confirmar con el
+1. El usuario hace la revisión visual (paso 4 de la guía T2) y el merge del PR #10; luego `git switch main && git pull`.
+2. Revisar la corrección por agotados en la fase 7 si se quiere acercar al rango esperado (hoy ≈ 0,3× de las unidades
+   perdidas; posibles causas: piso de disponibilidad 0,5, solo variantes activas, quiebres cortos no visibles por día).
+3. Completar en REQ-09 y REQ-10 stakeholder, necesidad, prioridad y el título de CU-05 (quedaron "[confirmar con el
    Word]"); validar la sintaxis de los `.puml` nuevos (no hay `plantuml` local).
-3. Fase 7: dashboard, reportes PDF/Excel (incluye el PDF de tendencias, CU-05), rendimiento y documento PPI.
+4. Fase 7: dashboard, reportes PDF/Excel (incluye el PDF de tendencias, CU-05), rendimiento y documento PPI.
 
-## Prueba T2 — fase 6 (PowerShell 5, desde la raíz del repo) — pendiente
+## Prueba T2 — fase 6 (PowerShell 5, desde la raíz del repo) — hecha por API (2026-10-21); falta el paso 4 visual
+
+Los pasos 1–3, 5 y 6 ya se ejecutaron (cifras en "Hecho"); la base de desarrollo quedó cargada con la semilla de 36
+meses más el plan PC-003674 recibido. Para la revisión visual basta el paso 3 (arrancar) y el paso 4.
 
 **Atención: el paso 1 BORRA todos los datos de tu base de desarrollo local.** Contraseñas: los 4 usuarios demo usan la de
 `SEED_PASSWORD` del `.env`; el ADMIN inicial (`ADMIN_EMAIL`) usa la de `ADMIN_PASSWORD`. Nunca se escriben en el repo.
+**Ojo:** en este `.env` `ADMIN_EMAIL` es `admin@livorno.co`, así que la semilla reutiliza ese usuario y
+`admin@livorno.co` entra con `ADMIN_PASSWORD`, no con `SEED_PASSWORD`.
 
 1. Base vacía: `docker compose down -v` y `docker compose up -d mysql` (esperar `healthy` con `docker compose ps`).
 2. Carga: `cd backend`, `.\mvnw.cmd clean` y `.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=dev,seed"`
@@ -109,8 +126,8 @@ Referencia: % de variantes en alerta de stock fase 4 47 %, fase 5 34,4 %; meta ~
 - Desactivación simultánea de los dos últimos ADMIN: el perdedor del deadlock de MySQL recibe 409.
 - Semilla: la analítica (ABC, ROP y alertas) corre tras el commit de la carga; si falla, la carga queda confirmada y se
   recupera con "Recalcular" como ADMIN (una nueva ejecución de la semilla dice "ya hay datos").
-- Umbral de alertas: fase 4 con `stockMinimo` 47 %; fase 5 con ROP 34,4 % (T2); fase 6 con posición de inventario:
-  pendiente de T2 (meta ~10–15 %, estimado 11–17 %; AGOTADO solo ya pesa ~9 %, ADR-010).
+- Umbral de alertas: fase 4 con `stockMinimo` 47 %; fase 5 con ROP 34,4 % (T2); fase 6 con posición de inventario
+  14,4 % (T2; meta ~10–15 % cumplida; 38,8 % si no se contara lo en camino).
 - Riesgos residuales de concurrencia de la analítica aceptados y documentados en ADR-009 (variante ocupada conserva ROP
   hasta la siguiente ejecución; ventana de milisegundos en SIN_ROTACION).
 - Para fases futuras: ventas ANULADAS fuera del pronóstico y la rentabilidad (fases 6–7); la demanda observada está

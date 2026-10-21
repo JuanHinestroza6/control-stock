@@ -94,17 +94,17 @@ defecto, `stockMinimo`. Las reglas constan en ADR-007 y en `docs/dominio.md` (se
 
 ### Resultados de la prueba T2 de la Fase 6 (semilla de 36 meses con reposición por planes)
 
-Pendiente de T2: la prueba real la ejecuta el equipo sobre la semilla de 36 meses.
+Prueba ejecutada el 2026-10-21 sobre la semilla de 36 meses (base vacía, perfiles `dev,seed`, semilla aleatoria por defecto), por la API y la base de datos. La revisión visual por la interfaz la realiza el usuario después.
 
 | Indicador | Resultado |
 |---|---|
-| Variantes activas analizadas | pendiente de T2 |
-| Variantes con pedido en camino / unidades en camino | pendiente de T2 |
-| Alertas ACTIVAS | AGOTADO: pendiente de T2; STOCK_BAJO: pendiente de T2; SIN_ROTACION: pendiente de T2 |
-| Variantes en alerta de stock con posición (AGOTADO o STOCK_BAJO) | pendiente de T2 (T2 de la Fase 5: 34,4 %) |
-| Variantes en alerta sin contar lo que viene en camino (contrafactual) | pendiente de T2 |
-| Meta de ~10 % a 15 % | pendiente de T2; el desglose explica la diferencia (AGOTADO ya pesaba cerca de 9 % en la Fase 5, por lo que la meta efectiva es de ~11 % a 17 %) |
-| Duración de la ejecución analítica con pronóstico (meta menor que 8 s) | pendiente de T2 |
+| Variantes activas analizadas | 291 (de 299; un producto desactivado) |
+| Variantes con pedido en camino / unidades en camino | 101 variantes (98 planes APROBADO, 1.060 unidades) |
+| Alertas ACTIVAS | AGOTADO 26; STOCK_BAJO 16; SIN_ROTACION 18 (LIV004, LIV026 y LIV030) |
+| Variantes en alerta de stock con posición (AGOTADO o STOCK_BAJO) | 42 de 291 = **14,4 %** (T2 de la Fase 5: 34,4 %; Fase 4: cerca de 47 %) |
+| Variantes en alerta sin contar lo que viene en camino (contrafactual) | 113 de 291 = 38,8 % |
+| Meta de ~10 % a 15 % | Cumplida (14,4 %, dentro del rango efectivo de ~11 % a 17 %). Desglose: AGOTADO 26 (8,9 %) y STOCK_BAJO 16 (5,5 %); los pedidos en camino reducen la métrica de 38,8 % a 14,4 % |
+| Duración de la ejecución analítica con pronóstico (meta menor que 8 s) | Cumplida: 6.523 ms en la ejecución de cierre (origen SEMILLA, EXITOSA) y 6.458 ms en el recálculo manual como ADMIN |
 
 ### Resultados de la prueba T2 de la Fase 5 (2026-10-15, semilla de 24 meses)
 
@@ -175,7 +175,7 @@ STOCK_BAJO con la posición de inventario (disponible más pedidos aprobados en 
 | CA-19 | Aprobar o cancelar publica `PosicionCambiada`; un fallo del listener no revierte la aprobación; las variantes inactivas con pedido en camino no generan alerta | Cumplido (Fase 6) | `PlanCompraAlertasIntegracionTest` |
 | CA-20 | El ROP usa la demanda pronosticada cuando hay pronóstico y la histórica si no; la ejecución guarda la métrica contrafactual y las variantes con pedido en camino | Cumplido (Fase 6) | `CalculadoraReordenPronosticoTest`, `EjecucionAnaliticaPronosticoIntegracionTest`, `PlanCompraAlertasIntegracionTest` |
 | CA-21 | Inventario, Reorden, Alertas y el panel de ejecución muestran lo que viene en camino y la métrica con y sin tránsito | Cumplido (Fase 6) | `InventarioPage.test.tsx`, `PestanaReorden.test.tsx`, `AlertasPage.test.tsx`, `AnaliticaPage.test.tsx` |
-| CA-22 | Meta de ~10 % a 15 % de variantes en alerta de stock | Pendiente de T2 (Fase 5 mide 34,4 %; la prueba real con la semilla de 36 meses la hace el equipo) | `SemillaIntegracionTest`; corrida real |
+| CA-22 | Meta de ~10 % a 15 % de variantes en alerta de stock | Cumplido (T2 de la Fase 6, 2026-10-21: 42 de 291 variantes = 14,4 %; Fase 5: 34,4 %). Medido por API y base de datos; la revisión visual por la interfaz queda a cargo del usuario | `SemillaIntegracionTest`; corrida real T2 |
 
 ## Observaciones
 
@@ -184,7 +184,8 @@ STOCK_BAJO con la posición de inventario (disponible más pedidos aprobados en 
 - El umbral dinámico (ROP calculado) llega con la Fase 5; sin ROP calculado se usa `stockMinimo`. Desde la Fase 6 el STOCK_BAJO usa la posición de inventario.
 - Riesgo aceptado (ADR-010): un plan aprobado y nunca recibido mantiene cerrada la alerta STOCK_BAJO hasta que se cancela;
   la interfaz de compras lo marca «atrasado» cuando pasa `aprobadoEn + max(leadTimeDias)`.
-- La meta de ~10 % a 15 % no está garantizada: AGOTADO ya pesaba cerca de 9 % (variantes que la semilla deja agotar a
+- T2 de la Fase 6 (2026-10-21, por API y base de datos; la revisión visual por la interfaz la realiza el usuario): meta cumplida con 14,4 %. Tras el ciclo de compra de prueba (PC-003674 aprobado y recibido) las alertas activas quedaron AGOTADO 24, STOCK_BAJO 0 y SIN_ROTACION 18; AGOTADO por clase: A 2, B 4, C 18; SIN_ROTACION: B 6, C 12.
+- La meta de ~10 % a 15 % no estaba garantizada: AGOTADO ya pesaba cerca de 9 % (variantes que la semilla deja agotar a
   propósito y quiebres reales). Se mide y se explica con el desglose; la definición no se cambia para llegar al número.
 - Riesgos residuales aceptados (ADR-009): una variante ocupada por una venta durante todos los reintentos conserva su ROP hasta la siguiente ejecución; ventana de milisegundos en la apertura de SIN_ROTACION.
 - Diagramas: `diagramas/secuencia-convertir-reservas.puml` (muestra el evento `StockCambiado` que dispara la evaluación);

@@ -3,8 +3,7 @@
 > Sección nueva del documento PPI. Implementada en la Fase 4 (rama `fase-4-datos-semilla`, corrida real T1 del
 > 2026-10-13), actualizada en la Fase 5 (rama `fase-5-analitica`, corrida real T2 del 2026-10-15, que reemplaza las
 > cifras de T1) y en la Fase 6 (rama `fase-6-prediccion-compras`: 36 meses de historia, reposición mediante planes de
-> compra reales, pedidos en camino al cerrar y pronóstico). Las cifras de la corrida T2 de la Fase 6 están
-> **pendientes de T2**: la prueba real la ejecuta el equipo después de esta documentación. Decisiones en ADR-008, ADR-009
+> compra reales, pedidos en camino al cerrar y pronóstico). Las cifras de la corrida T2 de la Fase 6 (2026-10-21) se midieron por API y base de datos; la revisión visual por la interfaz la realiza el usuario después. Decisiones en ADR-008, ADR-009
 > y ADR-010.
 
 | Campo | Contenido |
@@ -94,47 +93,45 @@ migraciones.
 4. Arrancar con normalidad usando el perfil `dev`.
 5. Para regenerar, se borra la base (`docker compose down -v`); el código no borra datos porque el kardex es inmutable.
 
-## Resultados de la corrida real T2 de la Fase 6 (semilla de 36 meses)
+## Resultados de la corrida real T2 de la Fase 6 (2026-10-21, semilla de 36 meses)
 
-**Pendiente de T2.** La prueba real la ejecuta el equipo con base vacía y `SEED_PASSWORD` en `.env`; estas cifras
-reemplazarán a las de la corrida de la Fase 5 (que se conserva abajo como referencia). Las estimaciones de ADR-010 son
-solo previsiones: la carga sube de cerca de 2 minutos a entre 3,5 y 4 minutos.
+Corrida con base vacía y `SEED_PASSWORD` en `.env`, perfiles `dev,seed`, semilla aleatoria por defecto y rango del 2023-10-21 al 2026-10-20, ejecutada por API y base de datos; la revisión visual por la interfaz la realiza el usuario después. Estas cifras reemplazan a las de la corrida de la Fase 5 (que se conserva abajo como referencia). La carga subió de cerca de 2 minutos a 4 min 26 s, algo por encima de la previsión de 3,5 a 4 minutos de ADR-010.
 
 | Indicador | Resultado T2 (Fase 6) | Referencia: T2 de la Fase 5 (24 meses) |
 |---|---|---|
 | Meses de historia / meses completos | 36 / 35 (por diseño) | 24 / 23 |
-| Tiempo de carga con perfiles `dev,seed` | pendiente de T2 | 129,99 s |
-| Ventas registradas (de ellas, anuladas) | pendiente de T2 | 12.227 (91 anuladas) |
-| Unidades en ventas registradas | pendiente de T2 | 18.810 |
-| Ingreso (ventas registradas) | pendiente de T2 | $2.224.875.800 |
-| Devoluciones | pendiente de T2 | 607 |
-| Reservas (activas) | pendiente de T2 | 96 (14 activas) |
-| Productos / variantes (activas) | pendiente de T2 | 30 / 299 (291 activas) |
-| Planes de compra: creados / recibidos / en camino | pendiente de T2 | no existían |
-| Unidades en camino al cierre | pendiente de T2 | no existían |
-| Segunda ejecución | pendiente de T2 (debe detectar datos y no crear nada) | Detectó datos y no creó nada |
+| Tiempo de carga con perfiles `dev,seed` | 4 min 26 s en total (generación 243,6 s; analítica de cierre 6,5 s) | 129,99 s |
+| Ventas registradas (de ellas, anuladas) | 20.281 (139 anuladas) | 12.227 (91 anuladas) |
+| Unidades en ventas registradas | 30.920 | 18.810 |
+| Ingreso (ventas registradas) | $3.749.748.100 | $2.224.875.800 |
+| Devoluciones | 1.093 (216 no aptas) | 607 |
+| Reservas (activas) | 85 (49 convertidas, 13 canceladas, 13 vencidas, 10 activas) | 96 (14 activas) |
+| Productos / variantes (activas) | 30 / 299 (291 activas; 1 producto desactivado) | 30 / 299 (291 activas) |
+| Planes de compra: creados / recibidos / en camino | 3.673 / 3.575 / 98 (ningún BORRADOR ni CANCELADO al cierre) | no existían |
+| Unidades en camino al cierre | 1.060 | no existían |
+| Segunda ejecución | Detectó ventas y no hizo nada | Detectó datos y no creó nada |
 
 ### Pronóstico y analítica sobre los datos de demostración (Fase 6)
 
-Ejecución analítica de origen SEMILLA: estado y duración pendientes de T2 (meta del recálculo manual con pronóstico menor
-que 8 s).
+Ejecución analítica de origen SEMILLA: EXITOSA en 6.523 ms. Recálculo manual como ADMIN: EXITOSA, 6.458 ms en el servidor (6,5 s en el cliente), con las mismas métricas (meta menor que 8 s cumplida).
 
 | Indicador | Resultado |
 |---|---|
-| Productos pronosticados | pendiente de T2 |
-| Productos con Holt-Winters / con SES (y motivos sin Holt-Winters) | pendiente de T2 |
-| WAPE global del pronóstico | pendiente de T2 |
-| Clase ABC (A / B / C) | pendiente de T2 |
-| Método del punto de reorden (NORMAL / POISSON / SIN_DEMANDA / SIN_HISTORIA) y fuente (PRONOSTICO / HISTORICA) | pendiente de T2 |
-| Variantes con pedido en camino | pendiente de T2 |
-| Alertas activas (AGOTADO / STOCK_BAJO / SIN_ROTACION) | pendiente de T2 |
-| Variantes en alerta de stock, con posición | pendiente de T2 (meta de ~10 % a 15 %; T2 de la Fase 5: 34,4 %) |
-| Variantes en alerta de stock si no se contara lo que viene en camino (contrafactual) | pendiente de T2 |
+| Productos pronosticados | 29 de 30 (el desactivado no se pronostica) |
+| Productos con Holt-Winters / con SES (y motivos sin Holt-Winters) | Holt-Winters 7 (LIV001, LIV002, LIV009, LIV014, LIV018, LIV020, LIV027); SES 22: 9 por `MES_EN_CERO` y 13 que compitieron con Holt-Winters y ganó SES |
+| WAPE global del pronóstico | 0,1828. WAPE medio: Holt-Winters 0,1706 (rango 0,0926 a 0,2987); SES 0,4201 (rango 0,1539 a 0,9865, productos de cola y estancados). LIV001: SES 0,1886 frente a Holt-Winters 0,0926 |
+| Clase ABC (A / B / C) | 78 / 82 / 131 |
+| Método del punto de reorden (NORMAL / POISSON / SIN_DEMANDA / SIN_HISTORIA) y fuente (PRONOSTICO / HISTORICA) | NORMAL 42; POISSON 222; SIN_DEMANDA 27; SIN_HISTORIA 0. Fuente PRONOSTICO en las 291 variantes |
+| Variantes con pedido en camino | 101 |
+| Alertas activas (AGOTADO / STOCK_BAJO / SIN_ROTACION) | 26 / 16 / 18 (LIV004, LIV026 y LIV030) |
+| Variantes en alerta de stock, con posición | 42 de 291 = **14,4 %** (meta de ~10 % a 15 % cumplida; T2 de la Fase 5: 34,4 %; Fase 4: cerca de 47 %) |
+| Variantes en alerta de stock si no se contara lo que viene en camino (contrafactual) | 113 de 291 = 38,8 % |
 
-Qué se espera comprobar (sin cifras): que los productos de cabeza, con 35 meses y sin meses en 0, compitan con
-Holt-Winters y los de cola, con meses en 0, usen SES; que las alertas STOCK_BAJO bajen respecto de la métrica
-contrafactual por los pedidos en camino; y que AGOTADO siga pesando cerca de 9 %, de modo que la meta efectiva sea de
-~11 % a 17 % y se explique con el desglose.
+Verificación de lo esperado: los productos de cabeza compitieron con Holt-Winters (ganó en 7 productos) y los de cola, con meses en 0, usaron SES; las alertas bajaron de 38,8 % (contrafactual) a 14,4 % por los pedidos en camino; AGOTADO pesó 26 de 291 variantes (8,9 %), de modo que la meta efectiva de ~11 % a 17 % se cumple. Al final, AGOTADO por clase: A 2, B 4, C 18; SIN_ROTACION: B 6, C 12 (cifras tomadas tras el ciclo de compra de prueba, con AGOTADO 24).
+
+**Observación sobre la corrección por agotados.** En los últimos 12 meses las unidades observadas (11.601) pasaron a 11.890,13 corregidas (+289 unidades), mientras que la semilla informa 2.817 unidades perdidas en 36 meses (cerca de 939 por año). La corrección recupera cerca de 0,3 veces lo perdido, por debajo del rango de 0,5 a 2 veces previsto en el plan. Causas probables: el piso de disponibilidad de 0,5, la inclusión solo de variantes activas, la ponderación por participación y que la demanda perdida por quiebres cortos dentro del día no se ve en los días con stock.
+
+**Otros datos de la corrida.** Usuarios de demostración 4; unidades iniciales 1.597; ventas perdidas 2.463 líneas (2,5 % evitables), 2.817 unidades; entradas 3.575; ajustes 72; alzas de precio 3. Flujo por API: matriz de roles correcta (compras, tendencias y pronóstico: ADMIN, INVENTARIO y CONTABILIDAD 200, VENDEDOR 403, sin token 401; sugerir y recalcular restringidos según la matriz; INVENTARIO 403 al aprobar); tendencias de 24 meses con 25 puntos; el plan sugerido PC-003674 (20 líneas) se aprobó y se recibió con 20 ENTRADAS `PLAN_COMPRA/3674` (152 unidades), y tras ese ciclo las alertas activas quedaron AGOTADO 24, STOCK_BAJO 0 y SIN_ROTACION 18.
 
 ## Resultados de la corrida real T2 de la Fase 5 (2026-10-15, semilla de 24 meses)
 
@@ -230,11 +227,11 @@ inventario (disponible más pedidos aprobados en camino).
   planes de la demostración no reflejan lo que el sistema propondría hoy.
 - **El backtest no cubre noviembre y diciembre.** Con los seis meses evaluados de abril a septiembre, el WAPE puede
   subestimar el error de los picos (riesgo aceptado, ADR-010).
-- **Reservas activas efímeras.** Las 14 reservas ACTIVAS (13 en T1) vencen a los pocos días de la carga; conviene regenerar la
+- **Reservas activas efímeras.** Las 10 reservas ACTIVAS de la T2 de la Fase 6 (13 en T1) vencen a los pocos días de la carga; conviene regenerar la
   base la víspera de la sustentación con una fecha final fija.
 - **Datos de clientes ficticios.** Los nombres y contactos de las reservas no corresponden a personas reales.
 - **Sin historial previo de alertas.** Solo quedan las alertas ACTIVAS correspondientes al stock final.
 - **Alertas elevadas.** Con el punto de reorden de la Fase 5 el 34,4 % de las variantes quedaba en alerta de stock; la
-  Fase 6 lo reduce con la posición de inventario (cifra pendiente de T2).
+  Fase 6 lo reduce con la posición de inventario (T2 de la Fase 6: 14,4 %).
 - **Pedidos en camino efímeros.** Los planes APROBADO que quedan en camino al cierre de la carga dependen de la fecha
   final; conviene regenerar la base la víspera de la sustentación.
