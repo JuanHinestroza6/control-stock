@@ -13,9 +13,19 @@ package co.livorno.controlstock.analitica.calculo;
  * @param loteMinimo            múltiplo de compra del producto, ≥ 1
  * @param pronostico            pronóstico mensual de la variante (desagregado), o null si el producto no tiene pronóstico
  * @param demandaMediaHistorica d̄ observada de la serie diaria de 90 días (unidades/día, ≥ 0); solo se usa sin pronóstico
+ * @param claseAbc              clase ABC de la variante (A, B, C) o null; no interviene en el cálculo, solo en la
+ *                              prioridad cuando hay más candidatas que el tope del plan
  */
 public record InsumoSugerencia(long varianteId, Integer puntoReorden, int stockMinimo, int disponible, int enCamino,
-        int leadTimeDias, int loteMinimo, PronosticoMensual pronostico, double demandaMediaHistorica) {
+        int leadTimeDias, int loteMinimo, PronosticoMensual pronostico, double demandaMediaHistorica,
+        Character claseAbc) {
+
+    /** Sin clase ABC. */
+    public InsumoSugerencia(long varianteId, Integer puntoReorden, int stockMinimo, int disponible, int enCamino,
+            int leadTimeDias, int loteMinimo, PronosticoMensual pronostico, double demandaMediaHistorica) {
+        this(varianteId, puntoReorden, stockMinimo, disponible, enCamino, leadTimeDias, loteMinimo, pronostico,
+                demandaMediaHistorica, null);
+    }
 
     public InsumoSugerencia {
         if (puntoReorden != null && puntoReorden < 0) {

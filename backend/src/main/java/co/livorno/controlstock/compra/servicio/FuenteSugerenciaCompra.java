@@ -8,8 +8,13 @@ import java.util.List;
  */
 public interface FuenteSugerenciaCompra {
 
-    /** Línea sugerida; {@code cantidad} es múltiplo de loteMinimo y {@code justificacion} cabe en 255. */
-    record LineaSugerida(Long varianteId, int cantidad, String justificacion) {
+    /**
+     * Línea sugerida; {@code cantidad} es múltiplo de loteMinimo y {@code justificacion} cabe en 255. Los demás campos
+     * sirven para priorizar cuando hay más candidatas que el tope del plan: clase ABC (o null), disponible, umbral
+     * (ROP o stock mínimo) y posición (disponible + en camino).
+     */
+    record LineaSugerida(Long varianteId, int cantidad, String justificacion, Character claseAbc, int disponible,
+            int umbral, long posicion) {
     }
 
     /** Resultado: líneas por id de variante ascendente y la ejecución analítica de la que salen. */

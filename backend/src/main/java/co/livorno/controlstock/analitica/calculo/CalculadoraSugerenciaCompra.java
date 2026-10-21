@@ -106,7 +106,8 @@ public final class CalculadoraSugerenciaCompra {
 
         String justificacion = justificar(insumo, fuente, demanda, sinRopNiDemanda, neto, faltante, cantidad);
         return Optional.of(new LineaSugerencia(insumo.varianteId(), umbral, posicion, fuente, escala2(demanda),
-                escala2(objetivo), Math.toIntExact(faltante), Math.toIntExact(cantidad), justificacion));
+                escala2(objetivo), Math.toIntExact(faltante), Math.toIntExact(cantidad), justificacion,
+                insumo.claseAbc(), insumo.disponible()));
     }
 
     /**

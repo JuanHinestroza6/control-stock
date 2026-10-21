@@ -16,9 +16,12 @@ import java.util.Objects;
  * @param faltante       ceil(S − posición), antes del lote (&gt; 0)
  * @param cantidad       faltante redondeado hacia arriba al múltiplo de loteMinimo (&gt; 0): cantidadSugerida
  * @param justificacion  texto legible del cálculo (cabe en {@code detalle_plan.justificacion}, 255)
+ * @param claseAbc       clase ABC de la variante o null (prioridad cuando hay más candidatas que el tope del plan)
+ * @param disponible     físico − reservado (0 = agotada)
  */
 public record LineaSugerencia(long varianteId, int umbral, long posicion, FuenteDemanda fuente,
-        BigDecimal demandaPeriodo, BigDecimal nivelObjetivo, int faltante, int cantidad, String justificacion) {
+        BigDecimal demandaPeriodo, BigDecimal nivelObjetivo, int faltante, int cantidad, String justificacion,
+        Character claseAbc, int disponible) {
 
     public LineaSugerencia {
         Objects.requireNonNull(fuente, "fuente");

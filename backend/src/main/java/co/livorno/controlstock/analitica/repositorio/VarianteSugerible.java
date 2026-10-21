@@ -7,5 +7,5 @@ import java.math.BigDecimal;
  * {@code demandaMedia} es la d̄ histórica de la última instantánea de la analítica (null si no hay).
  */
 public record VarianteSugerible(Long id, Integer puntoReorden, int stockMinimo, int disponible, int leadTimeDias,
-        int loteMinimo, BigDecimal demandaMedia) {
+        int loteMinimo, BigDecimal demandaMedia, Character claseAbc) {
 }

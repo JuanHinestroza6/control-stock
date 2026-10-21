@@ -57,7 +57,10 @@ Había nueve cuestiones abiertas:
 6. **Sugerencia (s, S).** Candidatas: variantes activas de productos activos con `posición ≤ umbral` que no estén en otro
    BORRADOR (se informan como omitidas). Cantidad hasta `S = umbral + demanda pronosticada de R = 30 días después del
    lead time`, redondeada hacia arriba al múltiplo de `loteMinimo`; las de cantidad 0 no entran. Equivale a la fórmula
-   del skill (`μ(L+R) + SS`); solo cambia qué variantes entran. Cada línea lleva una justificación legible.
+   del skill (`μ(L+R) + SS`); solo cambia qué variantes entran. Cada línea lleva una justificación legible. Con más de 300
+   candidatas (tope del plan) entran las de mayor prioridad: agotadas (disponible 0) primero, luego clase ABC A, B, C y
+   sin clase, luego mayor faltante relativo `(umbral − posición) / max(umbral, 1)` y por último el id; las excluidas se
+   informan en `excluidasPorTope` y siguen siendo candidatas en la siguiente sugerencia.
 7. **Roles.** Crear (sugerido o manual) y editar borradores: ADMIN e INVENTARIO. Aprobar: solo ADMIN. Cancelar: ADMIN;
    INVENTARIO solo descarta borradores. Recibir: ADMIN e INVENTARIO. Ver planes: ADMIN, INVENTARIO y CONTABILIDAD.
    Tendencias y pronóstico: ADMIN, INVENTARIO y CONTABILIDAD. VENDEDOR: 403 en todo lo anterior.
@@ -137,5 +140,7 @@ Había nueve cuestiones abiertas:
     activas).
   - Un plan aprobado y nunca recibido mantiene la alerta cerrada hasta que se cancela; la interfaz lo marca "atrasado"
     cuando pasa `aprobadoEn + max(leadTimeDias)`.
+  - Dos sugerencias simultáneas pueden meter la misma variante en dos borradores (la exclusión de las que ya están en
+    otro BORRADOR no es atómica); el costo es un borrador duplicado que se corrige a mano o se cancela.
   - Sin historial de pronósticos (solo el último), sin proveedores y una sola instancia del backend (guardia en memoria
     de ADR-009).

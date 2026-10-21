@@ -67,11 +67,12 @@ public class SugerenciaCompraAnalitica implements FuenteSugerenciaCompra {
             long camino = transito.getOrDefault(v.id(), 0L);
             insumos.add(new InsumoSugerencia(v.id(), v.puntoReorden(), v.stockMinimo(), v.disponible(),
                     (int) Math.min(camino, Integer.MAX_VALUE), v.leadTimeDias(), v.loteMinimo(),
-                    pronostico.get(v.id()), demandaMedia));
+                    pronostico.get(v.id()), demandaMedia, v.claseAbc()));
         }
         List<LineaSugerencia> lineas = new CalculadoraSugerenciaCompra(periodoRevisionDias).sugerir(insumos, corte);
         return new Sugerencia(ejecucionId, lineas.stream()
-                .map(l -> new LineaSugerida(l.varianteId(), l.cantidad(), l.justificacion())).toList());
+                .map(l -> new LineaSugerida(l.varianteId(), l.cantidad(), l.justificacion(), l.claseAbc(),
+                        l.disponible(), l.umbral(), l.posicion())).toList());
     }
 
     /** Series mensuales por variante desde las filas guardadas (último cálculo), meses consecutivos desde el primero. */

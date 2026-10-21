@@ -114,7 +114,7 @@ public interface AnaliticaVarianteRepository extends JpaRepository<AnaliticaVari
     @Query("""
             select new co.livorno.controlstock.analitica.repositorio.VarianteSugerible(
                 v.id, v.puntoReorden, v.stockMinimo, v.stockFisico - v.stockReservado, p.leadTimeDias, p.loteMinimo,
-                a.demandaMedia)
+                a.demandaMedia, v.claseAbc)
             from Variante v join v.producto p left join AnaliticaVariante a on a.varianteId = v.id
             where v.activo = true and p.activo = true
               and (:categoriaId is null or p.categoria.id = :categoriaId)

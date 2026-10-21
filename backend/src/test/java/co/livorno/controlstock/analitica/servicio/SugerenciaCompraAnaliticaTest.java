@@ -31,7 +31,7 @@ class SugerenciaCompraAnaliticaTest {
         var transito = mock(ConsultaPedidosEnCamino.class);
         // dado: sin pronóstico, demanda histórica de 2/día, ROP 10, disponible 0, lote 1
         when(variantes.sugeribles(null)).thenReturn(List.of(
-                new VarianteSugerible(1L, 10, 2, 0, 10, 1, new BigDecimal("2.0"))));
+                new VarianteSugerible(1L, 10, 2, 0, 10, 1, new BigDecimal("2.0"), null)));
         when(pronosticos.findByVarianteIdIsNotNullOrderByVarianteIdAscPeriodoAsc()).thenReturn(List.of());
         when(ejecuciones.findFirstByEstadoOrderByIniciadaEnDescIdDesc(EstadoEjecucion.EXITOSA))
                 .thenReturn(Optional.empty());

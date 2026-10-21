@@ -28,6 +28,18 @@ public interface DetallePlanRepository extends JpaRepository<DetallePlan, Long> 
             """)
     List<EnCaminoVariante> enCaminoPorVariante();
 
+    /** Lo mismo que {@link #enCaminoPorVariante()} pero solo para las variantes dadas (detalle de un plan). */
+    @Query("""
+            select new co.livorno.controlstock.compra.repositorio.EnCaminoVariante(
+                d.variante.id, sum(d.cantidadAprobada))
+            from DetallePlan d
+            where d.plan.estado = co.livorno.controlstock.compra.modelo.EstadoPlan.APROBADO
+              and d.variante.id in :ids
+            group by d.variante.id
+            order by d.variante.id
+            """)
+    List<EnCaminoVariante> enCaminoDe(@Param("ids") Collection<Long> ids);
+
     /** Ids de las variantes (entre las dadas) que ya están en algún plan BORRADOR, para omitirlas al sugerir. */
     @Query("""
             select distinct d.variante.id from DetallePlan d

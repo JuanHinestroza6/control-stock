@@ -11,7 +11,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
-/** Detalle del plan con sus líneas. {@code omitidas} solo se llena al sugerir (SKUs ya en otro borrador). */
+/** Detalle del plan con sus líneas. {@code omitidas} (SKUs ya en otro borrador) y {@code excluidasPorTope}
+ * (candidatas que no entraron por el tope de 300 líneas) solo se llenan al sugerir; en los demás casos, null y 0. */
 public record PlanCompraDetalleResponse(
         Long id,
         String numero,
@@ -32,10 +33,11 @@ public record PlanCompraDetalleResponse(
         LocalDateTime canceladoEn,
         String canceladoPor,
         List<String> omitidas,
+        int excluidasPorTope,
         List<LineaPlanResponse> lineas) {
 
     public static PlanCompraDetalleResponse de(PlanCompra p, Map<Long, String> nombres, Map<Long, Long> enCamino,
-            LocalDateTime ahora, List<String> omitidas) {
+            LocalDateTime ahora, List<String> omitidas, int excluidasPorTope) {
         LocalDateTime llegada = llegadaEsperada(p);
         List<LineaPlanResponse> lineas = p.getLineas().stream()
                 .sorted(Comparator.comparing((DetallePlan d) -> d.getVariante().getId()))
@@ -44,7 +46,7 @@ public record PlanCompraDetalleResponse(
         return new PlanCompraDetalleResponse(p.getId(), p.numero(), p.getEstado(), p.getOrigen(), p.getCreadoEn(),
                 nombres.get(p.getCreadoPor()), p.getAprobadoEn(), nombres.get(p.getAprobadoPor()), p.getRecibidoEn(),
                 unidades(p), costoTotal(p), llegada, atrasado(p, llegada, ahora), p.getVersion(), p.getObservacion(),
-                p.getMotivoCancelacion(), p.getCanceladoEn(), nombres.get(p.getCanceladoPor()), omitidas, lineas);
+                p.getMotivoCancelacion(), p.getCanceladoEn(), nombres.get(p.getCanceladoPor()), omitidas, excluidasPorTope, lineas);
     }
 
     static int unidades(PlanCompra p) {

@@ -35,6 +35,7 @@ import co.livorno.controlstock.usuario.repositorio.UsuarioRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -86,7 +87,8 @@ public class PlanCompraService {
     /**
      * Plan BORRADOR de origen SUGERIDO con lo que pide el puerto de sugerencia (ADR-010): omite las variantes que ya
      * están en otro BORRADOR (las informa en {@code omitidas}), topa cada línea en 100.000 y el plan en 300 líneas
-     * (las que sobran vuelven a ser candidatas en la siguiente sugerencia). Sin nada que reponer, 422. No toca stock.
+     * (se eligen por prioridad, ver {@link #PRIORIDAD}; las que sobran vuelven a ser candidatas y se informan en
+     * {@code excluidasPorTope}). Sin nada que reponer, 422. No toca stock.
      */
     @Transactional
     public PlanCompraDetalleResponse crearSugerido(SugerirPlanRequest request) {
@@ -96,8 +98,13 @@ public class PlanCompraService {
         List<FuenteSugerenciaCompra.LineaSugerida> candidatas = sugerencia.lineas();
         Set<Long> enBorrador = candidatas.isEmpty() ? Set.of()
                 : new HashSet<>(detalles.varianteIdsEnBorrador(candidatas.stream().map(l -> l.varianteId()).toList()));
-        List<FuenteSugerenciaCompra.LineaSugerida> nuevas = candidatas.stream()
-                .filter(l -> !enBorrador.contains(l.varianteId())).limit(MAX_LINEAS).toList();
+        List<FuenteSugerenciaCompra.LineaSugerida> sinBorrador = candidatas.stream()
+                .filter(l -> !enBorrador.contains(l.varianteId())).toList();
+        // Con más de MAX_LINEAS candidatas se toman las de mayor prioridad; las demás vuelven a ser candidatas en la
+        // siguiente sugerencia. Las elegidas se reordenan por id de variante (orden de bloqueo, ADR-010).
+        int excluidasPorTope = Math.max(0, sinBorrador.size() - MAX_LINEAS);
+        List<FuenteSugerenciaCompra.LineaSugerida> nuevas = sinBorrador.stream().sorted(PRIORIDAD).limit(MAX_LINEAS)
+                .sorted(Comparator.comparing(FuenteSugerenciaCompra.LineaSugerida::varianteId)).toList();
         List<String> omitidas = enBorrador.isEmpty() ? List.of()
                 : variantes.findAllById(new java.util.TreeSet<>(enBorrador)).stream().map(Variante::getSku).sorted()
                         .toList();
@@ -126,7 +133,28 @@ public class PlanCompraService {
             throw new ExcepcionNegocio("No hay variantes por reponer.");
         }
         planes.saveAndFlush(plan);
-        return detalle(plan, ahora, omitidas);
+        return detalle(plan, ahora, omitidas, excluidasPorTope);
+    }
+
+    /** Agotadas primero, luego clase A, B, C y sin clase, luego mayor faltante relativo y por último el id. */
+    static final Comparator<FuenteSugerenciaCompra.LineaSugerida> PRIORIDAD = Comparator
+            .comparingInt((FuenteSugerenciaCompra.LineaSugerida l) -> l.disponible() == 0 ? 0 : 1)
+            .thenComparingInt(l -> rangoClase(l.claseAbc()))
+            .thenComparing(Comparator.comparingDouble(PlanCompraService::faltanteRelativo).reversed())
+            .thenComparing(FuenteSugerenciaCompra.LineaSugerida::varianteId);
+
+    private static int rangoClase(Character clase) {
+        return clase == null ? 3 : switch (clase) {
+            case 'A' -> 0;
+            case 'B' -> 1;
+            case 'C' -> 2;
+            default -> 3;
+        };
+    }
+
+    /** (umbral − posición) / max(umbral, 1). */
+    private static double faltanteRelativo(FuenteSugerenciaCompra.LineaSugerida l) {
+        return (double) (l.umbral() - l.posicion()) / Math.max(l.umbral(), 1);
     }
 
     @Transactional
@@ -304,15 +332,23 @@ public class PlanCompraService {
     }
 
     private PlanCompraDetalleResponse detalle(PlanCompra plan, LocalDateTime ahora) {
-        return detalle(plan, ahora, null);
+        return detalle(plan, ahora, null, 0);
     }
 
-    private PlanCompraDetalleResponse detalle(PlanCompra plan, LocalDateTime ahora, List<String> omitidas) {
+    /** El en camino se consulta solo para las variantes del plan. */
+    private PlanCompraDetalleResponse detalle(PlanCompra plan, LocalDateTime ahora, List<String> omitidas,
+            int excluidasPorTope) {
         Map<Long, Long> enCamino = new HashMap<>();
-        for (EnCaminoVariante e : detalles.enCaminoPorVariante()) {
-            enCamino.put(e.varianteId(), e.unidades());
+        Set<Long> ids = new HashSet<>();
+        for (DetallePlan d : plan.getLineas()) {
+            ids.add(d.getVariante().getId());
         }
-        return PlanCompraDetalleResponse.de(plan, nombres(List.of(plan)), enCamino, ahora, omitidas);
+        if (!ids.isEmpty()) {
+            for (EnCaminoVariante e : detalles.enCaminoDe(ids)) {
+                enCamino.put(e.varianteId(), e.unidades());
+            }
+        }
+        return PlanCompraDetalleResponse.de(plan, nombres(List.of(plan)), enCamino, ahora, omitidas, excluidasPorTope);
     }
 
     private Map<Long, String> nombres(List<PlanCompra> lista) {

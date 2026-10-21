@@ -321,7 +321,10 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. Desde la Fas
 - **Sugerencia (s, S)**: candidatas = variantes activas de productos activos con `posición ≤ umbral` que no estén en otro
   BORRADOR (las omitidas se informan). Cantidad hasta `S = umbral + demanda pronosticada de R = 30 días posteriores al
   lead time` (`app.compras.periodo-revision-dias`), redondeada hacia arriba al múltiplo de `loteMinimo`; las de cantidad 0
-  no entran. Sin ninguna candidata → 422. Cada línea lleva una justificación legible. Nunca toca stock.
+  no entran. Sin ninguna candidata → 422. Cada línea lleva una justificación legible. Nunca toca stock. Sin ROP y sin
+  demanda pronosticada ni histórica, el respaldo es `S = 2 × stockMinimo`. Con más de 300 candidatas entran 300 por
+  prioridad: agotadas primero, luego clase A, B, C y sin clase, luego mayor faltante relativo
+  `(umbral − posición) / max(umbral, 1)` y por último el id; el plan informa `excluidasPorTope`.
 - **Recibir** (recepción única): por línea, cantidad recibida (0–100.000, por defecto la aprobada) y costo. Una ENTRADA
   por línea con cantidad > 0, vía `OperacionInventarioService` → `MovimientoService`, referencia `PLAN_COMPRA/{id}`, con las
   reglas de entradas (mismo costo por producto, `precioCompra` = último costo > 0). Lo no recibido deja de estar en

@@ -286,8 +286,76 @@ class SugerenciaCompraIntegracionTest {
         assertThat(linea(plan, a).cantidadSugerida()).isEqualTo(100_000);
     }
 
+    /** Variante activa talla M con ROP 10, disponible y clase ABC dados (null = sin clase). */
+    private Long varianteConClase(Long productoId, String color, int disponible, String clase) {
+        String sku = "X" + sufijo + "-" + productoId + "-" + color;
+        jdbc.update("INSERT INTO variante (producto_id, sku, talla, color, stock_fisico, stock_reservado, stock_minimo,"
+                + " punto_reorden, clase_abc, activo, creado_en, actualizado_en) VALUES (?, ?, 'M', ?, ?, 0, 2, 10, ?,"
+                + " TRUE, NOW(6), NOW(6))", productoId, sku, color, disponible, clase);
+        Long id = jdbc.queryForObject("SELECT id FROM variante WHERE sku = ?", Long.class, sku);
+        idsVariantes.add(id);
+        return id;
+    }
+
     @Test
-    void crearSugerido_conMasDe300Candidatas_creaSolo300LineasLasPrimerasPorId() {
+    void crearSugerido_con301Candidatas_dejaFueraLaDeMenorPrioridadNoLaDeMayorId() {
+        // dado: 301 candidatas; la de menor id es la única con disponible (no agotada), todas las demás están agotadas
+        Long p = producto("A", cat1, true, 1);
+        Long menorPrioridad = varianteConClase(p, "K0", 5, null);
+        List<Long> agotadas = new ArrayList<>();
+        for (int i = 1; i <= 300; i++) {
+            agotadas.add(varianteConClase(p, "K" + i, 0, null));
+        }
+
+        // cuando
+        PlanCompraDetalleResponse plan = sugerir(cat1);
+
+        // entonces: queda fuera la de menor prioridad (id más bajo), no la de mayor id; se informa el exceso
+        assertThat(plan.excluidasPorTope()).isEqualTo(1);
+        assertThat(plan.lineas()).extracting(LineaPlanResponse::varianteId)
+                .containsExactlyElementsOf(agotadas);
+        assertThat(plan.lineas()).extracting(LineaPlanResponse::varianteId).doesNotContain(menorPrioridad);
+    }
+
+    @Test
+    void crearSugerido_conMezclaDeClases_priorizaAgotadasYLuegoClaseAbc() {
+        // dado: 303 candidatas: agotadas 100 A, 100 B, 50 C y 52 sin clase; más una A no agotada (disponible 5)
+        Long p = producto("A", cat1, true, 1);
+        List<Long> a = new ArrayList<>();
+        List<Long> b = new ArrayList<>();
+        List<Long> c = new ArrayList<>();
+        List<Long> sin = new ArrayList<>();
+        for (int i = 0; i < 52; i++) {
+            sin.add(varianteConClase(p, "S" + i, 0, null));
+        }
+        for (int i = 0; i < 50; i++) {
+            c.add(varianteConClase(p, "C" + i, 0, "C"));
+        }
+        for (int i = 0; i < 100; i++) {
+            b.add(varianteConClase(p, "B" + i, 0, "B"));
+        }
+        for (int i = 0; i < 100; i++) {
+            a.add(varianteConClase(p, "A" + i, 0, "A"));
+        }
+        Long aNoAgotada = varianteConClase(p, "ANA", 5, "A");
+
+        // cuando
+        PlanCompraDetalleResponse plan = sugerir(cat1);
+
+        // entonces: entran las 250 con clase y las 50 primeras (por id) sin clase; quedan fuera las 2 últimas sin
+        // clase y la A no agotada (agotadas primero); las líneas salen en orden de id de variante
+        List<Long> esperadas = new ArrayList<>(sin.subList(0, 50));
+        esperadas.addAll(c);
+        esperadas.addAll(b);
+        esperadas.addAll(a);
+        assertThat(plan.excluidasPorTope()).isEqualTo(3);
+        assertThat(plan.lineas()).extracting(LineaPlanResponse::varianteId).containsExactlyElementsOf(esperadas);
+        assertThat(plan.lineas()).extracting(LineaPlanResponse::varianteId).doesNotContain(aNoAgotada,
+                sin.get(50), sin.get(51));
+    }
+
+    @Test
+    void crearSugerido_conMasDe300Candidatas_creaSolo300LineasConIgualPrioridadLasDeMenorId() {
         // dado: 305 candidatas
         Long p = producto("A", cat1, true, 1);
         List<Long> ids = new ArrayList<>();
@@ -298,7 +366,8 @@ class SugerenciaCompraIntegracionTest {
         // cuando
         PlanCompraDetalleResponse plan = sugerir(cat1);
 
-        // entonces: las 300 de menor id; las 5 restantes siguen siendo candidatas
+        // entonces: con la misma prioridad se toman las 300 de menor id; las 5 restantes siguen siendo candidatas
+        assertThat(plan.excluidasPorTope()).isEqualTo(5);
         assertThat(plan.lineas()).extracting(LineaPlanResponse::varianteId)
                 .containsExactlyInAnyOrderElementsOf(ids.subList(0, 300));
         PlanCompraDetalleResponse segundo = sugerir(cat1);
