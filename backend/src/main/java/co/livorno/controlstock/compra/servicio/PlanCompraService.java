@@ -4,7 +4,15 @@ import co.livorno.controlstock.catalogo.modelo.Producto;
 import co.livorno.controlstock.catalogo.modelo.Variante;
 import co.livorno.controlstock.catalogo.repositorio.VarianteRepository;
 import co.livorno.controlstock.compra.dto.ActualizarPlanRequest;
+import co.livorno.controlstock.compra.dto.AprobarPlanRequest;
 import co.livorno.controlstock.compra.dto.CancelarPlanRequest;
+import co.livorno.controlstock.compra.dto.LineaRecepcionRequest;
+import co.livorno.controlstock.compra.dto.RecibirPlanRequest;
+import co.livorno.controlstock.inventario.dto.LineaEntradaRequest;
+import co.livorno.controlstock.inventario.evento.PosicionCambiada;
+import co.livorno.controlstock.inventario.servicio.OperacionInventarioService;
+import java.util.ArrayList;
+import org.springframework.context.ApplicationEventPublisher;
 import co.livorno.controlstock.compra.dto.CrearPlanRequest;
 import co.livorno.controlstock.compra.dto.LineaPlanRequest;
 import co.livorno.controlstock.compra.dto.PlanCompraDetalleResponse;
@@ -59,6 +67,8 @@ public class PlanCompraService {
     private final UsuarioRepository usuarios;
     private final UsuarioActual usuarioActual;
     private final Clock clock;
+    private final OperacionInventarioService operaciones;
+    private final ApplicationEventPublisher eventos;
 
     @Transactional
     public PlanCompraDetalleResponse crear(CrearPlanRequest request) {
@@ -117,9 +127,101 @@ public class PlanCompraService {
         if (plan.getEstado() == EstadoPlan.APROBADO && "INVENTARIO".equals(usuario.rol())) {
             throw new AccessDeniedException("INVENTARIO no puede cancelar un plan aprobado");
         }
+        boolean eraAprobado = plan.getEstado() == EstadoPlan.APROBADO;
         plan.cancelar(motivo, ahora, usuario.id());
         planes.saveAndFlush(plan);
-        // La publicación de PosicionCambiada al cancelar un APROBADO la agrega B7/B8 (el evento aún no existe).
+        if (eraAprobado) {
+            publicarPosicion(plan);
+        }
+        return detalle(plan, ahora);
+    }
+
+    @Transactional
+    public PlanCompraDetalleResponse aprobar(Long id, AprobarPlanRequest request) {
+        if (request == null || request.version() == null) {
+            throw new SolicitudInvalidaException("version", "La versión del plan es obligatoria.");
+        }
+        LocalDateTime ahora = LocalDateTime.now(clock);
+        PlanCompra plan = bloquear(id);
+        if (plan.getEstado() != EstadoPlan.BORRADOR) {
+            throw new ConflictoException("El plan " + plan.numero() + " ya está " + plan.getEstado() + ".");
+        }
+        if (request.version() != plan.getVersion()) {
+            throw new ConflictoException("El plan " + plan.numero()
+                    + " cambió mientras lo revisabas. Recarga la página y vuelve a intentar.");
+        }
+        if (plan.getLineas().isEmpty()) {
+            throw new ExcepcionNegocio("El plan " + plan.numero() + " no tiene líneas.");
+        }
+        for (DetallePlan d : plan.getLineas()) {
+            Variante v = d.getVariante();
+            if (!v.isActivo() || !v.getProducto().isActivo()) {
+                throw new ExcepcionNegocio("La variante " + v.getSku() + " está inactiva; quítala del plan para aprobarlo.");
+            }
+        }
+        plan.aprobar(ahora, usuarioActual.id());
+        planes.saveAndFlush(plan);
+        publicarPosicion(plan);
+        return detalle(plan, ahora);
+    }
+
+    /**
+     * Recepción única: una ENTRADA por línea con cantidad mayor a 0 vía inventario (referencia PLAN_COMPRA/id). Debe
+     * traer todas las líneas del plan exactamente una vez. Orden de bloqueo: plan y luego variantes por id.
+     */
+    @Transactional
+    public PlanCompraDetalleResponse recibir(Long id, RecibirPlanRequest request) {
+        LocalDateTime ahora = LocalDateTime.now(clock);
+        PlanCompra plan = bloquear(id);
+        if (plan.getEstado() != EstadoPlan.APROBADO) {
+            throw new ConflictoException("El plan " + plan.numero() + " ya está " + plan.getEstado() + ".");
+        }
+        Map<Long, DetallePlan> porDetalle = new HashMap<>();
+        for (DetallePlan d : plan.getLineas()) {
+            porDetalle.put(d.getId(), d);
+        }
+        Set<Long> vistos = new HashSet<>();
+        for (LineaRecepcionRequest l : request.lineas()) {
+            if (l == null || l.detalleId() == null || l.cantidadRecibida() == null || l.costoUnitario() == null) {
+                throw new SolicitudInvalidaException("lineas", "Cada línea necesita detalle, cantidad y costo.");
+            }
+            if (!porDetalle.containsKey(l.detalleId())) {
+                throw new SolicitudInvalidaException("lineas",
+                        "La línea " + l.detalleId() + " no pertenece al plan " + plan.numero() + ".");
+            }
+            if (!vistos.add(l.detalleId())) {
+                throw new SolicitudInvalidaException("lineas", "La línea " + l.detalleId() + " está repetida.");
+            }
+            if (l.cantidadRecibida() < 0 || l.cantidadRecibida() > DetallePlan.CANTIDAD_MAXIMA) {
+                throw new SolicitudInvalidaException("lineas",
+                        "La cantidad recibida debe estar entre 0 y " + DetallePlan.CANTIDAD_MAXIMA + ".");
+            }
+            if (l.costoUnitario().signum() < 0) {
+                throw new SolicitudInvalidaException("lineas", "El costo no puede ser negativo.");
+            }
+        }
+        if (vistos.size() != porDetalle.size()) {
+            throw new SolicitudInvalidaException("lineas", "Debes informar todas las líneas del plan ("
+                    + porDetalle.size() + "), una sola vez cada una.");
+        }
+        String observacion = normalizarObservacion(request.observacion());
+        List<LineaEntradaRequest> entradas = new ArrayList<>();
+        for (LineaRecepcionRequest l : request.lineas()) {
+            if (l.cantidadRecibida() > 0) {
+                entradas.add(new LineaEntradaRequest(porDetalle.get(l.detalleId()).getVariante().getId(),
+                        l.cantidadRecibida(), l.costoUnitario()));
+            }
+        }
+        if (entradas.isEmpty()) {
+            throw new ExcepcionNegocio("No se recibió ninguna unidad del plan " + plan.numero()
+                    + ": use Cancelar en vez de Recibir.");
+        }
+        operaciones.registrarEntradaDePlan(plan.getId(), entradas, observacion);
+        for (LineaRecepcionRequest l : request.lineas()) {
+            porDetalle.get(l.detalleId()).registrarRecepcion(l.cantidadRecibida(), l.costoUnitario());
+        }
+        plan.recibir(ahora, usuarioActual.id());
+        planes.saveAndFlush(plan);
         return detalle(plan, ahora);
     }
 
@@ -137,6 +239,12 @@ public class PlanCompraService {
     }
 
     // ---------- internos ----------
+
+    /** PosicionCambiada por línea, en orden de variante (ADR-010); lo consume el listener de alertas (B8). */
+    private void publicarPosicion(PlanCompra plan) {
+        plan.getLineas().stream().map(d -> d.getVariante().getId()).sorted()
+                .forEach(vid -> eventos.publishEvent(new PosicionCambiada(vid)));
+    }
 
     private PlanCompra bloquear(Long id) {
         return planes.bloquear(id).orElseThrow(() -> new RecursoNoEncontradoException("Plan de compra", id));

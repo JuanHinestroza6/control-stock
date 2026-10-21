@@ -44,10 +44,28 @@ public class OperacionInventarioService {
      */
     @Transactional
     public List<MovimientoResponse> registrarEntrada(EntradaRequest req) {
+        String observacion = req.observacion() == null || req.observacion().isBlank() ? null : req.observacion().strip();
+        return procesarEntrada(req.lineas(), observacion, null, null, true);
+    }
+
+    /**
+     * Recepción de un plan de compras (ADR-010): igual que {@link #registrarEntrada} pero con referencia
+     * {@code PLAN_COMPRA/{planId}} y permitida sobre variantes o productos inactivos (la mercancía ya pedida llega
+     * igual). Método interno: lo invoca {@code compra}; no tiene endpoint propio.
+     */
+    @Transactional
+    public List<MovimientoResponse> registrarEntradaDePlan(Long planId, List<LineaEntradaRequest> lineas,
+            String observacion) {
+        String obs = observacion == null || observacion.isBlank() ? null : observacion.strip();
+        return procesarEntrada(lineas, obs, "PLAN_COMPRA", planId, false);
+    }
+
+    private List<MovimientoResponse> procesarEntrada(List<LineaEntradaRequest> lineas, String observacion,
+            String referenciaTipo, Long referenciaId, boolean exigirActivas) {
         Set<Long> vistas = new HashSet<>();
         Map<Long, Producto> productos = new LinkedHashMap<>();
         Map<Long, BigDecimal> costoPorProducto = new HashMap<>();
-        for (LineaEntradaRequest linea : req.lineas()) {
+        for (LineaEntradaRequest linea : lineas) {
             if (!vistas.add(linea.varianteId())) {
                 throw new SolicitudInvalidaException(
                         "La variante " + linea.varianteId() + " está repetida en la entrada.");
@@ -55,7 +73,7 @@ public class OperacionInventarioService {
             Variante v = variantes.findById(linea.varianteId())
                     .orElseThrow(() -> new RecursoNoEncontradoException("Variante", linea.varianteId()));
             Producto p = v.getProducto();
-            if (!v.isActivo() || !p.isActivo()) {
+            if (exigirActivas && (!v.isActivo() || !p.isActivo())) {
                 throw new ExcepcionNegocio("La variante " + v.getSku() + " está inactiva.");
             }
             BigDecimal costo = linea.costoUnitario();
@@ -69,13 +87,12 @@ public class OperacionInventarioService {
 
         UsuarioAutenticado usuario = usuarioActual.obtener();
         List<MovimientoResponse> respuesta = new ArrayList<>();
-        String observacion = req.observacion() == null || req.observacion().isBlank() ? null : req.observacion().strip();
         // Orden por varianteId (como la venta): mismo orden de bloqueo entre transacciones concurrentes
-        List<LineaEntradaRequest> ordenadas = req.lineas().stream()
+        List<LineaEntradaRequest> ordenadas = lineas.stream()
                 .sorted(Comparator.comparing(LineaEntradaRequest::varianteId)).toList();
         for (LineaEntradaRequest linea : ordenadas) {
             Movimiento m = movimientos.registrar(new SolicitudMovimiento(linea.varianteId(), TipoMovimiento.ENTRADA,
-                    linea.cantidad(), linea.costoUnitario(), usuario.id(), null, null, observacion));
+                    linea.cantidad(), linea.costoUnitario(), usuario.id(), referenciaTipo, referenciaId, observacion));
             respuesta.add(MovimientoResponse.de(m, usuario.nombre()));
         }
         productos.forEach((id, producto) -> {
