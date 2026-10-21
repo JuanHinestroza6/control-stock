@@ -116,26 +116,24 @@ describe('PestanaReorden', () => {
     expect(within(tabla).getByText('50')).toBeInTheDocument()
   })
 
-  it('"Solo en alerta" descarta las filas cuya posición supera el umbral y conserva agotadas y bajas', async () => {
-    const lista = pagina([
-      fila({ varianteId: 1, sku: 'BAJA-1', stockDisponible: 10, enCamino: 0, posicion: 10, umbralEfectivo: 28 }),
-      fila({ varianteId: 2, sku: 'CUBIERTA-2', stockDisponible: 10, enCamino: 40, posicion: 50, umbralEfectivo: 28 }),
-      fila({ varianteId: 3, sku: 'AGOTADA-3', stockDisponible: 0, enCamino: 40, posicion: 40, umbralEfectivo: 28, estadoStock: 'AGOTADO' }),
-    ])
-    montar('ADMIN', resumen(), lista)
+  it('"Solo en alerta" envía enAlerta=true y muestra tal cual la página del servidor', async () => {
+    montar('ADMIN', resumen(), pagina([fila({ varianteId: 1, sku: 'BAJA-1' })]))
     await screen.findByText('BAJA-1')
-    expect(screen.getByText('CUBIERTA-2')).toBeInTheDocument()
+    // El servidor devuelve ahora solo lo que está en alerta por posición; el cliente no filtra de nuevo.
+    vi.mocked(api.listarReorden).mockResolvedValue(
+      pagina(
+        [
+          fila({ varianteId: 2, sku: 'ALERTA-2', stockDisponible: 10, enCamino: 40, posicion: 50, umbralEfectivo: 60 }),
+          fila({ varianteId: 3, sku: 'AGOTADA-3', stockDisponible: 0, enCamino: 40, posicion: 40, umbralEfectivo: 28, estadoStock: 'AGOTADO' }),
+        ],
+        { totalElements: 45, totalPages: 3 },
+      ),
+    )
     await userEvent.click(screen.getByLabelText('Solo en alerta'))
-    await waitFor(() => expect(screen.queryByText('CUBIERTA-2')).not.toBeInTheDocument())
-    expect(screen.getByText('BAJA-1')).toBeInTheDocument()
+    await waitFor(() => expect(ultimaLlamada().enAlerta).toBe(true))
+    expect(await screen.findByText('ALERTA-2')).toBeInTheDocument()
     expect(screen.getByText('AGOTADA-3')).toBeInTheDocument()
-  })
-
-  it('"Solo en alerta" con una página sin filas en alerta y más páginas avisa en vez de mostrar vacío', async () => {
-    montar('ADMIN', resumen(), pagina([fila({ stockDisponible: 10, enCamino: 40, posicion: 50, umbralEfectivo: 28 })], { totalPages: 3 }))
-    await screen.findByText('Camiseta Oversize')
-    await userEvent.click(screen.getByLabelText('Solo en alerta'))
-    expect(await screen.findByRole('status')).toHaveTextContent(/página siguiente/)
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
   it('la ayuda con la fórmula se muestra al desplegar', async () => {

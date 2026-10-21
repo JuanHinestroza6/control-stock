@@ -34,12 +34,6 @@ const OPCIONES_METODO = (Object.keys(METODOS) as MetodoReorden[]).map((m) => ({ 
 
 const FUENTES: Record<FuenteDemanda, string> = { PRONOSTICO: 'Pronóstico', HISTORICA: 'Histórica' }
 
-/** Alerta de stock según la posición (ADR-010): AGOTADO con disponible 0; STOCK_BAJO con 0 < disponible y posición ≤ umbral. */
-function enAlertaPorPosicion(f: ReordenVarianteResponse): boolean {
-  if (f.stockDisponible === 0) return true
-  return (f.posicion ?? f.stockDisponible) <= f.umbralEfectivo
-}
-
 const num2 = new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const num1 = new Intl.NumberFormat('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 const entero = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 })
@@ -187,8 +181,6 @@ export function PestanaReorden() {
 
   const hayFiltros = q !== '' || clase !== '' || categoriaId !== '' || metodo !== '' || enAlerta
   const pag = lista.data
-  // El backend filtra por disponible <= umbral (superconjunto de la alerta por posición); aquí se descartan las que tienen pedido en camino suficiente.
-  const filas = pag ? (enAlerta ? pag.content.filter(enAlertaPorPosicion) : pag.content) : []
   const reiniciar = (set: (v: string) => void) => (e: { target: { value: string } }) => {
     set(e.target.value)
     setPagina(0)
@@ -235,16 +227,11 @@ export function PestanaReorden() {
         <EstadoCarga />
       ) : lista.isError && !pag ? (
         <EstadoError mensaje={mensajeError(lista.error)} onReintentar={() => void lista.refetch()} />
-      ) : pag && filas.length === 0 && pag.page.totalPages <= pag.page.number + 1 ? (
+      ) : pag && pag.content.length === 0 ? (
         <EstadoVacio mensaje={hayFiltros ? 'Ninguna variante coincide con los filtros.' : 'No hay puntos de reorden calculados.'} />
       ) : pag ? (
         <>
-          {filas.length === 0 && (
-            <p role="status" className="text-sm text-oxford/70">
-              Las variantes de esta página tienen pedidos en camino que cubren su umbral. Revisa la página siguiente.
-            </p>
-          )}
-          <Tabla columnas={COLUMNAS} filas={filas} claveFila={(f) => f.varianteId} descripcion="Punto de reorden por variante" />
+          <Tabla columnas={COLUMNAS} filas={pag.content}claveFila={(f) => f.varianteId} descripcion="Punto de reorden por variante" />
           <Paginacion pagina={pag.page} onCambiar={setPagina} />
         </>
       ) : null}
