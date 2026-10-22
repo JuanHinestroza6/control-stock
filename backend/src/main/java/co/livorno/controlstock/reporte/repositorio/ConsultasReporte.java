@@ -26,6 +26,11 @@ public class ConsultasReporte {
             long devueltas, BigDecimal ventasLista, BigDecimal descuentos, BigDecimal facturado,
             BigDecimal devoluciones, BigDecimal costoVentas, BigDecimal mermaNoApta, long lineasCostoCero) {}
 
+    /** Acumulado de valorización de un grupo (categoría, producto o variante). */
+    public record AcumuladoValorizacion(Long id, String codigo, String nombre, String categoria, long fisicas,
+            long reservadas, BigDecimal valorCosto, BigDecimal valorVenta, long enCamino,
+            BigDecimal valorEnCamino) {}
+
     /** Ventas REGISTRADA de un periodo del libro (por fecha de venta). */
     public record VentasPeriodo(String periodo, long numeroVentas, long unidades, BigDecimal ventasLista,
             BigDecimal descuentos, BigDecimal facturado, BigDecimal costo) {}
@@ -196,6 +201,74 @@ public class ConsultasReporte {
                 rs.getObject("fecha", LocalDateTime.class), rs.getLong("venta_id"), rs.getString("sku"),
                 rs.getString("producto"), rs.getInt("cantidad"), rs.getBoolean("apta_para_venta"),
                 rs.getBigDecimal("precio_unitario"), rs.getBigDecimal("costo_unitario")));
+    }
+
+    /**
+     * Valorización por grupo al momento de la consulta: físico (incluye lo reservado) por el precio de compra y de
+     * venta actuales del producto, más lo en camino (planes APROBADO, cantidad aprobada por costo estimado), que es
+     * informativo. Entran las variantes con físico &gt; 0 o con algo en camino; sin inactivas si
+     * {@code incluirInactivas} es false (variante o producto inactivo).
+     */
+    public List<AcumuladoValorizacion> valorizacion(Long categoriaId, AgrupacionReporte agrupacion,
+            boolean incluirInactivas) {
+        String columnas;
+        String grupo;
+        switch (agrupacion) {
+            case CATEGORIA -> {
+                columnas = "c.id AS id, NULL AS codigo, c.nombre AS nombre, NULL AS categoria";
+                grupo = "c.id, c.nombre";
+            }
+            case PRODUCTO -> {
+                columnas = "p.id AS id, p.codigo AS codigo, p.nombre AS nombre, c.nombre AS categoria";
+                grupo = "p.id, p.codigo, p.nombre, c.nombre";
+            }
+            default -> {
+                columnas = "va.id AS id, va.sku AS codigo,"
+                        + " CONCAT(p.nombre, ' (', va.talla, ' ', va.color, ')') AS nombre, c.nombre AS categoria";
+                grupo = "va.id, va.sku, va.talla, va.color, p.nombre, c.nombre";
+            }
+        }
+        String sql = "SELECT " + columnas + ","
+                + " SUM(va.stock_fisico) AS fisicas, SUM(va.stock_reservado) AS reservadas,"
+                + " SUM(va.stock_fisico * p.precio_compra) AS valor_costo,"
+                + " SUM(va.stock_fisico * p.precio_venta) AS valor_venta,"
+                + " COALESCE(SUM(t.unidades), 0) AS en_camino, COALESCE(SUM(t.valor), 0) AS valor_en_camino"
+                + " FROM variante va JOIN producto p ON p.id = va.producto_id"
+                + " JOIN categoria c ON c.id = p.categoria_id" + CAMINO
+                + " WHERE (va.stock_fisico > 0 OR t.unidades > 0)" + filtrosValorizacion(categoriaId, incluirInactivas)
+                + " GROUP BY " + grupo;
+        return jdbc.query(sql, parametrosValorizacion(categoriaId), (rs, n) -> new AcumuladoValorizacion(
+                rs.getLong("id"), rs.getString("codigo"), rs.getString("nombre"), rs.getString("categoria"),
+                rs.getBigDecimal("fisicas").longValue(), rs.getBigDecimal("reservadas").longValue(),
+                rs.getBigDecimal("valor_costo"), rs.getBigDecimal("valor_venta"),
+                rs.getBigDecimal("en_camino").longValue(), rs.getBigDecimal("valor_en_camino")));
+    }
+
+    /** Productos distintos con existencias y precio de compra 0 (su valor a costo es 0), con los mismos filtros. */
+    public long productosConCostoCero(Long categoriaId, boolean incluirInactivas) {
+        String sql = "SELECT COUNT(DISTINCT p.id) FROM variante va JOIN producto p ON p.id = va.producto_id"
+                + " WHERE va.stock_fisico > 0 AND p.precio_compra = 0"
+                + filtrosValorizacion(categoriaId, incluirInactivas);
+        Long n = jdbc.queryForObject(sql, parametrosValorizacion(categoriaId), Long.class);
+        return n == null ? 0 : n;
+    }
+
+    private static final String CAMINO = " LEFT JOIN (SELECT dp.variante_id AS variante_id,"
+            + " SUM(dp.cantidad_aprobada) AS unidades, SUM(dp.cantidad_aprobada * dp.costo_estimado) AS valor"
+            + " FROM detalle_plan dp JOIN plan_compra pc ON pc.id = dp.plan_id WHERE pc.estado = 'APROBADO'"
+            + " GROUP BY dp.variante_id) t ON t.variante_id = va.id";
+
+    private static String filtrosValorizacion(Long categoriaId, boolean incluirInactivas) {
+        return (incluirInactivas ? "" : " AND va.activo = TRUE AND p.activo = TRUE")
+                + (categoriaId != null ? " AND p.categoria_id = :categoriaId" : "");
+    }
+
+    private static MapSqlParameterSource parametrosValorizacion(Long categoriaId) {
+        MapSqlParameterSource p = new MapSqlParameterSource();
+        if (categoriaId != null) {
+            p.addValue("categoriaId", categoriaId);
+        }
+        return p;
     }
 
     /** Nombre de la categoría, o null si no existe. */

@@ -1,6 +1,14 @@
 package co.livorno.controlstock.reporte;
 
+import co.livorno.controlstock.compra.dto.AprobarPlanRequest;
+import co.livorno.controlstock.compra.dto.CrearPlanRequest;
+import co.livorno.controlstock.compra.dto.LineaPlanRequest;
+import co.livorno.controlstock.compra.dto.PlanCompraDetalleResponse;
+import co.livorno.controlstock.compra.servicio.PlanCompraService;
 import co.livorno.controlstock.comun.seguridad.UsuarioAutenticado;
+import co.livorno.controlstock.inventario.dto.CrearReservaRequest;
+import co.livorno.controlstock.inventario.dto.LineaReservaRequest;
+import co.livorno.controlstock.inventario.servicio.ReservaService;
 import co.livorno.controlstock.inventario.dto.EntradaRequest;
 import co.livorno.controlstock.inventario.dto.LineaEntradaRequest;
 import co.livorno.controlstock.inventario.servicio.OperacionInventarioService;
@@ -37,6 +45,9 @@ public class DatosReporte {
     private final VentaService ventas;
     private final DevolucionService devoluciones;
     private final OperacionInventarioService operaciones;
+    private ReservaService reservas;
+    private PlanCompraService planes;
+    private final List<Long> planesCreados = new ArrayList<>();
     private final String sufijo = Long.toString(System.nanoTime(), 36).toUpperCase();
     private final List<Long> usuarios = new ArrayList<>();
     private final List<Long> categorias = new ArrayList<>();
@@ -53,6 +64,13 @@ public class DatosReporte {
         this.operaciones = operaciones;
         adminId = usuario(nombreAdmin, "ADMIN");
         vendedorId = usuario("Vendedor Reporte", "VENDEDOR");
+    }
+
+    /** Habilita {@link #reservar} y {@link #pedidoEnCamino}. */
+    public DatosReporte conReservasYPlanes(ReservaService reservas, PlanCompraService planes) {
+        this.reservas = reservas;
+        this.planes = planes;
+        return this;
     }
 
     public String sufijo() {
@@ -143,6 +161,25 @@ public class DatosReporte {
         }
     }
 
+    /** Aparta unidades como VENDEDOR para un cliente de prueba. */
+    public void reservar(Long varianteId, int cantidad, String clienteNombre, String clienteContacto) {
+        como(vendedorId, "VENDEDOR", () -> reservas.crear(new CrearReservaRequest(clienteNombre, clienteContacto,
+                null, List.of(new LineaReservaRequest(varianteId, cantidad)))).size());
+    }
+
+    /** Plan manual creado por INVENTARIO y aprobado por ADMIN: queda en camino. */
+    public void pedidoEnCamino(Long varianteId, int cantidad, String costoEstimado) {
+        PlanCompraDetalleResponse plan = como(adminId, "ADMIN", () -> planes.crear(new CrearPlanRequest(null,
+                List.of(new LineaPlanRequest(varianteId, cantidad, new BigDecimal(costoEstimado))))));
+        planesCreados.add(plan.id());
+        como(adminId, "ADMIN", () -> planes.aprobar(plan.id(), new AprobarPlanRequest(plan.version())).id());
+    }
+
+    /** Desactiva la variante por SQL (preparación; los servicios la bloquean si hay reservas). */
+    public void desactivarVariante(Long varianteId) {
+        jdbc.update("UPDATE variante SET activo = FALSE WHERE id = ?", varianteId);
+    }
+
     /** Borra todo lo creado, en orden de dependencias (alertas y reservas antes que las variantes). */
     public void limpiar() {
         SecurityContextHolder.clearContext();
@@ -156,6 +193,10 @@ public class DatosReporte {
             jdbc.update("DELETE FROM reserva WHERE variante_id IN " + variantes);
             jdbc.update("DELETE FROM analitica_variante WHERE variante_id IN " + variantes);
             jdbc.update("DELETE FROM detalle_venta WHERE variante_id IN " + variantes);
+            jdbc.update("DELETE FROM detalle_plan WHERE variante_id IN " + variantes);
+        }
+        if (!planesCreados.isEmpty()) {
+            jdbc.update("DELETE FROM plan_compra WHERE id IN (" + csv(planesCreados) + ")");
         }
         if (!usuarios.isEmpty()) {
             jdbc.update("DELETE FROM venta WHERE usuario_id IN (" + csv(usuarios) + ")");
