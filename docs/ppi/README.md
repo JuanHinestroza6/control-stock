@@ -10,3 +10,13 @@ listos para renderizar y pegar en el documento Word del PPI.
   Fase 6 (compras): `estados-plan-compra.puml` (máquina de estados del plan), `clases-fase6-compra.puml` (módulo `compra` y sus puertos con `inventario` y `analitica`), `secuencia-plan-compra.puml` (sugerir, aprobar y recibir).
 
 Renderizar: extensión PlantUML de VSCode (Alt+D para vista previa) o https://www.plantuml.com/plantuml
+
+Fase 7 (vistas generales): `paquetes-modulos.puml` (módulos y dependencias según ArchUnit y ADR-011, con los puertos), `componentes-sistema.puml` (SPA, API por módulos, MySQL, tareas programadas, generadores PDF/Excel), `despliegue-objetivo.puml` (objetivo de ADR-001; hoy MySQL en Docker Compose, backend con Maven y frontend con Vite) y `casos-uso-general.puml` (CU-01 a CU-18 por rol).
+
+Validar la sintaxis (no requiere Graphviz; para renderizar sin Graphviz use `!pragma layout smetana`), desde la raíz del repositorio en Git Bash:
+
+```
+java -jar "$USERPROFILE/.vscode/extensions/jebbs.plantuml-2.18.1/plantuml.jar" -checkonly docs/ppi/diagramas/*.puml
+```
+
+Sin salida y código 0 significa que la sintaxis es correcta.

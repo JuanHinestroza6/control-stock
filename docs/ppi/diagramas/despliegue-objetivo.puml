@@ -1,0 +1,37 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+title Diagrama de despliegue - Objetivo de ADR-001 y entorno actual de desarrollo
+
+node "Navegador web (equipo del usuario)" as Nav {
+  artifact "SPA React\n(HTML, JS, CSS)" as Spa
+}
+
+node "Servidor de aplicación (objetivo)" as Srv {
+  node "JVM 21" as Jvm {
+    artifact "control-stock.jar\n(Spring Boot 4.1.1)" as Jar
+  }
+  artifact "Estáticos del frontend\n(npm run build)" as Est
+}
+
+node "Servidor de base de datos (objetivo)" as Db {
+  database "MySQL 8.4 LTS\ncontrol_stock" as Mysql
+}
+
+Nav --> Est : HTTPS (descarga de estáticos)
+Spa --> Jar : HTTPS (API REST /api, JSON + JWT)
+Jar --> Mysql : JDBC (TCP 3306)
+
+note bottom of Srv
+  Decisión D6 (fase 7): no se agrega un Dockerfile nuevo.
+  El despliegue objetivo (ADR-001) es un JAR + MySQL + estáticos del frontend;
+  el HTTPS lo aporta el servidor o proxy donde se instale.
+end note
+note bottom of Nav
+  Entorno actual (desarrollo local): Docker Compose levanta solo MySQL;
+  el backend corre con Maven (mvnw spring-boot:run, puerto 8080)
+  y el frontend con Vite (npm run dev, puerto 5173), por HTTP.
+end note
+@enduml
