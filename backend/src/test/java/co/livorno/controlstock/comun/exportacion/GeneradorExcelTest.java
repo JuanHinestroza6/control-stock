@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 
 class GeneradorExcelTest {
 
-    private final ExportadorDocumentos exportador = new ExportadorDocumentos(new GeneradorExcel());
+    private final ExportadorDocumentos exportador = new ExportadorDocumentos(new GeneradorExcel(), new GeneradorPdf());
 
     private static final List<ColumnaReporte> COLUMNAS = List.of(
             ColumnaReporte.texto("Producto", 24),
