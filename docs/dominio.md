@@ -338,6 +338,34 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. Desde la Fas
   `inventario.servicio.ConsultaPedidosEnCamino` (implementado en `compra`) y `compra.servicio.FuenteSugerenciaCompra`
   (implementado en `analitica`). `compra` no depende de `venta` ni de `analitica`.
 
+## Reportes y panel (ADR-011)
+
+- **Solo lectura**: módulo `reporte` con consultas SQL agregadas (`readOnly`); nunca toca stock ni kardex. Solo cuentan
+  ventas REGISTRADA; las ANULADAS solo aparecen en la sección de anuladas del libro de ventas.
+- **Métricas** por línea (q cantidad, pl `precioLista`, pu `precioUnitario`, c `costoUnitario`, d devuelto total, dn
+  devuelto no apto): ventas a lista Σ q·pl; descuentos Σ q·(pl − pu); facturado Σ q·pu; devoluciones Σ d·pu; **ingreso
+  neto** Σ (q − d)·pu (igual que Más vendidos); **costo de ventas** Σ (q − d)·c; **margen bruto** = neto − costo, % sobre
+  el neto (escala 1, null si el neto es 0); **merma no apta** Σ dn·c en columna aparte ("resultado después de mermas").
+  Dinero escala 2 HALF_UP. El costo es el último costo de entrada (ADR-006): el margen es aproximado.
+- **Rentabilidad** (REQ-03, CU-06): rango por fecha de venta, categoría opcional, agrupación CATEGORIA, PRODUCTO o
+  VARIANTE, orden por margen, ingreso o unidades. Las devoluciones cuentan en la **fecha de la venta**.
+- **Libro de ventas** (REQ-07, CU-07): por DIA o MES; ventas por fecha de venta y devoluciones por **fecha de la
+  devolución** (con el reverso de su costo). Sobre un rango que cubra la venta y sus devoluciones, concilia con la
+  rentabilidad. Sección de anuladas (número, fecha, total, anulada en y por, motivo). El detalle solo en Excel, máximo
+  50.000 filas (422 "Acote el rango").
+- **Valorización** (REQ-07): al momento de la consulta; físico × `precioCompra` actual (incluye lo reservado y, por
+  defecto, las variantes inactivas con físico > 0), valor a precio de venta y margen potencial; lo en camino es
+  informativo y no suma.
+- **Rangos**: inclusivos, máximo 731 días; `desde > hasta` o fecha futura → 400; por defecto del día 1 del mes en curso
+  hasta hoy (America/Bogota). Un periodo sin ventas responde 200 con "No hay ventas en el periodo".
+- **Exportación**: `GET …/exportar?formato=PDF|XLSX`, mismos filtros y mismo servicio que la consulta (lo exportado = lo
+  mostrado), `Cache-Control: no-store`. Tendencias se exporta a PDF (CU-05) con un resumen calculado.
+- **Ley 1581**: los reportes y el panel nunca incluyen nombre ni contacto de clientes (el panel solo cuenta apartados).
+- **Panel de inicio** (`GET /api/panel`): ventas de hoy y del mes (ADMIN, VENDEDOR, CONTABILIDAD); margen del mes y valor
+  del inventario a costo y a precio de venta (ADMIN, CONTABILIDAD); inventario (todos); apartados (ADMIN, INVENTARIO,
+  VENDEDOR); compras en camino y atrasadas (ADMIN, INVENTARIO, CONTABILIDAD). Las secciones no permitidas llegan `null`.
+- **Rendimiento (RNF-03)**: consultas de inventario y reportes < 3 s con hasta 10.000 registros.
+
 ## Datos semilla (ADR-008)
 
 - **Propósito**: 36 meses de historia de demostración (35 completos al cerrar; Holt-Winters compite desde 30 meses,
@@ -392,7 +420,9 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. Desde la Fas
 | Alertas | Ver / atender | Ver / atender | Ver | — |
 | Analítica (ABC, ROP, pronóstico, tendencias) | Sí | Ver | Más vendidos | Ver |
 | Plan de compras | CRUD / aprobar / recibir | Crear y editar borrador / recibir | — | Ver |
-| Reportes contables / rentabilidad | Sí | — | — | Sí |
+| Reportes contables / rentabilidad (y su exportación) | Sí | — | — | Sí |
+| Panel de inicio | Completo | Sin ventas ni costos | Sin costos ni compras | Sin apartados |
+| Exportar tendencias (PDF) | Sí | Sí | — | Sí |
 
 Notas de la matriz (Fase 2): la consulta de inventario actual (stock por variante, sin costos) está abierta a todo
 usuario autenticado porque el VENDEDOR la usa para buscar al vender. Anular ventas: solo ADMIN. Los costos (`precioCompra`,
@@ -409,20 +439,24 @@ Notas de la matriz (Fase 6): en Plan de compras, INVENTARIO crea y edita borrado
 escribir. Tendencias y pronóstico: ADMIN, INVENTARIO y CONTABILIDAD; VENDEDOR solo "Más vendidos" (403 en compras,
 tendencias y pronósticos).
 
+Notas de la matriz (Fase 7, ADR-011): reportes y su exportación solo ADMIN y CONTABILIDAD (VENDEDOR e INVENTARIO 403).
+El panel es para todos, con secciones según el rol decididas en el servidor; el margen y los valores a costo solo los ven
+ADMIN y CONTABILIDAD. Exportar tendencias: los mismos roles que verlas.
+
 ## Trazabilidad con el documento PPI
 
 | Requisito PPI | Módulo |
 |---|---|
 | REQ-01 Visualizar stock y atributos en tiempo real (CU-04) | catalogo, inventario |
 | REQ-02 Registrar automáticamente operaciones de stock (CU-03) | inventario |
-| REQ-03 Reportes de rentabilidad | reporte |
+| REQ-03 Generar reportes de rentabilidad (CU-06; Fase 7, ADR-011) | reporte |
 | REQ-04 Emitir alertas de nivel mínimo de stock (CU-10) | inventario (alertas) + analitica (ROP) |
 | REQ-05 Identificar Productos de Mayor Venta (CU-08) | analitica |
 | REQ-06 Controlar el acceso y roles de usuario (CU-02) | auth, usuario |
-| REQ-07 Reportes contables | reporte |
+| REQ-07 Elaborar reportes contables automáticos (CU-07; Fase 7: libro de ventas y valorización) | reporte |
 | REQ-08 Gestionar el registro de devoluciones (CU-09) | venta |
-| REQ-09 Tendencias históricas (CU-05; Fase 6, PDF en Fase 7) | analitica |
-| REQ-10 Planeación de compras (CU-16, CU-17, CU-18 nuevos; Fase 6, ADR-010) | compra + analitica (pronóstico, sugerencia) + inventario (posición, recepción) |
+| REQ-09 Analizar tendencias históricas de venta (CU-05; Fase 6, PDF en Fase 7) | analitica |
+| REQ-10 Optimizar la planeación de compras (CU-01 del Word; detalle en CU-16, CU-17, CU-18 nuevos; Fase 6, ADR-010) | compra + analitica (pronóstico, sugerencia) + inventario (posición, recepción) |
 | REQ-11 Gestión de productos (CU-11) | catalogo |
 | REQ-12 Registrar y gestionar usuarios (CU-12) | usuario |
 | REQ-13 Gestionar apartados (CU-14, nuevo) | inventario (reservas), venta (conversión) |
@@ -445,6 +479,6 @@ Nota: en el documento PPI, REQ-08 y REQ-09 tienen nombre y descripción cruzados
 |---|---|---|---|---|
 | RNF-01 Disponibilidad en el sistema | Gerencia | — | Alta | infraestructura (Docker Compose, `/actuator/health`) |
 | RNF-02 Seguridad y control | Gerencia | NEC-06 | Alta | auth, usuario, comun (CU-13 Iniciar sesión) |
-| RNF-03 Rendimiento de consultas | Contabilidad | NEC-01, NEC-03 | Media | reporte, analitica, inventario (consultas e índices) |
+| RNF-03 Rendimiento de consultas (< 3 s con hasta 10.000 registros; Fase 7) | Contabilidad | NEC-01, NEC-03 | Media | reporte, analitica, inventario (consultas e índices) |
 | RNF-04 Usabilidad de la interfaz | Vendedores | NEC-02, NEC-05 | Media | frontend |
 | RNF-05 Escalabilidad del sistema | Junta directiva | NEC-09, NEC-10 | Alta | transversal |

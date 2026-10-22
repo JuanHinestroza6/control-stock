@@ -96,6 +96,11 @@ public class ProductoController {
 - Rutas en plural y español: `/api/productos`, `/api/variantes/{id}/movimientos`.
 - Listados siempre paginados (`Page<T>`), tamaño por defecto 20, máximo 100.
 - Roles según la matriz de `docs/dominio.md`.
+- Exportación de reportes (ADR-011): endpoint hermano `GET …/exportar?formato=PDF|XLSX` con los mismos filtros y el
+  mismo servicio que el JSON. El servicio arma un `DocumentoTabular` (`comun.exportacion`) y `ExportadorDocumentos` lo
+  convierte en `ArchivoExportado`; el controller responde `ResponseEntity<byte[]>` con `Content-Type` explícito,
+  `Content-Disposition: attachment; filename="..."` y `Cache-Control: no-store`. Los errores de filtros siguen siendo
+  400 `ProblemDetail` (no se usa negociación por `Accept`).
 
 ## Errores
 
