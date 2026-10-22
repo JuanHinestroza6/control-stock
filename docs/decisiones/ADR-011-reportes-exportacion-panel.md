@@ -46,7 +46,7 @@ la medición de rendimiento (RNF-03: < 3 s con hasta 10.000 registros). Había v
    reservas. Reutiliza los endpoints de alertas, Más vendidos y última ejecución con sus roles.
 6. **Ley 1581**: ninguna consulta de `reporte` selecciona `cliente_nombre` ni `cliente_contacto`; una prueba busca el
    nombre del cliente en los bytes del PDF y del XLSX.
-7. **Rendimiento (RNF-03)**: prueba `RendimientoReportesIT` con ~12.000 ventas insertadas por JDBC en el contenedor de
+7. **Rendimiento (RNF-03)**: prueba `RendimientoReportesTest` con ~12.000 ventas insertadas por JDBC en el contenedor de
    prueba (peor de 5 corridas < 3 s y `EXPLAIN` sin recorrido completo de venta, detalle_venta ni movimiento) y medición
    real sobre la semilla de 36 meses. Migración de índices solo si el `EXPLAIN` lo exige.
 

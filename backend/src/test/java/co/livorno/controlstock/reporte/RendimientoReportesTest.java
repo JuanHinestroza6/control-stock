@@ -62,7 +62,7 @@ import org.testcontainers.mysql.MySQLContainer;
 @SpringBootTest
 @AutoConfigureMockMvc
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class RendimientoReportesIT {
+class RendimientoReportesTest {
 
     private static final ZoneId BOGOTA = ZoneId.of("America/Bogota");
     private static final String CLAVE = "Clave123!";

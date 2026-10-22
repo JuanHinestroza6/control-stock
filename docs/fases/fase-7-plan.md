@@ -80,7 +80,7 @@ Rama: `fase-7-cierre-entrega`.
   - Excel: formatos numéricos, primera fila fija, autofiltro y hoja Notas.
   - PDF: carta horizontal, con encabezado, filtros, "Generado por… el…", totales y "Página n de m".
 - **R8 Rendimiento**:
-  - `RendimientoReportesIT`: unas 12.000 ventas por JDBC en el contenedor; peor de 5 corridas < 3 s; `EXPLAIN` sin `ALL` sobre venta, detalle_venta ni movimiento.
+  - `RendimientoReportesTest`: unas 12.000 ventas por JDBC en el contenedor; peor de 5 corridas < 3 s; `EXPLAIN` sin `ALL` sobre venta, detalle_venta ni movimiento.
   - Además, medición real sobre la semilla con `Measure-Command`.
 - **R9 Índices**: V17 solo si el `EXPLAIN` lo pide.
 - **R10 Ley 1581**: ningún reporte selecciona datos de cliente. Una prueba busca el nombre del cliente en los bytes del PDF y del XLSX.
