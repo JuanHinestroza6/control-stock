@@ -87,3 +87,18 @@ export function puedeCancelarPlan(rol: Rol | undefined, estado: EstadoPlan): boo
   if (rol === 'INVENTARIO') return estado === 'BORRADOR'
   return false
 }
+
+/** Reportes de rentabilidad, libro de ventas y valorización: ADMIN y CONTABILIDAD. */
+export function puedeVerReportes(rol: Rol | undefined): boolean {
+  return rol === 'ADMIN' || rol === 'CONTABILIDAD'
+}
+
+/** Valores a costo y margen en el panel: ADMIN y CONTABILIDAD. */
+export function puedeVerValoresCosto(rol: Rol | undefined): boolean {
+  return rol === 'ADMIN' || rol === 'CONTABILIDAD'
+}
+
+/** Exportar tendencias (PDF/Excel): ADMIN, INVENTARIO y CONTABILIDAD. */
+export function puedeExportarTendencias(rol: Rol | undefined): boolean {
+  return rol === 'ADMIN' || rol === 'INVENTARIO' || rol === 'CONTABILIDAD'
+}

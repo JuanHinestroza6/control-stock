@@ -13,6 +13,8 @@ import type {
   ResumenAbcResponse,
   TendenciaResponse,
 } from '../tipos/analitica'
+import { leerArchivo, normalizarErrorBlob, type ArchivoDescargado } from '../lib/descarga'
+import type { FormatoExportacion } from '../tipos/reportes'
 import { cliente } from './cliente'
 
 type Params = Record<string, string | number | boolean>
@@ -108,6 +110,19 @@ export function parametrosPronosticos(f: FiltrosPronosticos): Params {
 export async function obtenerTendencias(filtros: FiltrosTendencias): Promise<TendenciaResponse> {
   const { data } = await cliente.get<TendenciaResponse>('/analitica/tendencias', { params: parametrosTendencias(filtros) })
   return data
+}
+
+/** Exporta las tendencias con los mismos filtros de la consulta (ADMIN, INVENTARIO, CONTABILIDAD). */
+export async function exportarTendencias(filtros: FiltrosTendencias, formato: FormatoExportacion): Promise<ArchivoDescargado> {
+  try {
+    const respuesta = await cliente.get<Blob>('/analitica/tendencias/exportar', {
+      params: { ...parametrosTendencias(filtros), formato },
+      responseType: 'blob',
+    })
+    return leerArchivo(respuesta, `tendencias.${formato.toLowerCase()}`)
+  } catch (error) {
+    return normalizarErrorBlob(error)
+  }
 }
 
 export async function listarPronosticos(filtros: FiltrosPronosticos): Promise<PaginaPronosticos> {

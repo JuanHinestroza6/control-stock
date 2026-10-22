@@ -17,6 +17,9 @@ import {
   puedeAprobarPlan,
   puedeRecibirPlan,
   puedeCancelarPlan,
+  puedeVerReportes,
+  puedeVerValoresCosto,
+  puedeExportarTendencias,
 } from './permisos'
 
 describe('puedeEditarCatalogo', () => {
@@ -95,5 +98,16 @@ describe('permisos de la fase 6', () => {
     expect(puedeCancelarPlan('VENDEDOR', 'BORRADOR')).toBe(false)
     expect(puedeCancelarPlan('CONTABILIDAD', 'BORRADOR')).toBe(false)
     expect(puedeCancelarPlan(undefined, 'BORRADOR')).toBe(false)
+  })
+})
+
+describe('permisos de la fase 7', () => {
+  const roles = ['ADMIN', 'INVENTARIO', 'VENDEDOR', 'CONTABILIDAD', undefined] as const
+  it('puedeVerReportes y puedeVerValoresCosto', () => {
+    expect(roles.map(puedeVerReportes)).toEqual([true, false, false, true, false])
+    expect(roles.map(puedeVerValoresCosto)).toEqual([true, false, false, true, false])
+  })
+  it('puedeExportarTendencias', () => {
+    expect(roles.map(puedeExportarTendencias)).toEqual([true, true, false, true, false])
   })
 })
