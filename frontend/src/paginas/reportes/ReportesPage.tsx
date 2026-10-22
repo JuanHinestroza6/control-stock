@@ -1,6 +1,7 @@
 import { useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router'
 import { Tarjeta } from '../../componentes/ui/Tarjeta'
+import { PestanaLibroVentas } from './PestanaLibroVentas'
 import { PestanaRentabilidad } from './PestanaRentabilidad'
 
 type ClavePestana = 'rentabilidad' | 'libro-ventas' | 'valorizacion'
@@ -14,7 +15,7 @@ const PESTANAS: { clave: ClavePestana; etiqueta: string }[] = [
 
 const contenido: Record<ClavePestana, () => ReactNode> = {
   rentabilidad: () => <PestanaRentabilidad />,
-  'libro-ventas': () => <Tarjeta>Libro de ventas.</Tarjeta>,
+  'libro-ventas': () => <PestanaLibroVentas />,
   valorizacion: () => <Tarjeta>Valorización del inventario.</Tarjeta>,
 }
 
