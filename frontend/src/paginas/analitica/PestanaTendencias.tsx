@@ -1,4 +1,5 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
+import { BotonExportar } from '../../componentes/ui/BotonExportar'
 import { EstadoCarga, EstadoError, EstadoVacio } from '../../componentes/ui/Estados'
 import { Selector } from '../../componentes/ui/Selector'
 import { Tabla, type Columna } from '../../componentes/ui/Tabla'
@@ -6,9 +7,12 @@ import { Tarjeta } from '../../componentes/ui/Tarjeta'
 import { useTendencias } from '../../hooks/useAnalitica'
 import { useCategorias } from '../../hooks/useCategorias'
 import { useProductos } from '../../hooks/useProductos'
+import { useExportarTendencias } from '../../hooks/useReportes'
+import { useSesion } from '../../hooks/useSesion'
 import { mensajeError } from '../../lib/errores'
 import { formatearMoneda } from '../../lib/formato'
 import { mesRelativo } from '../../lib/meses'
+import { puedeExportarTendencias } from '../../lib/permisos'
 import type { FiltrosTendencias, PuntoTendencia } from '../../tipos/analitica'
 
 // Recharts pesa: el gráfico se descarga solo al abrir esta pestaña.
@@ -48,6 +52,8 @@ export function PestanaTendencias() {
   const [producto, setProducto] = useState('')
   const [metrica, setMetrica] = useState<Metrica>('UNIDADES')
 
+  const { usuario } = useSesion()
+  const exportar = useExportarTendencias()
   const categorias = useCategorias()
   const productos = useProductos({
     ...(categoria ? { categoriaId: Number(categoria) } : {}),
@@ -130,6 +136,10 @@ export function PestanaTendencias() {
         />
         <Selector etiqueta="Métrica" opciones={METRICAS} value={metrica} onChange={(e) => setMetrica(e.target.value as Metrica)} />
       </Tarjeta>
+
+      {puedeExportarTendencias(usuario?.rol) && (
+        <BotonExportar nombre="tendencias" exportar={(formato) => exportar.mutateAsync({ filtros, formato })} />
+      )}
 
       {consulta.isPending ? (
         <EstadoCarga />
