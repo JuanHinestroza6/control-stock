@@ -4,9 +4,9 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
 
 ## Estado actual
 
-- Semana: 4
-- Fase en curso: 6 — Predicción y compras **terminada**; T2 real por API y base de datos hecha (2026-10-21). Rama
-  `fase-6-prediccion-compras`, PR #10 abierto sin merge; falta la revisión visual del usuario por la interfaz
+- Semana: 5
+- Fase en curso: 7 — Cierre de entrega, **núcleo terminado** (punto de corte del plan). Rama `fase-7-cierre-entrega`,
+  sin push. Plan: docs/fases/fase-7-plan.md; ADR-011
 - Última actualización: 2026-10-21
 
 ## Hecho
@@ -56,9 +56,21 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
       16 → 0. Segunda carga sin borrar: no hizo nada. Observación: la corrección por agotados recupera ≈ 0,3× de las
       unidades perdidas (esperado 0,5×–2×)
 
+- [x] Fase 7 — plan y ADR-011 (D1–D6 confirmadas: 3 reportes + movimientos después del corte, devoluciones en fecha
+      mixta, merma aparte, costos del panel solo ADMIN/CONTABILIDAD, corrección por agotados sin cambio, sin Dockerfile);
+      textos del Word de REQ-03, REQ-07, RNF-03, REQ-09 y REQ-10 en el anexo del plan
+- [x] Fase 7 — núcleo: POI 5.4.1 y OpenPDF 2.0.3; `comun.exportacion` (Excel y PDF); módulo `reporte` con rentabilidad,
+      libro de ventas, valorización, `/exportar` y panel por rol; exportar tendencias a PDF (con gráfico y resumen) y
+      Excel; frontend con panel de inicio, página Reportes (3 pestañas, gráfico de margen, respaldo de formato) y exportar
+      en Tendencias; T1 rendimiento con 12.150 ventas: todo < 0,5 s (peor: libro XLSX 24 meses 430 ms), EXPLAIN sin
+      recorrido completo, sin índices nuevos; T2 flujo por HTTP (conciliación, Ley 1581 en bytes, matriz de roles).
+      Diagramas de paquetes, componentes, despliegue y casos de uso general. Backend 1380/1380, frontend 635/635
+
 ## En curso
 
-- [ ] Fase 6 — revisión visual del usuario (paso 4 de la guía T2, por la interfaz) y merge del PR #10
+- [ ] Fase 7 — después del corte: B9 movimientos del periodo (+ F7), B10 unidades perdidas comparables en la semilla,
+      T3 guía T2 real y guion de sustentación, D1 fichas (REQ-03, REQ-07, RNF-03, REQ-09, REQ-10, REQ-01), D2 clases
+      general y secuencia "exportar", D3 trazabilidad final; revisión (`revisor`)
 
 ## Próximos pasos
 
