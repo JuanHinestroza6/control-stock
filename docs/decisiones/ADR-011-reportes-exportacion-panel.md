@@ -43,7 +43,9 @@ la medición de rendimiento (RNF-03: < 3 s con hasta 10.000 registros). Había v
    (CU-06 alt. 2). El PDF de tendencias incluye un resumen calculado con las cifras (CU-05 paso 6).
 5. **Panel**: `GET /api/panel` agregado, con secciones en `null` según el rol decididas en el servidor. Margen y valor a
    costo solo para ADMIN y CONTABILIDAD; INVENTARIO no ve ventas; VENDEDOR no ve compras ni costos; CONTABILIDAD no ve
-   reservas. Reutiliza los endpoints de alertas, Más vendidos y última ejecución con sus roles.
+   reservas. Reutiliza Más vendidos y la última ejecución con sus roles. Los conteos de agotadas, bajo stock y sin
+   rotación van solo en las tarjetas de Inventario; el bloque de alertas lista las más urgentes
+   (`GET /api/alertas/urgentes`, ver dominio "Alertas") con enlace a Alertas, sin repetir los conteos.
 6. **Ley 1581**: ninguna consulta de `reporte` selecciona `cliente_nombre` ni `cliente_contacto`; una prueba busca el
    nombre del cliente en los bytes del PDF y del XLSX.
 7. **Rendimiento (RNF-03)**: prueba `RendimientoReportesTest` con ~12.000 ventas insertadas por JDBC en el contenedor de

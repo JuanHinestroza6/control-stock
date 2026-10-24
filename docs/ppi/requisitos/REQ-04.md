@@ -130,6 +130,7 @@ STOCK_BAJO con la posición de inventario (disponible más pedidos aprobados en 
 |---|---|
 | `GET /api/alertas?estado&tipo&page&size` | ADMIN, INVENTARIO, VENDEDOR |
 | `GET /api/alertas/resumen` | ADMIN, INVENTARIO, VENDEDOR |
+| `GET /api/alertas/urgentes?limite` (fase 7, bloque del panel: AGOTADO por umbral y antigüedad, STOCK_BAJO por cobertura; 1–20, 5 por defecto) | ADMIN, INVENTARIO, VENDEDOR |
 | `POST /api/alertas/{id}/atender` | ADMIN, INVENTARIO |
 | `GET /api/analitica/reorden` (Fase 5) | ADMIN, INVENTARIO, CONTABILIDAD |
 | `POST /api/analitica/recalcular` (Fase 5, re-evalúa todas las alertas; Fase 6, incluye el pronóstico) | ADMIN |

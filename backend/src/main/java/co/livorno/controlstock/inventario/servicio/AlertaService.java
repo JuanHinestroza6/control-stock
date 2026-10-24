@@ -8,6 +8,7 @@ import co.livorno.controlstock.catalogo.repositorio.VarianteRepository;
 import co.livorno.controlstock.inventario.modelo.TipoAlerta;
 import co.livorno.controlstock.inventario.repositorio.AlertaRepository;
 import co.livorno.controlstock.comun.excepcion.RecursoNoEncontradoException;
+import co.livorno.controlstock.comun.excepcion.SolicitudInvalidaException;
 import co.livorno.controlstock.comun.web.Ordenamiento;
 import co.livorno.controlstock.inventario.dto.AlertaResponse;
 import co.livorno.controlstock.inventario.dto.ResumenAlertasResponse;
@@ -17,11 +18,13 @@ import co.livorno.controlstock.usuario.modelo.Usuario;
 import co.livorno.controlstock.usuario.repositorio.UsuarioRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -68,6 +71,46 @@ public class AlertaService {
                 .filter(Objects::nonNull).distinct().toList()).stream()
                 .collect(Collectors.toMap(Usuario::getId, Usuario::getNombre, (a, b) -> a));
         return pagina.map(a -> AlertaResponse.de(a, a.getAtendidaPor() == null ? null : nombres.get(a.getAtendidaPor())));
+    }
+
+    /**
+     * Alertas de stock ACTIVAS más urgentes para el panel de inicio: primero AGOTADO por mayor umbral (más demanda
+     * esperada: un agotado con umbral 0 no tiene demanda) y antigüedad, luego STOCK_BAJO por menor cobertura
+     * (disponible / umbral) y antigüedad. SIN_ROTACION no es una urgencia de stock y no entra. 400 si {@code limite} no
+     * está entre 1 y {@value #LIMITE_URGENTES_MAXIMO}.
+     */
+    @Transactional(readOnly = true)
+    public List<AlertaResponse> urgentes(Integer limite) {
+        int n = limite != null ? limite : LIMITE_URGENTES_POR_DEFECTO;
+        if (n < 1 || n > LIMITE_URGENTES_MAXIMO) {
+            throw new SolicitudInvalidaException("limite",
+                    "El límite debe estar entre 1 y " + LIMITE_URGENTES_MAXIMO + ".");
+        }
+        List<Alerta> agotadas = alertas.buscar(EstadoAlerta.ACTIVA, TipoAlerta.AGOTADO, Pageable.unpaged()).getContent();
+        List<Alerta> bajas = alertas.buscar(EstadoAlerta.ACTIVA, TipoAlerta.STOCK_BAJO, Pageable.unpaged()).getContent();
+        return Stream.concat(agotadas.stream().sorted(POR_DEMANDA), bajas.stream().sorted(POR_COBERTURA))
+                .limit(n)
+                .map(a -> AlertaResponse.de(a, null))
+                .toList();
+    }
+
+    static final int LIMITE_URGENTES_POR_DEFECTO = 5;
+    static final int LIMITE_URGENTES_MAXIMO = 20;
+
+    /** Umbral descendente, luego la más antigua. */
+    private static final Comparator<Alerta> POR_DEMANDA = Comparator
+            .comparingLong((Alerta a) -> umbral(a.getVariante())).reversed()
+            .thenComparing(Alerta::getCreadaEn).thenComparing(Alerta::getId);
+
+    /** disponible / umbral ascendente sin flotantes (d1·u2 vs d2·u1, umbral mínimo 1), luego la más antigua. */
+    private static final Comparator<Alerta> POR_COBERTURA = ((Comparator<Alerta>) (a, b) -> Long.compare(
+            a.getVariante().getStockDisponible() * Math.max(1, umbral(b.getVariante())),
+            b.getVariante().getStockDisponible() * Math.max(1, umbral(a.getVariante()))))
+            .thenComparing(Alerta::getCreadaEn).thenComparing(Alerta::getId);
+
+    /** Mismo umbral que muestra {@link AlertaResponse}. */
+    private static long umbral(Variante v) {
+        return v.getPuntoReorden() != null ? v.getPuntoReorden() : v.getStockMinimo();
     }
 
     @Transactional(readOnly = true)

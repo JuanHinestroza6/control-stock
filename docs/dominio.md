@@ -235,6 +235,9 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. Desde la Fas
   llega al usuario (la operación ya se confirmó). Variantes inactivas no generan alertas y no aparecen en el listado;
   desactivar una variante (o su producto) cierra todas sus alertas ACTIVAS.
 - Una sola alerta ACTIVA por variante y tipo, garantizada además por un índice único en la base.
+- **Más urgentes** (panel de inicio, fase 7): `GET /api/alertas/urgentes?limite` (1–20, 5 por defecto) devuelve las
+  AGOTADO activas por mayor umbral (más demanda esperada; umbral 0 = sin demanda) y antigüedad, y luego las STOCK_BAJO
+  por menor cobertura (disponible / umbral) y antigüedad. SIN_ROTACION no entra: no es una urgencia de stock.
 - Atender a mano una AGOTADO o STOCK_BAJO cuya condición sigue vigente la cierra; el siguiente movimiento de esa variante
   o la re-evaluación nocturna vuelve a abrirla.
 - **Re-evaluación nocturna** (Fase 5): la ejecución analítica re-evalúa todas las variantes (ver "Analítica"). Calcular el

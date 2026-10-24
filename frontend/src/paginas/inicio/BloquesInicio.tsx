@@ -1,8 +1,9 @@
 import { Link } from 'react-router'
+import { BadgeTipoAlerta } from '../../componentes/dominio/BadgeTipoAlerta'
 import { Badge } from '../../componentes/ui/Badge'
 import { EstadoCarga, EstadoError, EstadoVacio } from '../../componentes/ui/Estados'
 import { Tarjeta } from '../../componentes/ui/Tarjeta'
-import { useResumenAlertas } from '../../hooks/useAlertas'
+import { useAlertasUrgentes } from '../../hooks/useAlertas'
 import { useMasVendidos, useUltimaEjecucion } from '../../hooks/useAnalitica'
 import { mensajeError } from '../../lib/errores'
 import { formatearFecha, formatearMoneda } from '../../lib/formato'
@@ -10,28 +11,43 @@ import { hoyIso, restarDias } from '../../lib/rangoFechas'
 
 const num = (n: number) => n.toLocaleString('es-CO')
 
+const LIMITE_URGENTES = 5
+
+/** Las alertas de stock más urgentes; los conteos por tipo están solo en las tarjetas de Inventario del panel. */
 export function BloqueAlertas() {
-  const q = useResumenAlertas()
+  const q = useAlertasUrgentes(LIMITE_URGENTES)
   return (
     <Tarjeta>
-      <h2 className="text-base">Alertas activas</h2>
+      <h2 className="text-base">Alertas más urgentes</h2>
       {q.isPending ? (
-        <EstadoCarga filas={2} />
+        <EstadoCarga filas={3} />
       ) : q.isError ? (
         <EstadoError mensaje={mensajeError(q.error)} onReintentar={() => void q.refetch()} />
+      ) : q.data.length === 0 ? (
+        <EstadoVacio mensaje="Sin alertas de stock activas." />
       ) : (
-        <div className="mt-2">
-          <p className="font-titulo text-2xl font-bold">{num(q.data.activas)}</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <Badge tono="critico">Agotado {num(q.data.agotado)}</Badge>
-            <Badge tono="alerta">Stock bajo {num(q.data.stockBajo)}</Badge>
-            <Badge tono="neutro">Sin rotación {num(q.data.sinRotacion)}</Badge>
-          </div>
-          <Link to="/alertas" className="mt-3 inline-block text-sm text-acento hover:underline">
-            Ver alertas
-          </Link>
-        </div>
+        <ul className="mt-2 flex flex-col gap-2 text-sm">
+          {q.data.map((a) => (
+            <li key={a.id} className="flex items-start justify-between gap-2">
+              <span className="min-w-0">
+                <span className="block truncate">{a.productoNombre}</span>
+                <span className="block text-xs text-oxford/60">
+                  {a.sku} · {a.talla} · {a.color}
+                </span>
+              </span>
+              <span className="flex shrink-0 flex-col items-end gap-1">
+                <BadgeTipoAlerta tipo={a.tipo} />
+                <span className="text-xs text-oxford/70">
+                  {num(a.stockDisponible)} / {num(a.umbral)} u
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
+      <Link to="/alertas" className="mt-3 inline-block text-sm text-acento hover:underline">
+        Ver todas las alertas
+      </Link>
     </Tarjeta>
   )
 }

@@ -15,6 +15,7 @@ import co.livorno.controlstock.auth.config.ConfiguracionSeguridad;
 import co.livorno.controlstock.catalogo.modelo.Talla;
 import co.livorno.controlstock.comun.excepcion.ConflictoException;
 import co.livorno.controlstock.comun.excepcion.ManejadorGlobalExcepciones;
+import co.livorno.controlstock.comun.excepcion.SolicitudInvalidaException;
 import co.livorno.controlstock.comun.seguridad.UsuarioActual;
 import co.livorno.controlstock.comun.seguridad.UsuarioAutenticado;
 import co.livorno.controlstock.inventario.dto.AlertaResponse;
@@ -88,6 +89,30 @@ class AlertaControllerTest {
     void listarYResumen_contabilidad_devuelve403() throws Exception {
         mvc.perform(get("/api/alertas").with(authentication(como("CONTABILIDAD")))).andExpect(status().isForbidden());
         mvc.perform(get("/api/alertas/resumen").with(authentication(como("CONTABILIDAD"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void urgentes_vendedor_devuelve200ConLaLista() throws Exception {
+        when(servicio.urgentes(3)).thenReturn(List.of(alerta(EstadoAlerta.ACTIVA, null)));
+
+        mvc.perform(get("/api/alertas/urgentes?limite=3").with(authentication(como("VENDEDOR"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].tipo").value("AGOTADO"))
+                .andExpect(jsonPath("$[0].sku").value("LIV001-M-NEG"));
+    }
+
+    @Test
+    void urgentes_limiteInvalido_devuelve400() throws Exception {
+        when(servicio.urgentes(50)).thenThrow(new SolicitudInvalidaException("limite", "fuera de rango"));
+
+        mvc.perform(get("/api/alertas/urgentes?limite=50").with(authentication(como("ADMIN"))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void urgentes_contabilidad_devuelve403() throws Exception {
+        mvc.perform(get("/api/alertas/urgentes").with(authentication(como("CONTABILIDAD"))))
                 .andExpect(status().isForbidden());
     }
 

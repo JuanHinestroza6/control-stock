@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { atenderAlerta, listarAlertas, obtenerResumenAlertas } from '../api/alertas'
+import { atenderAlerta, listarAlertas, obtenerAlertasUrgentes, obtenerResumenAlertas } from '../api/alertas'
 import type { AlertaResponse, FiltrosAlertas, PaginaAlertas, ResumenAlertasResponse } from '../tipos/alertas'
 
 export function useAlertas(filtros: FiltrosAlertas) {
@@ -7,6 +7,15 @@ export function useAlertas(filtros: FiltrosAlertas) {
     queryKey: ['alertas', filtros],
     queryFn: () => listarAlertas(filtros),
     placeholderData: keepPreviousData,
+  })
+}
+
+/** Bloque "Alertas más urgentes" del panel: se refresca cada 60 s, igual que el panel. */
+export function useAlertasUrgentes(limite: number) {
+  return useQuery<AlertaResponse[]>({
+    queryKey: ['alertas', 'urgentes', limite],
+    queryFn: () => obtenerAlertasUrgentes(limite),
+    refetchInterval: 60_000,
   })
 }
 

@@ -2,7 +2,7 @@ import type { AxiosAdapter, InternalAxiosRequestConfig } from 'axios'
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, describe, expect, it } from 'vitest'
 import { invalidarStock } from '../hooks/useInventario'
-import { parametrosAlertas, atenderAlerta, obtenerResumenAlertas } from './alertas'
+import { parametrosAlertas, atenderAlerta, obtenerAlertasUrgentes, obtenerResumenAlertas } from './alertas'
 import { cliente } from './cliente'
 import { cancelarReserva, convertirReservas, crearReserva, extenderReserva, parametrosReservas } from './reservas'
 
@@ -40,6 +40,7 @@ describe('escrituras y lecturas', () => {
     await extenderReserva(7, { horas: 24 })
     await convertirReservas({ reservaIds: [7, 8] })
     await obtenerResumenAlertas()
+    await obtenerAlertasUrgentes(5)
     await atenderAlerta(3)
     expect(v.map((x) => `${x.method} ${x.url}`)).toEqual([
       'post /reservas',
@@ -47,6 +48,7 @@ describe('escrituras y lecturas', () => {
       'post /reservas/7/extender',
       'post /ventas/desde-reservas',
       'get /alertas/resumen',
+      'get /alertas/urgentes',
       'post /alertas/3/atender',
     ])
     expect(v[2].data).toEqual({ horas: 24 })

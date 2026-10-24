@@ -6,6 +6,7 @@ import co.livorno.controlstock.inventario.dto.ResumenAlertasResponse;
 import co.livorno.controlstock.inventario.modelo.EstadoAlerta;
 import co.livorno.controlstock.inventario.modelo.TipoAlerta;
 import co.livorno.controlstock.inventario.servicio.AlertaService;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -33,6 +34,13 @@ public class AlertaController {
             @RequestParam(required = false) TipoAlerta tipo,
             @PageableDefault(size = 20, sort = "creadaEn", direction = Sort.Direction.DESC) Pageable pageable) {
         return servicio.listar(estado, tipo, pageable);
+    }
+
+    /** Lista corta de las alertas de stock más urgentes (bloque del panel de inicio). */
+    @GetMapping("/urgentes")
+    @PreAuthorize("hasAnyRole('ADMIN','INVENTARIO','VENDEDOR')")
+    public List<AlertaResponse> urgentes(@RequestParam(required = false) Integer limite) {
+        return servicio.urgentes(limite);
     }
 
     @GetMapping("/resumen")

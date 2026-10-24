@@ -1,10 +1,11 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as apiAlertas from '../../api/alertas'
 import * as apiAnalitica from '../../api/analitica'
 import * as apiPanel from '../../api/panel'
 import { renderizarApp } from '../../pruebas/render'
+import type { AlertaResponse } from '../../tipos/alertas'
 import type { Rol } from '../../tipos/auth'
 import type { PanelResponse } from '../../tipos/panel'
 import { InicioPage } from './InicioPage'
@@ -38,9 +39,18 @@ function panel(rol: Rol): PanelResponse {
   }
 }
 
+const alertaBase = {
+  estado: 'ACTIVA', varianteId: 1, talla: 'M', color: 'NEGRO', creadaEn: '2026-10-20T08:00:00',
+  revisadaEn: '2026-10-21T08:00:00', atendidaEn: null, atendidaPor: null,
+} as const
+const urgentes: AlertaResponse[] = [
+  { ...alertaBase, id: 1, tipo: 'AGOTADO', sku: 'LIV001-M-NEG', productoNombre: 'Chaqueta Denim', stockDisponible: 0, umbral: 6 },
+  { ...alertaBase, id: 2, tipo: 'STOCK_BAJO', sku: 'LIV002-M-NEG', productoNombre: 'Jogger Cargo', stockDisponible: 1, umbral: 8 },
+]
+
 function simular(rol: Rol) {
   vi.mocked(apiPanel.obtenerPanel).mockResolvedValue(panel(rol))
-  vi.mocked(apiAlertas.obtenerResumenAlertas).mockResolvedValue({ activas: 60, agotado: 26, stockBajo: 16, sinRotacion: 18 })
+  vi.mocked(apiAlertas.obtenerAlertasUrgentes).mockResolvedValue(urgentes)
   vi.mocked(apiAnalitica.obtenerMasVendidos).mockResolvedValue({
     desde: '2026-09-22', hasta: '2026-10-21', criterio: 'UNIDADES', agrupacion: 'PRODUCTO', categoriaId: null,
     totalUnidades: 10, totalIngreso: 500_000,
@@ -69,12 +79,34 @@ describe('InicioPage (panel)', () => {
     expect(screen.getByText('Apartados activos')).toBeInTheDocument()
     expect(screen.getByText('Planes en camino')).toBeInTheDocument()
     expect(await screen.findByRole('img', { name: /últimos 7 días/ })).toBeInTheDocument()
-    expect(await screen.findByText('Alertas activas')).toBeInTheDocument()
+    expect(await screen.findByText('Alertas más urgentes')).toBeInTheDocument()
     expect(await screen.findByText(/Camiseta Oversize/)).toBeInTheDocument()
     expect(await screen.findByText('Última ejecución analítica')).toBeInTheDocument()
     expect(screen.getByText(/Generado a las 15:30/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Ventas de hoy/ })).toHaveAttribute('href', '/ventas')
     expect(screen.getByRole('link', { name: /Margen del mes/ })).toHaveAttribute('href', '/reportes')
+  })
+
+  it('agotadas y bajo stock solo como tarjetas; el bloque de alertas lista las más urgentes', async () => {
+    montar('INVENTARIO')
+    const bloque = await screen.findByRole('heading', { name: 'Alertas más urgentes' })
+    const tarjeta = bloque.parentElement as HTMLElement
+    expect(await within(tarjeta).findByText('LIV001-M-NEG · M · NEGRO')).toBeInTheDocument()
+    expect(within(tarjeta).getByText('Jogger Cargo')).toBeInTheDocument()
+    expect(within(tarjeta).getByText('0 / 6 u')).toBeInTheDocument()
+    expect(within(tarjeta).queryByText(/Agotado \d/)).not.toBeInTheDocument()
+    expect(within(tarjeta).getByRole('link', { name: 'Ver todas las alertas' })).toHaveAttribute('href', '/alertas')
+    expect(apiAlertas.obtenerAlertasUrgentes).toHaveBeenCalledWith(5)
+    // Los conteos quedan en las tarjetas de Inventario
+    expect(screen.getByRole('link', { name: /Agotadas/ })).toHaveTextContent('26')
+    expect(screen.getByRole('link', { name: /Bajo stock/ })).toHaveTextContent('16')
+  })
+
+  it('el bloque de alertas avisa cuando no hay alertas de stock', async () => {
+    simular('ADMIN')
+    vi.mocked(apiAlertas.obtenerAlertasUrgentes).mockResolvedValue([])
+    renderizarApp(<InicioPage />, { rol: 'ADMIN' })
+    expect(await screen.findByText('Sin alertas de stock activas.')).toBeInTheDocument()
   })
 
   it('INVENTARIO no ve ventas, margen ni valores a costo', async () => {
@@ -105,8 +137,8 @@ describe('InicioPage (panel)', () => {
     expect(await screen.findByText('Margen del mes')).toBeInTheDocument()
     expect(screen.getByText('Valor a costo')).toBeInTheDocument()
     expect(screen.queryByText('Apartados activos')).not.toBeInTheDocument()
-    expect(screen.queryByText('Alertas activas')).not.toBeInTheDocument()
-    expect(apiAlertas.obtenerResumenAlertas).not.toHaveBeenCalled()
+    expect(screen.queryByText('Alertas más urgentes')).not.toBeInTheDocument()
+    expect(apiAlertas.obtenerAlertasUrgentes).not.toHaveBeenCalled()
   })
 
   it('muestra el estado de carga', () => {
