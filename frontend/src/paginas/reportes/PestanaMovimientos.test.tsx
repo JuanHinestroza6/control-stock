@@ -76,6 +76,12 @@ describe('PestanaMovimientos', () => {
     expect(screen.queryByText(/solo se incluye al exportar/i)).not.toBeInTheDocument()
   })
 
+  it('sobre el tope del Excel pide acotar el rango', async () => {
+    montar(respuesta({ movimientosDetalle: 60_000 }))
+    expect(await screen.findByText(/admite hasta 50\.000: acote el rango/i)).toBeInTheDocument()
+    expect(screen.queryByText(/solo se incluye al exportar/i)).not.toBeInTheDocument()
+  })
+
   it('exporta con los filtros vigentes', async () => {
     montar()
     vi.mocked(api.exportarMovimientos).mockResolvedValue({ nombre: 'movimientos.xlsx', blob: new Blob(['x']) })

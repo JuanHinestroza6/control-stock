@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.ToLongFunction;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.springframework.data.domain.Page;
@@ -75,9 +76,10 @@ public class AlertaService {
 
     /**
      * Alertas de stock ACTIVAS más urgentes para el panel de inicio: primero AGOTADO por mayor umbral (más demanda
-     * esperada: un agotado con umbral 0 no tiene demanda) y antigüedad, luego STOCK_BAJO por menor cobertura
-     * (disponible / umbral) y antigüedad. SIN_ROTACION no es una urgencia de stock y no entra. 400 si {@code limite} no
-     * está entre 1 y {@value #LIMITE_URGENTES_MAXIMO}.
+     * esperada: un agotado con umbral 0 no tiene demanda) y antigüedad, luego STOCK_BAJO por menor cobertura de la
+     * posición ((disponible + en camino) / umbral, la misma posición que abre la alerta, ADR-010) y antigüedad.
+     * SIN_ROTACION no es una urgencia de stock y no entra. 400 si {@code limite} no está entre 1 y
+     * {@value #LIMITE_URGENTES_MAXIMO}.
      */
     @Transactional(readOnly = true)
     public List<AlertaResponse> urgentes(Integer limite) {
@@ -88,7 +90,8 @@ public class AlertaService {
         }
         List<Alerta> agotadas = alertas.buscar(EstadoAlerta.ACTIVA, TipoAlerta.AGOTADO, Pageable.unpaged()).getContent();
         List<Alerta> bajas = alertas.buscar(EstadoAlerta.ACTIVA, TipoAlerta.STOCK_BAJO, Pageable.unpaged()).getContent();
-        return Stream.concat(agotadas.stream().sorted(POR_DEMANDA), bajas.stream().sorted(POR_COBERTURA))
+        Map<Long, Long> enCamino = bajas.isEmpty() ? Map.of() : pedidos.enCaminoPorVariante();
+        return Stream.concat(agotadas.stream().sorted(POR_DEMANDA), bajas.stream().sorted(porCobertura(enCamino)))
                 .limit(n)
                 .map(a -> AlertaResponse.de(a, null))
                 .toList();
@@ -102,11 +105,15 @@ public class AlertaService {
             .comparingLong((Alerta a) -> umbral(a.getVariante())).reversed()
             .thenComparing(Alerta::getCreadaEn).thenComparing(Alerta::getId);
 
-    /** disponible / umbral ascendente sin flotantes (d1·u2 vs d2·u1, umbral mínimo 1), luego la más antigua. */
-    private static final Comparator<Alerta> POR_COBERTURA = ((Comparator<Alerta>) (a, b) -> Long.compare(
-            a.getVariante().getStockDisponible() * Math.max(1, umbral(b.getVariante())),
-            b.getVariante().getStockDisponible() * Math.max(1, umbral(a.getVariante()))))
-            .thenComparing(Alerta::getCreadaEn).thenComparing(Alerta::getId);
+    /** posición / umbral ascendente sin flotantes (p1·u2 vs p2·u1, umbral mínimo 1), luego la más antigua. */
+    private static Comparator<Alerta> porCobertura(Map<Long, Long> enCamino) {
+        ToLongFunction<Alerta> posicion = a -> a.getVariante().getStockDisponible()
+                + enCamino.getOrDefault(a.getVariante().getId(), 0L);
+        return ((Comparator<Alerta>) (a, b) -> Long.compare(
+                posicion.applyAsLong(a) * Math.max(1, umbral(b.getVariante())),
+                posicion.applyAsLong(b) * Math.max(1, umbral(a.getVariante()))))
+                .thenComparing(Alerta::getCreadaEn).thenComparing(Alerta::getId);
+    }
 
     /** Mismo umbral que muestra {@link AlertaResponse}. */
     private static long umbral(Variante v) {

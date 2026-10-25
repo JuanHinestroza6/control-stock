@@ -14,6 +14,9 @@ const AGRUPACIONES = [
   { valor: 'VARIANTE', etiqueta: 'Por variante' },
 ]
 
+/** Tope del detalle en Excel (`MovimientosPeriodoService.LIMITE_DETALLE_POR_DEFECTO`); encima, el servidor responde 422. */
+const LIMITE_DETALLE_EXCEL = 50_000
+
 const esTotal = (f: FilaMovimientos) => f.id === null
 
 type CampoUnidades = 'saldoInicial' | 'entradas' | 'ventas' | 'anulaciones' | 'devoluciones' | 'ajustesPositivos' | 'ajustesNegativos' | 'saldoFinal'
@@ -90,7 +93,8 @@ export function PestanaMovimientos() {
             {r.filas.length > 0 && (
               <>
                 <p className="text-xs text-oxford/70">
-                  Unidades físicas: saldo final = saldo inicial + entradas − ventas + anulaciones + devoluciones + ajustes.
+                  Unidades físicas: saldo final = saldo inicial + entradas − ventas + anulaciones + devoluciones + ajustes positivos −
+                  ajustes negativos.
                 </p>
                 <Tabla
                   columnas={COLUMNAS}
@@ -100,11 +104,17 @@ export function PestanaMovimientos() {
                 />
               </>
             )}
-            {!r.sinMovimientos && (
-              <p className="rounded-lg border border-acento/30 bg-acento/5 p-3 text-sm text-oxford">
-                El detalle de {formatearNumero(r.movimientosDetalle)} movimientos solo se incluye al exportar a Excel.
-              </p>
-            )}
+            {!r.sinMovimientos &&
+              (r.movimientosDetalle > LIMITE_DETALLE_EXCEL ? (
+                <p className="rounded-lg border border-alerta/40 bg-alerta/10 p-3 text-sm text-oxford">
+                  El periodo tiene {formatearNumero(r.movimientosDetalle)} movimientos y el detalle en Excel admite hasta{' '}
+                  {formatearNumero(LIMITE_DETALLE_EXCEL)}: acote el rango para exportar a Excel (el PDF no lleva detalle).
+                </p>
+              ) : (
+                <p className="rounded-lg border border-acento/30 bg-acento/5 p-3 text-sm text-oxford">
+                  El detalle de {formatearNumero(r.movimientosDetalle)} movimientos solo se incluye al exportar a Excel.
+                </p>
+              ))}
             <PieReporte notas={r.notas} generadoEn={r.generadoEn} />
           </>
         )}

@@ -6,6 +6,7 @@ import co.livorno.controlstock.compra.dto.LineaPlanRequest;
 import co.livorno.controlstock.compra.dto.PlanCompraDetalleResponse;
 import co.livorno.controlstock.compra.servicio.PlanCompraService;
 import co.livorno.controlstock.comun.seguridad.UsuarioAutenticado;
+import co.livorno.controlstock.inventario.dto.CancelarReservaRequest;
 import co.livorno.controlstock.inventario.dto.CrearReservaRequest;
 import co.livorno.controlstock.inventario.dto.LineaReservaRequest;
 import co.livorno.controlstock.inventario.servicio.ReservaService;
@@ -15,6 +16,7 @@ import co.livorno.controlstock.inventario.modelo.TipoMovimiento;
 import co.livorno.controlstock.inventario.dto.LineaEntradaRequest;
 import co.livorno.controlstock.inventario.servicio.OperacionInventarioService;
 import co.livorno.controlstock.venta.dto.AnularVentaRequest;
+import co.livorno.controlstock.venta.dto.ConvertirReservasRequest;
 import co.livorno.controlstock.venta.dto.DevolucionRequest;
 import co.livorno.controlstock.venta.dto.DevolucionResponse;
 import co.livorno.controlstock.venta.dto.LineaVentaRequest;
@@ -179,9 +181,21 @@ public class DatosReporte {
     }
 
     /** Aparta unidades como VENDEDOR para un cliente de prueba. */
-    public void reservar(Long varianteId, int cantidad, String clienteNombre, String clienteContacto) {
-        como(vendedorId, "VENDEDOR", () -> reservas.crear(new CrearReservaRequest(clienteNombre, clienteContacto,
-                null, List.of(new LineaReservaRequest(varianteId, cantidad)))).size());
+    public Long reservar(Long varianteId, int cantidad, String clienteNombre, String clienteContacto) {
+        return como(vendedorId, "VENDEDOR", () -> reservas.crear(new CrearReservaRequest(clienteNombre,
+                clienteContacto, null, List.of(new LineaReservaRequest(varianteId, cantidad)))).get(0).id());
+    }
+
+    /** Convierte la reserva en venta como VENDEDOR (movimiento VENTA_RESERVA). */
+    public void convertirReserva(Long reservaId) {
+        como(vendedorId, "VENDEDOR",
+                () -> ventas.registrarDesdeReservas(new ConvertirReservasRequest(List.of(reservaId), null)).id());
+    }
+
+    /** Cancela la reserva como VENDEDOR (movimiento LIBERACION). */
+    public void cancelarReserva(Long reservaId) {
+        como(vendedorId, "VENDEDOR",
+                () -> reservas.cancelar(reservaId, new CancelarReservaRequest("Cliente desistió")).id());
     }
 
     /** Plan manual creado por INVENTARIO y aprobado por ADMIN: queda en camino. */

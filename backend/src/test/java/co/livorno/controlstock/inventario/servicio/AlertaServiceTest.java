@@ -348,9 +348,20 @@ class AlertaServiceTest {
     private static Alerta alertaUrgente(long id, TipoAlerta tipo, int disponible, int umbral, int diasAntiguedad) {
         Variante v = new Variante(producto(), "LIV001-" + id, Talla.M, "NEGRO", umbral);
         v.aplicarMovimiento(disponible, 0);
+        org.springframework.test.util.ReflectionTestUtils.setField(v, "id", 100 + id);
         Alerta a = new Alerta(v, tipo, AHORA.minusDays(diasAntiguedad));
         org.springframework.test.util.ReflectionTestUtils.setField(a, "id", id);
         return a;
+    }
+
+    @Test
+    void urgentes_stockBajoOrdenaPorPosicionConLoEnCamino() {
+        // 9: disponible 1 + 8 en camino = 9 de 10 (90 %); 10: disponible 3 sin pedido = 3 de 10 (30 %)
+        simularActivas(java.util.List.of(), java.util.List.of(alertaUrgente(9, TipoAlerta.STOCK_BAJO, 1, 10, 5),
+                alertaUrgente(10, TipoAlerta.STOCK_BAJO, 3, 10, 1)));
+        when(pedidos.enCaminoPorVariante()).thenReturn(java.util.Map.of(109L, 8L));
+
+        assertThat(servicio.urgentes(5)).extracting(AlertaResponse::id).containsExactly(10L, 9L);
     }
 
     private void simularActivas(java.util.List<Alerta> agotadas, java.util.List<Alerta> bajas) {

@@ -77,13 +77,22 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
       CU-05"; CU-01 extiende CU-10; "Comparar periodos" extiende CU-05), clases general y secuencia de exportar; D3
       `docs/ppi/trazabilidad.md` y README del PPI. 20 `.puml` validan con PlantUML 1.2024.7 (JAR de `~/.m2`)
 
+- [x] Fase 7 — revisión (rol `revisor`; esta sesión no cargó los agentes del proyecto y se usó un agente general con
+      `.claude/agents/revisor.md`): sin críticos. Corregidas las 2 advertencias: B10 usa la ventana de la `fechaCorte`
+      real de la analítica (pérdidas por mes en la simulación; antes podía desalinearse con `fecha-fin` explícita) y la
+      prueba de integración de movimientos cubre VENTA_RESERVA, LIBERACION, variante inactiva y otra categoría. De las
+      sugerencias: urgentes STOCK_BAJO por posición (con lo en camino), fórmula completa y aviso del tope del Excel en
+      la pestaña Movimientos, sesgo de B10 documentado, ajustes menores de documentación. Quedan como están: carga de
+      todas las alertas activas para elegir 5 (con ~300 variantes no pesa) y el UPDATE de fecha del kardex solo en la
+      preparación de la prueba. Backend 905 + 493 omitidas (Testcontainers), frontend 642
+
 ## En curso
 
-- [ ] Fase 7 — revisión (`revisor`) y correcciones; guía T2 para el portátil y guion de sustentación (T3)
+- [ ] Fase 7 — guía T2 para el portátil y guion de sustentación (T3)
 
 ## Próximos pasos
 
-1. Revisión con `revisor` y corrección de lo que encuentre; guía T2 para el portátil y guion de sustentación (T3).
+1. Guía T2 para el portátil y guion de sustentación (T3).
 2. El usuario corre la T2 de la fase 7 (incluye la cifra real de B10: unidades perdidas comparables y razón de la
    corrección por agotados, hoy ≈ 0,3× contra todas las perdidas de 36 meses).
 3. Push y PR de `fase-7-cierre-entrega` cuando el usuario lo pida; la CI corre las pruebas con Testcontainers (nuevas:

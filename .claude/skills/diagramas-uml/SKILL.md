@@ -46,5 +46,5 @@ java -jar "$USERPROFILE/.vscode/extensions/jebbs.plantuml-2.18.1/plantuml.jar" -
 Sin salida y código 0 = sintaxis correcta. Graphviz no está instalado: para renderizar agregar `!pragma layout smetana`.
 
 Sin la extensión de VS Code (p. ej. el portátil), el mismo JAR desde Maven Central (queda en `~/.m2`, desde `backend/`):
-`./mvnw dependency:get -Dartifact=net.sourceforge.plantuml:plantuml:1.2024.7` y luego
+`./mvnw dependency:get -Dartifact=net.sourceforge.plantuml:plantuml:1.2024.7` y luego, desde la raíz del repositorio (`cd ..`),
 `java -jar ~/.m2/repository/net/sourceforge/plantuml/plantuml/1.2024.7/plantuml-1.2024.7.jar -checkonly docs/ppi/diagramas/*.puml`.

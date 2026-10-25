@@ -190,9 +190,10 @@ VENDEDOR recibe 403 en todos los anteriores. CONTABILIDAD solo lee (403 en toda 
   implementado (pronóstico, plan y recepción).
 - Alcance frente al Word: en el sistema también INVENTARIO crea y recibe planes; solo ADMIN aprueba (D7 de la fase 6).
   «Registrar proveedor» (extensión de CU-01) queda fuera de alcance.
-- Fase 7 (B10): el resumen de la semilla informa ahora las unidades perdidas comparables (misma ventana de 12 meses, sin
-  variantes agotables a propósito ni el descontinuado) y la razón de la corrección por agotados; la cifra de la semilla
-  de 36 meses se registra en la T2 de la fase 7.
+- Fase 7 (B10): el resumen de la semilla informa ahora las unidades perdidas comparables (12 meses completos antes del
+  mes del corte de la analítica de cierre, sin variantes agotables a propósito ni el descontinuado) y la razón de la
+  corrección por agotados. La corrección también ve las variantes agotables (siguen activas) y el denominador no, así
+  que la razón tiende a quedar algo alta. La cifra de la semilla de 36 meses se registra en la T2 de la fase 7.
 - Inconsistencias del Word: REQ-08 y REQ-09 con nombre y descripción cruzados (ver `REQ-09.md`); NEC-010 debería ser
   NEC-10.
 - **Riesgo aceptado: el backtest no cubre noviembre y diciembre.** Los seis meses evaluados van de abril a septiembre con

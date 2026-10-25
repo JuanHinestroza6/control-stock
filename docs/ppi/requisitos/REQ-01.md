@@ -39,9 +39,9 @@ El sistema debe mostrar el stock físico, reservado y disponible de cada variant
   **bajo stock** y **sin rotación**; valor a costo y a precio de venta solo para ADMIN y CONTABILIDAD. Ventas (ADMIN,
   VENDEDOR, CONTABILIDAD; margen sin el VENDEDOR), apartados (sin CONTABILIDAD) y compras (sin VENDEDOR).
 - Bloque **«Alertas más urgentes»** (ADMIN, INVENTARIO, VENDEDOR): `GET /api/alertas/urgentes?limite=5` lista las
-  AGOTADO por mayor umbral y antigüedad y luego las STOCK_BAJO por menor cobertura (disponible / umbral), con SKU,
-  talla, color, disponible / umbral y enlace a Alertas. Los conteos por tipo están solo en las tarjetas de Inventario
-  (sin duplicarlos en el bloque).
+  AGOTADO por mayor umbral y antigüedad y luego las STOCK_BAJO por menor cobertura de la posición ((disponible + en
+  camino) / umbral, la misma que abre la alerta), con SKU, talla, color, disponible / umbral y enlace a Alertas. Los
+  conteos por tipo están solo en las tarjetas de Inventario (sin duplicarlos en el bloque).
 
 | Método y ruta | Rol |
 |---|---|

@@ -73,4 +73,7 @@ la medición de rendimiento (RNF-03: < 3 s con hasta 10.000 registros). Había v
 - Corrección por agotados (pendiente de la fase 6): no se cambia el algoritmo; la semilla informa las unidades perdidas
   comparables (12 meses, variantes activas, sin las agotadas a propósito ni productos inactivos). Implementado (B10):
   el resumen muestra esas unidades, lo que suma la corrección (Σ corregidas − observadas de `analitica_producto`) y la
-  razón entre ambas (esperado 0,5×–2×); la ventana son los 12 meses completos antes del mes de `fecha-fin + 1`.
+  razón entre ambas (esperado 0,5×–2×). La ventana son los 12 meses completos antes del mes de la `fechaCorte` de la
+  analítica de cierre (la simulación acumula las pérdidas por mes y el resumen las suma en esa ventana; así coincide
+  aunque se fije `fecha-fin`). Sesgo conocido: la corrección también ve las variantes agotables a propósito (siguen
+  activas) y el denominador no, así que la razón tiende a quedar algo alta.

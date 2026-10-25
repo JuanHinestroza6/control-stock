@@ -207,10 +207,6 @@ public class SimuladorDiario {
         private final Map<Long, BigDecimal> totalVenta = new HashMap<>();
         private final LocalDate corteReposicion;
         private final LocalDate corteDesactivacion;
-        // Ventana de la corrección por agotados de la analítica de cierre: los 12 meses completos antes del mes del corte
-        // (fin + 1 = hoy con fecha-fin vacía), [inicioComparable, finComparable).
-        private final LocalDate inicioComparable;
-        private final LocalDate finComparable;
 
         private PriorityQueue<Evento> cola;
         private long orden;
@@ -228,7 +224,9 @@ public class SimuladorDiario {
         private long lineasEvitablesPerdidas;
         private long lineasPerdidas;
         private long unidadesPerdidas;
-        private long unidadesPerdidasComparables;
+        // Unidades perdidas evitables (sin agotables ni descontinuado) por mes, para compararlas con la corrección por
+        // agotados de la analítica de cierre en su misma ventana de 12 meses (ADR-011, D5).
+        private final Map<YearMonth, Long> perdidasEvitablesPorMes = new TreeMap<>();
         private long anuladas;
         private long nDevoluciones;
         private long noAptas;
@@ -256,8 +254,6 @@ public class SimuladorDiario {
             }
             this.corteReposicion = fin.minusMonths(MESES_SIN_REPOSICION);
             this.corteDesactivacion = fin.minusMonths(MESES_DESCONTINUADO);
-            this.finComparable = YearMonth.from(fin.plusDays(1)).atDay(1);
-            this.inicioComparable = finComparable.minusMonths(12);
             this.fisico = new int[variantes.size()];
             this.enCamino = new int[variantes.size()];
             this.reservado = new int[variantes.size()];
@@ -294,7 +290,8 @@ public class SimuladorDiario {
                 unidadesEnCamino += n;
             }
             return new ResultadoSimulacion(dias, nVentas, unidadesVendidas, lineasPedidas, lineasPerdidas,
-                    lineasEvitablesPedidas, lineasEvitablesPerdidas, unidadesPerdidas, unidadesPerdidasComparables,
+                    lineasEvitablesPedidas, lineasEvitablesPerdidas, unidadesPerdidas,
+                    Map.copyOf(perdidasEvitablesPorMes),
                     anuladas, nDevoluciones, noAptas, entradas, ajustes, alzas, desactivados.size(), ingreso,
                     reservasCreadas, reservasConvertidas, reservasCanceladas, reservasVencidas, planesCreados, planesRecibidos,
                     planesCreados - planesRecibidos, unidadesEnCamino, pendiente);
@@ -501,8 +498,9 @@ public class SimuladorDiario {
                         lineasEvitablesPerdidas++;
                     }
                     unidadesPerdidas += l.cantidad() - vendible;
-                    if (evitable && !diaActual.isBefore(inicioComparable) && diaActual.isBefore(finComparable)) {
-                        unidadesPerdidasComparables += l.cantidad() - vendible;
+                    if (evitable) {
+                        perdidasEvitablesPorMes.merge(YearMonth.from(diaActual), (long) (l.cantidad() - vendible),
+                                Long::sum);
                     }
                 }
                 if (vendible > 0) {

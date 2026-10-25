@@ -23,10 +23,10 @@ java -jar "$USERPROFILE/.vscode/extensions/jebbs.plantuml-2.18.1/plantuml.jar" -
 Sin salida y código 0 significa que la sintaxis es correcta.
 
 En un equipo sin la extensión de VS Code (por ejemplo, el portátil), el mismo JAR se obtiene de Maven Central y queda en
-`~/.m2` (desde `backend/`, con red):
+`~/.m2` (con red, desde la raíz del repositorio):
 
 ```
-./mvnw dependency:get -Dartifact=net.sourceforge.plantuml:plantuml:1.2024.7
+cd backend && ./mvnw dependency:get -Dartifact=net.sourceforge.plantuml:plantuml:1.2024.7 && cd ..
 java -jar ~/.m2/repository/net/sourceforge/plantuml/plantuml/1.2024.7/plantuml-1.2024.7.jar -checkonly docs/ppi/diagramas/*.puml
 ```
 

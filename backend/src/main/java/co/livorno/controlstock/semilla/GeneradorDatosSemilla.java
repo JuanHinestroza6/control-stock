@@ -135,7 +135,7 @@ public class GeneradorDatosSemilla {
                 ejecucion.getEnAlertaStock(), ejecucion.getPorcentajeAlertaStock(),
                 porTipo.getOrDefault("SIN_ROTACION", 0L), ejecucion.getDuracionMs(),
                 ejecucion.getConHoltWinters(), ejecucion.getConSes(), ejecucion.getWapeGlobal(),
-                ejecucion.getEnAlertaSinTransito(), ejecucion.getConPedidoEnCamino(),
+                ejecucion.getEnAlertaSinTransito(), ejecucion.getConPedidoEnCamino(), ejecucion.getFechaCorte(),
                 jdbc.queryForObject("select coalesce(sum(unidades_corregidas_12m - unidades_observadas_12m), 0)"
                         + " from analitica_producto", BigDecimal.class));
         return resumen.conCierre(activas == null ? 0 : activas, porTipo.getOrDefault("AGOTADO", 0L),

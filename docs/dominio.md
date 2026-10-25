@@ -237,7 +237,8 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. Desde la Fas
 - Una sola alerta ACTIVA por variante y tipo, garantizada además por un índice único en la base.
 - **Más urgentes** (panel de inicio, fase 7): `GET /api/alertas/urgentes?limite` (1–20, 5 por defecto) devuelve las
   AGOTADO activas por mayor umbral (más demanda esperada; umbral 0 = sin demanda) y antigüedad, y luego las STOCK_BAJO
-  por menor cobertura (disponible / umbral) y antigüedad. SIN_ROTACION no entra: no es una urgencia de stock.
+  por menor cobertura de la posición ((disponible + en camino) / umbral, como la alerta) y antigüedad. SIN_ROTACION
+  no entra: no es una urgencia de stock.
 - Atender a mano una AGOTADO o STOCK_BAJO cuya condición sigue vigente la cierra; el siguiente movimiento de esa variante
   o la re-evaluación nocturna vuelve a abrirla.
 - **Re-evaluación nocturna** (Fase 5): la ejecución analítica re-evalúa todas las variantes (ver "Analítica"). Calcular el
@@ -303,7 +304,9 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. Desde la Fas
   con stock de las variantes activas ponderada por su participación, reconstruida desde el kardex (día sin stock: abre en 0
   y ningún movimiento lo deja > 0). Se guardan ambas series.
   La semilla compara lo que agrega (Σ corregidas − observadas, 12 meses) con sus "unidades perdidas comparables" (misma
-  ventana, sin variantes agotables a propósito ni el descontinuado) y muestra la razón en el resumen (ADR-011, D5).
+  ventana: 12 meses completos antes del mes de la `fechaCorte` de la analítica de cierre; sin variantes agotables a
+  propósito ni el descontinuado) y muestra la razón en el resumen (ADR-011, D5; la corrección sí ve las agotables, lo
+  que sube algo la razón).
 - **Método**: SES u **Holt-Winters multiplicativo** (m = 12), elegido por backtesting con origen móvil (cortes n − 6 y
   n − 3, 3 meses cada uno, WAPE sobre 6 puntos; empate < 0,001 → SES). HW solo compite con n ≥ 30 meses, sin ningún mes
   en 0 y con nivel positivo; si no, SES y se guarda el motivo (`POCA_HISTORIA`, `MES_EN_CERO`, `NIVEL_NO_POSITIVO`).

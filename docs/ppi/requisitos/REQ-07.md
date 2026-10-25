@@ -13,7 +13,7 @@
 | **Stakeholder** | Contabilidad |
 | **Necesidad** | NEC-07 |
 | **Caso de uso** | CU-07 «Generar reportes contables automáticos» (movimientos del periodo: también CU-03 «Registrar entradas y salidas») |
-| **Relacionados** | REQ-03 (rentabilidad: concilia con el libro); REQ-02 (kardex: fuente de valorización y movimientos); REQ-08 (devoluciones y merma no apta); REQ-10 (lo en camino de los planes aprobados); RNF-03 (rendimiento); REQ-06 (roles) |
+| **Relacionados** | REQ-03 (rentabilidad: concilia con el libro); REQ-02 (kardex: fuente de los movimientos del periodo); REQ-08 (devoluciones y merma no apta); REQ-10 (lo en camino de los planes aprobados); RNF-03 (rendimiento); REQ-06 (roles) |
 | **Prioridad** | Media |
 | **Módulos** | `reporte` (`LibroVentasService`, `ValorizacionService`, `MovimientosPeriodoService`, `ConsultasReporte`, `ReporteController`); `comun.exportacion`; frontend: `paginas/reportes` (pestañas «Libro de ventas», «Valorización» y «Movimientos»), `api/reportes`, `lib/descarga` |
 
