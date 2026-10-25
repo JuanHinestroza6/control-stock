@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { exportarTendencias } from './analitica'
 import { cliente } from './cliente'
-import { parametrosLibroVentas, parametrosRentabilidad, parametrosValorizacion } from './reportes'
+import { parametrosLibroVentas, parametrosMovimientos, parametrosRentabilidad, parametrosValorizacion } from './reportes'
 
 describe('parámetros de reportes', () => {
   it('omiten indefinidos y conservan false', () => {
@@ -13,6 +13,12 @@ describe('parámetros de reportes', () => {
     })
     expect(parametrosLibroVentas({ agrupacion: 'MES' })).toEqual({ agrupacion: 'MES' })
     expect(parametrosValorizacion({ incluirInactivas: false })).toEqual({ incluirInactivas: false })
+    expect(parametrosMovimientos({})).toEqual({})
+    expect(parametrosMovimientos({ hasta: '2026-09-30', categoriaId: 0, agrupacion: 'VARIANTE' })).toEqual({
+      hasta: '2026-09-30',
+      categoriaId: 0,
+      agrupacion: 'VARIANTE',
+    })
   })
 })
 

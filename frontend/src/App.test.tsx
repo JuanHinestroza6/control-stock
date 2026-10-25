@@ -20,7 +20,7 @@ describe('App', () => {
     for (const rol of ['ADMIN', 'CONTABILIDAD'] as const) {
       const { unmount } = renderizarApp(<App />, { ruta: '/reportes', rol })
       expect(screen.getByRole('heading', { level: 1, name: 'Reportes' })).toBeInTheDocument()
-      expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Rentabilidad', 'Libro de ventas', 'Valorización'])
+      expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Rentabilidad', 'Libro de ventas', 'Valorización', 'Movimientos'])
       expect(screen.queryByRole('heading', { name: 'Próximamente' })).not.toBeInTheDocument()
       unmount()
     }

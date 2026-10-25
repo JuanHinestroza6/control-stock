@@ -2,9 +2,11 @@ import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
 import { exportarTendencias } from '../api/analitica'
 import {
   exportarLibroVentas,
+  exportarMovimientos,
   exportarRentabilidad,
   exportarValorizacion,
   obtenerLibroVentas,
+  obtenerMovimientos,
   obtenerRentabilidad,
   obtenerValorizacion,
 } from '../api/reportes'
@@ -12,10 +14,12 @@ import { guardarArchivo, type ArchivoDescargado } from '../lib/descarga'
 import type { FiltrosTendencias } from '../tipos/analitica'
 import type {
   FiltrosLibroVentas,
+  FiltrosMovimientos,
   FiltrosRentabilidad,
   FiltrosValorizacion,
   FormatoExportacion,
   LibroVentasResponse,
+  MovimientosResponse,
   RentabilidadResponse,
   ValorizacionResponse,
 } from '../tipos/reportes'
@@ -48,6 +52,15 @@ export function useValorizacion(filtros: FiltrosValorizacion, habilitado = true)
   })
 }
 
+export function useMovimientosPeriodo(filtros: FiltrosMovimientos, habilitado = true) {
+  return useQuery<MovimientosResponse>({
+    queryKey: ['reportes', 'movimientos', filtros],
+    queryFn: () => obtenerMovimientos(filtros),
+    placeholderData: keepPreviousData,
+    enabled: habilitado,
+  })
+}
+
 async function conDescarga(obtener: () => Promise<ArchivoDescargado>) {
   const archivo = await obtener()
   guardarArchivo(archivo)
@@ -73,6 +86,13 @@ export function useExportarValorizacion() {
   return useMutation({
     mutationFn: ({ filtros, formato }: { filtros: FiltrosValorizacion; formato: FormatoExportacion }) =>
       conDescarga(() => exportarValorizacion(filtros, formato)),
+  })
+}
+
+export function useExportarMovimientos() {
+  return useMutation({
+    mutationFn: ({ filtros, formato }: { filtros: FiltrosMovimientos; formato: FormatoExportacion }) =>
+      conDescarga(() => exportarMovimientos(filtros, formato)),
   })
 }
 

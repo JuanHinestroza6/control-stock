@@ -1,22 +1,25 @@
 import { useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router'
 import { PestanaLibroVentas } from './PestanaLibroVentas'
+import { PestanaMovimientos } from './PestanaMovimientos'
 import { PestanaRentabilidad } from './PestanaRentabilidad'
 import { PestanaValorizacion } from './PestanaValorizacion'
 
-type ClavePestana = 'rentabilidad' | 'libro-ventas' | 'valorizacion'
+type ClavePestana = 'rentabilidad' | 'libro-ventas' | 'valorizacion' | 'movimientos'
 
 
 const PESTANAS: { clave: ClavePestana; etiqueta: string }[] = [
   { clave: 'rentabilidad', etiqueta: 'Rentabilidad' },
   { clave: 'libro-ventas', etiqueta: 'Libro de ventas' },
   { clave: 'valorizacion', etiqueta: 'Valorización' },
+  { clave: 'movimientos', etiqueta: 'Movimientos' },
 ]
 
 const contenido: Record<ClavePestana, () => ReactNode> = {
   rentabilidad: () => <PestanaRentabilidad />,
   'libro-ventas': () => <PestanaLibroVentas />,
   valorizacion: () => <PestanaValorizacion />,
+  movimientos: () => <PestanaMovimientos />,
 }
 
 export function ReportesPage() {

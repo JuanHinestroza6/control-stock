@@ -160,3 +160,51 @@ export interface ValorizacionResponse {
   notas: string[]
   generadoEn: string
 }
+
+export interface FiltrosMovimientos {
+  desde?: string
+  hasta?: string
+  categoriaId?: number
+  agrupacion?: AgrupacionReporte
+}
+
+/**
+ * Estado del físico de un grupo en el periodo (unidades). Cumple saldoFinal = saldoInicial + entradas − ventas +
+ * anulaciones + devoluciones + ajustesPositivos − ajustesNegativos.
+ */
+export interface FilaMovimientos {
+  /** Id de la categoría, producto o variante; null en la fila de totales. */
+  id: number | null
+  codigo: string | null
+  nombre: string
+  categoria: string | null
+  saldoInicial: number
+  entradas: number
+  /** Σ cantidad × costo unitario de las entradas. */
+  valorEntradas: number
+  /** VENTA y VENTA_RESERVA. */
+  ventas: number
+  anulaciones: number
+  /** Solo las aptas (la no apta no regresa al inventario). */
+  devoluciones: number
+  ajustesPositivos: number
+  ajustesNegativos: number
+  saldoFinal: number
+}
+
+export interface MovimientosResponse {
+  desde: string
+  hasta: string
+  categoriaId: number | null
+  categoria: string | null
+  agrupacion: AgrupacionReporte
+  sinMovimientos: boolean
+  /** "No hay movimientos en el periodo" o null. */
+  mensaje: string | null
+  filas: FilaMovimientos[]
+  totales: FilaMovimientos
+  /** Movimientos del rango que cambian el físico (el detalle solo se exporta a Excel, máximo 50.000). */
+  movimientosDetalle: number
+  notas: string[]
+  generadoEn: string
+}
