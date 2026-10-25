@@ -1,0 +1,108 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+left to right direction
+title Diagrama de casos de uso general - Control Stock (CU-01 a CU-18)
+
+actor "Administrador\n(ADMIN)" as Admin
+actor "Encargado de inventario\n(INVENTARIO)" as Inv
+actor "Vendedor\n(VENDEDOR)" as Ven
+actor "Contabilidad\n(CONTABILIDAD)" as Con
+actor "Sistema\n(tareas programadas)" as Sis <<sistema>>
+
+rectangle "Control Stock" {
+  usecase "CU-01 Optimizar planeación de compras" as CU01
+  usecase "CU-02 Gestión de usuarios y roles" as CU02
+  usecase "CU-03 Registrar entradas y salidas" as CU03
+  usecase "CU-04 Visualizar inventario en tiempo real" as CU04
+  usecase "CU-05 Visualizar tendencias históricas de ventas" as CU05
+  usecase "Comparar periodos de venta" as CU05C
+  usecase "CU-06 Generar reportes de ventas y rentabilidad" as CU06
+  usecase "CU-07 Generar reportes contables automáticos" as CU07
+  usecase "CU-08 Identificar productos más vendidos" as CU08
+  usecase "CU-09 Registrar devoluciones" as CU09
+  usecase "CU-10 Alertas automáticas de stock bajo" as CU10
+  usecase "CU-11 Registrar y gestionar productos" as CU11
+  usecase "CU-12 Registrar y gestionar usuarios" as CU12
+  usecase "CU-13 Iniciar sesión" as CU13
+  usecase "CU-14 Gestionar apartados" as CU14
+  usecase "CU-15 Clasificar productos (ABC)" as CU15
+  usecase "CU-16 Consultar el pronóstico de demanda" as CU16
+  usecase "CU-17 Gestionar el plan de compras" as CU17
+  usecase "CU-18 Recibir un pedido" as CU18
+}
+
+Admin --> CU01
+Admin --> CU02
+Admin --> CU03
+Admin --> CU04
+Admin --> CU05
+Admin --> CU06
+Admin --> CU07
+Admin --> CU08
+Admin --> CU09
+Admin --> CU10
+Admin --> CU11
+Admin --> CU12
+Admin --> CU14
+Admin --> CU15
+Admin --> CU16
+Admin --> CU17
+Admin --> CU18
+
+Inv --> CU03
+Inv --> CU04
+Inv --> CU05
+Inv --> CU08
+Inv --> CU10
+Inv --> CU11
+Inv --> CU14
+Inv --> CU15
+Inv --> CU16
+Inv --> CU17
+Inv --> CU18
+
+Ven --> CU04
+Ven --> CU08
+Ven --> CU09
+Ven --> CU10
+Ven --> CU14
+
+Con --> CU04
+Con --> CU05
+Con --> CU06
+Con --> CU07
+Con --> CU08
+Con --> CU15
+Con --> CU16
+Con --> CU17
+
+Sis --> CU10
+Sis --> CU14
+Sis --> CU15
+
+CU01 ..> CU16 : <<include>>
+CU01 ..> CU17 : <<include>>
+CU01 ..> CU18 : <<include>>
+CU12 ..> CU02 : <<include>>
+CU02 ..> CU13 : <<include>>
+CU01 ..> CU10 : <<extend>>\n(crear solicitud de compra directa)
+CU05C ..> CU05 : <<extend>>\n(comparar periodos)
+
+note right of CU01
+  CU-01 (Word) agrupa la planeación de compras;
+  CU-16, CU-17 y CU-18 (nuevos) la desglosan.
+  Desde una alerta de stock bajo (CU-10) se puede
+  crear una solicitud de compra directa (extensión).
+end note
+note bottom of CU05C
+  Extensión de CU-05: cada mes se compara
+  con el mismo mes del año anterior.
+end note
+note bottom of Sis
+  Sistema: analítica nocturna (02:00), vencimiento
+  de reservas (cada 15 min) y alertas por evento.
+end note
+@enduml

@@ -158,7 +158,7 @@ class ReglasArquitecturaTest {
 
     /**
      * JDBC directo evita JPA y por tanto cualquier regla sobre entidades: solo lo usan las consultas de lectura de la
-     * analítica y el módulo semilla (verifica y consulta, nunca escribe; ver la regla siguiente).
+     * analítica, el repositorio de reporte (ADR-011) y el módulo semilla (verifica y consulta, nunca escribe; ver la regla siguiente).
      */
     @ArchTest
     static final ArchRule jdbcDirectoSoloEnClasesDeLectura = noClasses()
@@ -169,6 +169,7 @@ class ReglasArquitecturaTest {
             .and().doNotHaveFullyQualifiedName(CLASES_JDBC_DE_LECTURA[4])
             .and().doNotHaveFullyQualifiedName(CLASES_JDBC_DE_LECTURA[5])
             .and().resideOutsideOfPackage("co.livorno.controlstock.semilla..")
+            .and().resideOutsideOfPackage("co.livorno.controlstock.reporte.repositorio..")
             .should().dependOnClassesThat(DescribedPredicate.describe("son JdbcTemplate, NamedParameterJdbcTemplate"
                     + " o JdbcClient", (JavaClass c) -> TIPOS_JDBC.contains(c.getName())))
             .because("un UPDATE por JDBC saltaría las reglas de stock, kardex y ROP/clase (reglas de oro 1 y 2, ADR-009)");

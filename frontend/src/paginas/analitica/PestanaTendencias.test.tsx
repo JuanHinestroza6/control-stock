@@ -8,6 +8,7 @@ import * as apiProductos from '../../api/productos'
 import { mesRelativo } from '../../lib/meses'
 import { renderizarApp } from '../../pruebas/render'
 import type { PuntoTendencia, TendenciaResponse } from '../../tipos/analitica'
+import type { Rol } from '../../tipos/auth'
 import { PestanaTendencias } from './PestanaTendencias'
 
 vi.mock('../../api/analitica')
@@ -37,7 +38,7 @@ function respuesta(extra: Partial<TendenciaResponse> = {}): TendenciaResponse {
   }
 }
 
-function montar(datos: TendenciaResponse = respuesta(), falloInicial = false) {
+function montar(datos: TendenciaResponse = respuesta(), falloInicial = false, rol: Rol = 'ADMIN') {
   if (falloInicial) vi.mocked(api.obtenerTendencias).mockRejectedValueOnce(new Error('falló'))
   vi.mocked(api.obtenerTendencias).mockResolvedValue(datos)
   vi.mocked(apiCategorias.listarCategorias).mockResolvedValue([
@@ -48,7 +49,7 @@ function montar(datos: TendenciaResponse = respuesta(), falloInicial = false) {
     content: [{ id: 7, codigo: 'LIV001', nombre: 'Camiseta Oversize' }],
     page: { size: 100, number: 0, totalElements: 1, totalPages: 1 },
   } as Awaited<ReturnType<typeof apiProductos.listarProductos>>)
-  return renderizarApp(<PestanaTendencias />, { rol: 'ADMIN' })
+  return renderizarApp(<PestanaTendencias />, { rol })
 }
 
 const ultimaLlamada = () => vi.mocked(api.obtenerTendencias).mock.calls.at(-1)![0]
@@ -134,5 +135,47 @@ describe('PestanaTendencias', () => {
     vi.mocked(apiProductos.listarProductos).mockResolvedValue({ content: [], page: { size: 100, number: 0, totalElements: 0, totalPages: 0 } })
     renderizarApp(<PestanaTendencias />, { rol: 'ADMIN' })
     expect(screen.getByRole('status', { name: 'Cargando' })).toBeInTheDocument()
+  })
+
+  describe('exportar', () => {
+    beforeEach(() => {
+      URL.createObjectURL = vi.fn(() => 'blob:prueba')
+      URL.revokeObjectURL = vi.fn()
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    })
+
+    it.each<Rol>(['ADMIN', 'INVENTARIO', 'CONTABILIDAD'])('%s ve los botones de exportar', async (rol) => {
+      montar(respuesta(), false, rol)
+      await screen.findByRole('table')
+      expect(screen.getByRole('button', { name: /exportar tendencias a pdf/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /exportar tendencias a excel/i })).toBeInTheDocument()
+    })
+
+    it('VENDEDOR no ve exportar', async () => {
+      montar(respuesta(), false, 'VENDEDOR')
+      await screen.findByRole('table')
+      expect(screen.queryByRole('button', { name: /exportar tendencias/i })).not.toBeInTheDocument()
+    })
+
+    it('descarga el PDF con los filtros vigentes', async () => {
+      montar()
+      vi.mocked(api.exportarTendencias).mockResolvedValue({ nombre: 'tendencias.pdf', blob: new Blob(['x']) })
+      await screen.findByRole('table')
+      await userEvent.selectOptions(screen.getByLabelText('Periodo'), '12')
+      await waitFor(() => expect(ultimaLlamada().desde).toBe(mesRelativo(12)))
+      await userEvent.click(screen.getByRole('button', { name: /exportar tendencias a pdf/i }))
+      await waitFor(() =>
+        expect(api.exportarTendencias).toHaveBeenCalledWith({ desde: mesRelativo(12), hasta: mesRelativo(1) }, 'PDF'),
+      )
+      expect(URL.createObjectURL).toHaveBeenCalled()
+    })
+
+    it('si falla ofrece el otro formato', async () => {
+      montar()
+      vi.mocked(api.exportarTendencias).mockRejectedValueOnce(new Error('falló'))
+      await screen.findByRole('table')
+      await userEvent.click(screen.getByRole('button', { name: /exportar tendencias a pdf/i }))
+      expect(await screen.findByRole('button', { name: 'Descargar en Excel' })).toBeInTheDocument()
+    })
   })
 })

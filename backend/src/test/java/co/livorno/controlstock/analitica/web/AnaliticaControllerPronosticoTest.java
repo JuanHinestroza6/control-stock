@@ -65,6 +65,7 @@ class AnaliticaControllerPronosticoTest {
     @MockitoBean ConsultaAnaliticaService consulta;
     @MockitoBean RecalculoAnaliticoService recalculo;
     @MockitoBean TendenciasService tendencias;
+    @MockitoBean co.livorno.controlstock.analitica.servicio.ExportarTendenciasService exportarTendencias;
     @MockitoBean ConsultaPronosticoService pronosticos;
     @MockitoBean co.livorno.controlstock.usuario.repositorio.UsuarioRepository usuarioRepository;
 

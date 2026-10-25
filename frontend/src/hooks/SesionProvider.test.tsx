@@ -8,7 +8,7 @@ import { renderizarApp } from '../pruebas/render'
 describe('SesionProvider', () => {
   it('ante el evento de sesión expirada vuelve a /login', () => {
     renderizarApp(<App />, { ruta: '/reportes', rol: 'ADMIN' })
-    expect(screen.getByRole('heading', { name: 'Próximamente' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Reportes' })).toBeInTheDocument()
     act(() => {
       window.dispatchEvent(new Event(EVENTO_SESION_EXPIRADA))
     })
@@ -25,7 +25,7 @@ describe('SesionProvider', () => {
 
   it('cerrar sesión en otra pestaña (evento storage) cierra esta sesión', () => {
     renderizarApp(<App />, { ruta: '/reportes', rol: 'ADMIN' })
-    expect(screen.getByRole('heading', { name: 'Próximamente' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Reportes' })).toBeInTheDocument()
     act(() => {
       localStorage.removeItem(CLAVE_SESION)
       window.dispatchEvent(new StorageEvent('storage', { key: CLAVE_SESION, newValue: null }))
@@ -38,6 +38,6 @@ describe('SesionProvider', () => {
     act(() => {
       window.dispatchEvent(new StorageEvent('storage', { key: 'otra-clave', newValue: null }))
     })
-    expect(screen.getByRole('heading', { name: 'Próximamente' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Reportes' })).toBeInTheDocument()
   })
 })

@@ -71,6 +71,7 @@ class AnaliticaControllerConsultasTest {
     @MockitoBean RecalculoAnaliticoService recalculo;
     @MockitoBean co.livorno.controlstock.usuario.repositorio.UsuarioRepository usuarioRepository;
     @MockitoBean co.livorno.controlstock.analitica.servicio.TendenciasService tendencias;
+    @MockitoBean co.livorno.controlstock.analitica.servicio.ExportarTendenciasService exportarTendencias;
     @MockitoBean co.livorno.controlstock.analitica.servicio.ConsultaPronosticoService pronosticos;
 
     private static Authentication como(String rol) {

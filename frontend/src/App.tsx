@@ -15,6 +15,7 @@ import { AnaliticaPage } from './paginas/analitica/AnaliticaPage'
 import { ComprasPage } from './paginas/compras/ComprasPage'
 import { PlanDetallePage } from './paginas/compras/PlanDetallePage'
 import { PlanNuevoPage } from './paginas/compras/PlanNuevoPage'
+import { ReportesPage } from './paginas/reportes/ReportesPage'
 import { ReservaNuevaPage } from './paginas/reservas/ReservaNuevaPage'
 import { ReservasPage } from './paginas/reservas/ReservasPage'
 import { CategoriasPage } from './paginas/productos/CategoriasPage'
@@ -26,7 +27,7 @@ import { VentaDetallePage } from './paginas/ventas/VentaDetallePage'
 import { VentaNuevaPage } from './paginas/ventas/VentaNuevaPage'
 import { VentasPage } from './paginas/ventas/VentasPage'
 
-const CON_PAGINA = ['productos', 'inventario', 'ventas', 'reservas', 'alertas', 'analitica', 'compras', 'usuarios']
+const CON_PAGINA = ['productos', 'inventario', 'ventas', 'reservas', 'alertas', 'analitica', 'compras', 'reportes', 'usuarios']
 
 export default function App() {
   return (
@@ -69,6 +70,9 @@ export default function App() {
           </Route>
           <Route element={<RutaProtegida roles={['ADMIN', 'INVENTARIO']} />}>
             <Route path="/compras/nueva" element={<PlanNuevoPage />} />
+          </Route>
+          <Route element={<RutaProtegida roles={['ADMIN', 'CONTABILIDAD']} />}>
+            <Route path="/reportes" element={<ReportesPage />} />
           </Route>
           <Route element={<RutaProtegida roles={['ADMIN']} />}>
             <Route path="/usuarios" element={<UsuariosPage />} />

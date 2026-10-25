@@ -503,6 +503,7 @@ class ReservasAlertasIntegracionTest {
         enviar("POST", "/api/ventas/desde-reservas", contabilidad, convertir).andExpect(status().isForbidden());
         enviar("GET", "/api/alertas", contabilidad, null).andExpect(status().isForbidden());
         enviar("GET", "/api/alertas/resumen", contabilidad, null).andExpect(status().isForbidden());
+        enviar("GET", "/api/alertas/urgentes", contabilidad, null).andExpect(status().isForbidden());
         enviar("POST", "/api/alertas/" + alerta + "/atender", contabilidad, null).andExpect(status().isForbidden());
         assertThat(estadoReserva(reserva)).isEqualTo("ACTIVA");
 
@@ -520,6 +521,7 @@ class ReservasAlertasIntegracionTest {
         enviar("POST", "/api/alertas/" + alerta + "/atender", vendedor, null).andExpect(status().isForbidden());
         enviar("GET", "/api/alertas", vendedor, null).andExpect(status().isOk());
         enviar("GET", "/api/alertas/resumen", vendedor, null).andExpect(status().isOk());
+        enviar("GET", "/api/alertas/urgentes?limite=3", vendedor, null).andExpect(status().isOk());
         enviar("GET", "/api/reservas", vendedor, null).andExpect(status().isOk());
         enviar("POST", "/api/reservas/" + reserva + "/extender", vendedor, "{\"horas\":24}")
                 .andExpect(status().isOk());

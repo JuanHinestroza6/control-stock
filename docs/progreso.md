@@ -4,10 +4,11 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
 
 ## Estado actual
 
-- Semana: 4
-- Fase en curso: 6 — Predicción y compras **terminada**; T2 real por API y base de datos hecha (2026-10-21). Rama
-  `fase-6-prediccion-compras`, PR #10 abierto sin merge; falta la revisión visual del usuario por la interfaz
-- Última actualización: 2026-10-21
+- Semana: 5
+- Fase en curso: 7 — Cierre de entrega: implementación, revisión, documentación, guía T2 y guion terminados (falta la
+  T2 real del usuario y el ensayo). Rama
+  `fase-7-cierre-entrega`, sin push. Plan: docs/fases/fase-7-plan.md; ADR-011
+- Última actualización: 2026-10-24 (portátil: Windows 10 LTSC, sin Docker, MySQL 9.7 nativo, perfil `dev,local`)
 
 ## Hecho
 
@@ -56,68 +57,117 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
       16 → 0. Segunda carga sin borrar: no hizo nada. Observación: la corrección por agotados recupera ≈ 0,3× de las
       unidades perdidas (esperado 0,5×–2×)
 
+- [x] Fase 7 — plan y ADR-011 (D1–D6 confirmadas: 3 reportes + movimientos después del corte, devoluciones en fecha
+      mixta, merma aparte, costos del panel solo ADMIN/CONTABILIDAD, corrección por agotados sin cambio, sin Dockerfile);
+      textos del Word de REQ-03, REQ-07, RNF-03, REQ-09 y REQ-10 en el anexo del plan
+- [x] Fase 7 — núcleo: POI 5.4.1 y OpenPDF 2.0.3; `comun.exportacion` (Excel y PDF); módulo `reporte` con rentabilidad,
+      libro de ventas, valorización, `/exportar` y panel por rol; exportar tendencias a PDF (con gráfico y resumen) y
+      Excel; frontend con panel de inicio, página Reportes (3 pestañas, gráfico de margen, respaldo de formato) y exportar
+      en Tendencias; T1 rendimiento con 12.150 ventas: todo < 0,5 s (peor: libro XLSX 24 meses 430 ms), EXPLAIN sin
+      recorrido completo, sin índices nuevos; T2 flujo por HTTP (conciliación, Ley 1581 en bytes, matriz de roles).
+      Diagramas de paquetes, componentes, despliegue y casos de uso general. Backend 1380/1380, frontend 635/635
+
+- [x] Fase 7 — después del corte (2026-10-24, en el portátil sin Docker; las pruebas con Testcontainers las corre la CI):
+      panel sin duplicación (agotadas y bajo stock solo en las tarjetas de Inventario; bloque "Alertas más urgentes" con
+      `GET /api/alertas/urgentes`: AGOTADO por umbral y antigüedad, STOCK_BAJO por cobertura); esperas de Testing Library
+      a 3 s (fallos intermitentes por carga); B9 + F7 movimientos del periodo (saldo inicial, entradas y su valor,
+      ventas, anulaciones, devoluciones, ajustes, saldo final; detalle del kardex solo en Excel; cuadre verificado en
+      vivo contra el kardex: 1.321 → 1.496); B10 unidades perdidas comparables y razón de la corrección en el resumen de
+      la semilla; D1 fichas REQ-03, REQ-07, RNF-03 nuevas y REQ-01, REQ-09, REQ-10 completas (sin "[confirmar con el
+      Word]"), títulos del Word de CU-03, CU-04, CU-09 y CU-10; D2 casos de uso general corregido (sin "CU-06 extiende
+      CU-05"; CU-01 extiende CU-10; "Comparar periodos" extiende CU-05), clases general y secuencia de exportar; D3
+      `docs/ppi/trazabilidad.md` y README del PPI. 20 `.puml` validan con PlantUML 1.2024.7 (JAR de `~/.m2`)
+
+- [x] Fase 7 — revisión (rol `revisor`; esta sesión no cargó los agentes del proyecto y se usó un agente general con
+      `.claude/agents/revisor.md`): sin críticos. Corregidas las 2 advertencias: B10 usa la ventana de la `fechaCorte`
+      real de la analítica (pérdidas por mes en la simulación; antes podía desalinearse con `fecha-fin` explícita) y la
+      prueba de integración de movimientos cubre VENTA_RESERVA, LIBERACION, variante inactiva y otra categoría. De las
+      sugerencias: urgentes STOCK_BAJO por posición (con lo en camino), fórmula completa y aviso del tope del Excel en
+      la pestaña Movimientos, sesgo de B10 documentado, ajustes menores de documentación. Quedan como están: carga de
+      todas las alertas activas para elegir 5 (con ~300 variantes no pesa) y el UPDATE de fecha del kardex solo en la
+      preparación de la prueba. Backend 905 + 493 omitidas (Testcontainers), frontend 642
+
+- [x] Fase 7 — T3: guía T2 adaptada al portátil (vaciar la base con el cliente nativo, carga `dev,local,seed`,
+      verificación por rol, cifras contra SQL, `Measure-Command`) y guion de sustentación de 15 min para 3 expositores
+      (Juan Francisco Hinestroza, Juan David Quinto y Santiago Granada Baena; `docs/ppi/guion-sustentacion.md`).
+      Comprobado que `dev,local,seed` arranca y, con datos, no hace nada
+
 ## En curso
 
-- [ ] Fase 6 — revisión visual del usuario (paso 4 de la guía T2, por la interfaz) y merge del PR #10
+- [ ] Fase 7 — T2 real del usuario en el portátil (guía abajo) y ensayo cronometrado con el guion
 
 ## Próximos pasos
 
-1. El usuario hace la revisión visual (paso 4 de la guía T2) y el merge del PR #10; luego `git switch main && git pull`.
-2. Revisar la corrección por agotados en la fase 7 si se quiere acercar al rango esperado (hoy ≈ 0,3× de las unidades
-   perdidas; posibles causas: piso de disponibilidad 0,5, solo variantes activas, quiebres cortos no visibles por día).
-3. Completar en REQ-09 y REQ-10 stakeholder, necesidad, prioridad y el título de CU-05 (quedaron "[confirmar con el
-   Word]"); validar la sintaxis de los `.puml` nuevos (no hay `plantuml` local).
-4. Fase 7: dashboard, reportes PDF/Excel (incluye el PDF de tendencias, CU-05), rendimiento y documento PPI.
+1. El usuario corre la T2 de la fase 7 (guía abajo) y anota las cifras: B10 (unidades perdidas comparables y razón de la
+   corrección), tiempos de `Measure-Command`, valorización contra SQL; se pasan a REQ-10, RNF-03 y
+   `docs/ppi/datos-demostracion.md`.
+2. Ensayo cronometrado con `docs/ppi/guion-sustentacion.md`.
+3. Push y PR de `fase-7-cierre-entrega` cuando el usuario lo pida; la CI corre las pruebas con Testcontainers (nuevas:
+   `MovimientosPeriodoServiceIntegracionTest`, movimientos en `ReportesFlujoIntegracionTest` y `RendimientoReportesTest`,
+   `/alertas/urgentes` en `ReservasAlertasIntegracionTest`, B10 en `SimulacionIntegracionTest`). El merge lo hace el
+   usuario.
 
-## Prueba T2 — fase 6 (PowerShell 5, desde la raíz del repo) — hecha por API (2026-10-21); falta el paso 4 visual
+## Prueba T2 — fase 7 en el portátil (PowerShell 5, MySQL nativo, perfiles `dev,local` y `dev,local,seed`)
 
-Los pasos 1–3, 5 y 6 ya se ejecutaron (cifras en "Hecho"); la base de desarrollo quedó cargada con la semilla de 36
-meses más el plan PC-003674 recibido. Para la revisión visual basta el paso 3 (arrancar) y el paso 4.
+Sin Docker: la base es el MySQL 9.7 nativo y la configuración sale de `backend/config/application-local.properties`
+(fuera de Git). Cliente de MySQL: `C:\tools\mysql\current\bin\mysql.exe`.
 
-**Atención: el paso 1 BORRA todos los datos de tu base de desarrollo local.** Contraseñas: los 4 usuarios demo usan la de
-`SEED_PASSWORD` del `.env`; el ADMIN inicial (`ADMIN_EMAIL`) usa la de `ADMIN_PASSWORD`. Nunca se escriben en el repo.
-**Ojo:** en este `.env` `ADMIN_EMAIL` es `admin@livorno.co`, así que la semilla reutiliza ese usuario y
-`admin@livorno.co` entra con `ADMIN_PASSWORD`, no con `SEED_PASSWORD`.
+**Atención: el paso 1 BORRA todos los datos de la base local `control_stock`.** Credenciales (nunca en el repo): el
+ADMIN inicial es el `spring.flyway.placeholders.admin-email` de `application-local.properties` con su `admin-password`;
+los 4 usuarios demo (`admin@livorno.co`, `inventario@livorno.co`, `ventas@livorno.co`, `contabilidad@livorno.co`) usan
+`app.semilla.password`. La clave de MySQL es `spring.datasource.password`.
 
-1. Base vacía: `docker compose down -v` y `docker compose up -d mysql` (esperar `healthy` con `docker compose ps`).
-2. Carga: `cd backend`, `.\mvnw.cmd clean` y `.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=dev,seed"`
-   (`fecha-fin` vacía = ayer; ahora son **36 meses**, se esperan ~3,5–4 min). Anota del resumen: duración total, ventas
-   (y anuladas), unidades perdidas, **planes creados / recibidos / en camino** (y unidades en camino), y de la analítica
-   de cierre: productos con **Holt-Winters** y con SES, **WAPE global**, % de variantes en alerta **con y sin tránsito**
-   y variantes con pedido en camino.
-3. Arranque normal: `.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=dev"` y en otra terminal `cd frontend`,
-   `npm run dev`. Abre http://localhost:5173.
+1. Base vacía (el usuario `control_stock` tiene todos los permisos sobre su base; pide la clave):
+   `& 'C:\tools\mysql\current\bin\mysql.exe' -u control_stock -p -e "DROP DATABASE control_stock; CREATE DATABASE control_stock CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"`
+2. Carga (Flyway crea V1–V16 y la semilla corre unos 4–5 min y termina): `cd backend`, `.\mvnw.cmd clean` y
+   `.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=dev,local,seed"`. Anota del resumen: duración, ventas (y
+   anuladas), unidades perdidas, planes creados / recibidos / en camino, y de la analítica: Holt-Winters y SES, WAPE
+   global, % en alerta con y sin tránsito y, **nuevo (B10)**, la línea «corrección por agotados (12 meses antes de
+   AAAA-MM): +X unidades frente a Y perdidas comparables = Z×» (esperado 0,5×–2×; en la fase 6 daba ≈ 0,3× contra todas
+   las perdidas de 36 meses).
+3. Arranque normal: `.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=dev,local"`; en otra terminal `cd frontend`
+   y `npm run dev`. Abre http://localhost:5173.
 4. Verificación por rol:
-   - [ ] `admin@livorno.co`: Analítica → panel "Última ejecución" (origen Datos semilla, EXITOSA, pronóstico HW/SES,
-         WAPE global, % en alerta con y sin tránsito). Pulsa "Recalcular" y anota la duración (meta < 8 s; aceptable
-         < 15 s). **Tendencias**: cambia periodo 12/24/36, métrica, categoría y producto (año anterior punteado).
-         **Pronóstico**: listado con método y semáforo de WAPE; abre LIV001 (producto de cabeza: gráfico con backtest y
-         reparto por variante) y LIV004 (estancado: SES con motivo "meses sin demanda"). **Reorden**: columnas En camino,
-         Posición y Fuente; "Solo en alerta" no muestra variantes cuya posición supera el umbral.
-   - [ ] `inventario@livorno.co`: Compras → "Generar sugerencia" (anota líneas, omitidas y si aparece el aviso de
-         excluidas por tope); en el borrador cambia una cantidad y guarda. Abre un plan **APROBADO** en camino de la
-         semilla y **recíbelo** (cambia una cantidad recibida; un solo costo por producto); en el kardex deben aparecer
-         las ENTRADAS con referencia `PLAN_COMPRA/…` y el plan queda RECIBIDO. No ve "Aprobar"; puede descartar un
-         BORRADOR pero no cancelar un APROBADO. Inventario muestra "N en camino".
-   - [ ] `admin@livorno.co` otra vez: aprueba el borrador sugerido (diálogo con total estimado), pulsa "Recalcular" y
-         anota la nueva métrica con y sin tránsito. Opcional (concurrencia): abre el mismo borrador en dos navegadores,
-         cambia líneas distintas en cada uno y guarda ambos: el segundo recibe 409 y "Cargar versión vigente" fusiona
-         sin perder los cambios del otro; si tocaron la misma línea aparece el conflicto a resolver.
-   - [ ] `ventas@livorno.co`: no ve Compras ni las pestañas Tendencias y Pronóstico (solo "Más vendidos").
-   - [ ] `contabilidad@livorno.co`: ve Compras con costos en solo lectura (sin botones), Tendencias y Pronóstico.
-5. Opcional (cifras para el PPI), desde la raíz: `docker compose exec mysql mysql -u root -p control_stock` (pide
-   `DB_ROOT_PASSWORD` del `.env`) y ejecuta:
-   `select metodo, count(*), avg(error_wape) from analitica_producto group by metodo;`
-   `select motivo_sin_hw, count(*) from analitica_producto group by motivo_sin_hw;`
-   `select al.tipo, a.clase_abc, count(*) from alerta al join analitica_variante a on a.variante_id = al.variante_id
-   where al.estado = 'ACTIVA' group by al.tipo, a.clase_abc order by 1, 2;`
-   `select p.estado, count(distinct p.id) planes, sum(d.cantidad_aprobada) unidades from plan_compra p
-   join detalle_plan d on d.plan_id = p.id group by p.estado;`
-   `select sum(unidades_observadas_12m), sum(unidades_corregidas_12m) from analitica_producto;` (lo que agrega la
-   corrección por agotados frente a las unidades perdidas del resumen: se espera el mismo orden de magnitud, 0,5×–2×).
-6. Volver a ejecutar el paso 2 sin borrar: debe decir que ya hay datos y no crear nada.
+   - [ ] `admin@livorno.co`, **Inicio**: secciones Ventas (con margen y gráfico de 7 días), Inventario (Agotadas, Bajo
+         stock y Sin rotación solo como tarjetas; valores a costo y a venta), Apartados y Compras. El bloque «Alertas más
+         urgentes» lista 5 (primero agotadas de mayor umbral, luego bajo stock con menor posición / umbral), sin repetir
+         los conteos, y «Ver todas las alertas» abre Alertas.
+   - [ ] `admin@livorno.co`, **Reportes** (4 pestañas): Rentabilidad del mes anterior completo por producto (gráfico del
+         top 10); Libro de ventas por mes de los últimos 12 meses (meses con devoluciones de otros meses pueden ir en
+         negativo; sección de anuladas); Valorización por categoría; **Movimientos** del mes anterior por categoría (la
+         fila Total cuadra: saldo inicial + entradas − ventas + anulaciones + devoluciones + ajustes + − ajustes − =
+         saldo final) y por variante. Exporta PDF y Excel de los cuatro y ábrelos (el Excel del libro y el de
+         movimientos traen hoja de detalle; el PDF no).
+   - [ ] `contabilidad@livorno.co`: Inicio con margen y valores a costo, sin Apartados ni bloque de alertas; Reportes
+         igual que el ADMIN.
+   - [ ] `inventario@livorno.co`: Inicio sin ventas ni valores a costo; `/reportes` muestra «Acceso denegado»;
+         Analítica → Tendencias → «Exportar PDF»: tabla, gráfico (año anterior punteado) y párrafo de resumen.
+   - [ ] `ventas@livorno.co`: Inicio con ventas sin margen ni Compras y con el bloque de alertas; `/reportes` denegado;
+         en Analítica solo «Más vendidos» (sin exportar).
+   - [ ] Pendiente visual de la fase 6 (rápido): Compras → «Generar sugerencia» como INVENTARIO, aprobar como ADMIN y
+         recibir como INVENTARIO un plan en camino; el kardex muestra las ENTRADAS `PLAN_COMPRA/…`.
+5. Cifras contra SQL (pide la clave de MySQL):
+   `& 'C:\tools\mysql\current\bin\mysql.exe' -u control_stock -p control_stock -e "select sum(va.stock_fisico * p.precio_compra) valor_costo, sum(va.stock_fisico) fisico from variante va join producto p on p.id = va.producto_id;"`
+   debe coincidir con el Total de Valorización (con inactivas) y con el saldo final de Movimientos hasta hoy.
+   Opcional: `select sum(unidades_observadas_12m), sum(unidades_corregidas_12m) from analitica_producto;` (la diferencia
+   entre ambas es el +X del paso 2).
+6. Tiempos (RNF-03, < 3 s) con el backend arriba; pide el usuario y la clave de un ADMIN demo:
+   ```
+   $c = Get-Credential admin@livorno.co
+   $b = @{ email = $c.UserName; password = $c.GetNetworkCredential().Password } | ConvertTo-Json
+   $h = @{ Authorization = "Bearer $((Invoke-RestMethod -Method Post http://localhost:8080/api/auth/login -ContentType 'application/json' -Body $b).token)" }
+   $hasta = Get-Date -Format yyyy-MM-dd; $desde = (Get-Date).AddDays(-730).ToString('yyyy-MM-dd'); $r = "desde=$desde&hasta=$hasta"
+   foreach ($u in "/api/panel", "/api/reportes/rentabilidad?$r&agrupacion=VARIANTE", "/api/reportes/libro-ventas?$r&agrupacion=MES", "/api/reportes/valorizacion?agrupacion=VARIANTE", "/api/reportes/movimientos?$r&agrupacion=VARIANTE", "/api/reportes/libro-ventas/exportar?$r&formato=XLSX", "/api/reportes/movimientos/exportar?desde=$((Get-Date).AddDays(-365).ToString('yyyy-MM-dd'))&hasta=$hasta&formato=XLSX", "/api/analitica/tendencias/exportar?formato=PDF") {
+     $ms = (Measure-Command { Invoke-WebRequest "http://localhost:8080$u" -Headers $h -UseBasicParsing -OutFile "$env:TEMP\t2.bin" }).TotalMilliseconds
+     "{0,8:N0} ms  {1}" -f $ms, $u
+   }
+   ```
+   Si el Excel de movimientos de 12 meses responde 422 (más de 50.000 movimientos), acota a 6 meses y anótalo.
+7. Volver a ejecutar el paso 2 sin borrar: debe decir «ya hay ventas en la base, no se hace nada».
+8. Ensayo cronometrado de la sustentación (unos 15 min) con `docs/ppi/guion-sustentacion.md`. La víspera de la demo,
+   repetir los pasos 1–2 para que las reservas ACTIVAS y SIN_ROTACION queden alineadas con la fecha.
 
-Referencia: % de variantes en alerta de stock fase 4 47 %, fase 5 34,4 %; meta ~10–15 % (estimado 11–17 %, ADR-010).
+Anota los resultados en "Hecho" (y en REQ-10, RNF-03 y `docs/ppi/datos-demostracion.md`).
 
 ## Bloqueos y decisiones pendientes (aceptados, sin acción)
 
@@ -142,7 +192,12 @@ Referencia: % de variantes en alerta de stock fase 4 47 %, fase 5 34,4 %; meta ~
 
 - Maven en el sandbox de Claude Code: usar `./mvnw -o` (offline). Si se agregan dependencias, ejecutar `./mvnw` con red
   (MAVEN_OPTS=-Djavax.net.ssl.trustStoreType=Windows-ROOT).
-- Docker Desktop debe estar arriba: sin él se omiten las pruebas con Testcontainers (no hacer commit en ese caso).
+- PC de mesa: Docker Desktop debe estar arriba (sin él se omiten las pruebas con Testcontainers). **Portátil** (sin
+  Docker, MySQL 9.7 nativo, perfil `dev,local` con `backend/config/application-local.properties`): se omiten las pruebas
+  con Testcontainers; un commit requiere en verde el resto del backend y el frontend completo, y las de integración las
+  valida la CI del PR. `gh` no está en el PATH (`& "C:\Program Files\GitHub CLI\gh.exe"`); no hay Python; PlantUML se
+  valida con el JAR de `~/.m2` (ver `docs/ppi/README.md`). En la sesión del 2026-10-24 Claude Code no cargó los agentes
+  de `.claude/agents/` (se usó un agente general con las instrucciones de `revisor.md`).
 - Al encadenar verificación y commit, cortar ante cualquier fallo (`verify && commit`).
 - Las pruebas que borran variantes deben borrar antes `alerta` y `reserva`; las de semilla usan `LimpiezaSemilla`.
 - Las reservas ACTIVAS de la semilla vencen a los pocos días: regenerar la víspera de una demo.
@@ -154,12 +209,14 @@ Referencia: % de variantes en alerta de stock fase 4 47 %, fase 5 34,4 %; meta ~
   local (1269/1269). Si se agregan pruebas con `@MockitoBean`/`@MockitoSpyBean` (contexto nuevo), vigilar ese número.
 - Frontend: las pruebas que simulan el login con un adaptador de Axios deben usar `soloLogin` (`src/pruebas/http.ts`);
   un falso que responde lo mismo a todo rompe la página destino según el tiempo (falló en CI con `/compras`).
-- Frontend: en dos corridas apareció 1 fallo intermitente que no se reprodujo en 7 corridas seguidas; probablemente
+- Frontend: los fallos intermitentes por carga (una prueba distinta en cada corrida completa) se resolvieron subiendo
+  `asyncUtilTimeout` a 3 s (`src/pruebas/setup.ts`, fase 7). Antes: en dos corridas apareció 1 fallo intermitente;
   carga de la máquina con Maven en paralelo. Si reaparece, guardar la salida de `npx vitest run --reporter=verbose`.
 - Fase 6: el IDE volvió a compilar en `target/` ("Unresolved compilation problems"); revisar que Java › Autobuild siga
   desactivado. Nunca correr dos Maven a la vez (corrompe `target/` y choca con Testcontainers).
 - Problema conocido: `ClassFormatError: Invalid method Code length 0` al arrancar (clase corrupta en `target/`, p. ej.
   `AnaliticaVariante`) se resuelve con `./mvnw clean` (o `.\mvnw.cmd clean`). El usuario desactivó el Auto Build de la
   extensión Java de VS Code, que compilaba en `target/` a la vez que Maven.
-- Para demos: regenerar la semilla la víspera (`docker compose down -v` y carga `dev,seed`) para que las reservas ACTIVAS
+- Para demos: regenerar la semilla la víspera (PC de mesa: `docker compose down -v` y carga `dev,seed`; portátil: pasos
+  1–2 de la guía T2 con `dev,local,seed`) para que las reservas ACTIVAS
   y la ventana de SIN_ROTACION queden alineadas con la fecha.

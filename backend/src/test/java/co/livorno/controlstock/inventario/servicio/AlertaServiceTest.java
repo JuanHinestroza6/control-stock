@@ -17,7 +17,9 @@ import co.livorno.controlstock.catalogo.modelo.Variante;
 import co.livorno.controlstock.catalogo.repositorio.VarianteRepository;
 import co.livorno.controlstock.comun.excepcion.ConflictoException;
 import co.livorno.controlstock.inventario.evento.StockCambiado;
+import co.livorno.controlstock.inventario.dto.AlertaResponse;
 import co.livorno.controlstock.inventario.modelo.Alerta;
+import co.livorno.controlstock.inventario.modelo.EstadoAlerta;
 import co.livorno.controlstock.inventario.modelo.TipoAlerta;
 import co.livorno.controlstock.inventario.repositorio.AlertaRepository;
 import java.time.Clock;
@@ -338,6 +340,70 @@ class AlertaServiceTest {
         assertThat(r.sinRotacion()).isEqualTo(3);
         assertThat(r.agotado()).isEqualTo(2);
         assertThat(r.stockBajo()).isEqualTo(5);
+    }
+
+    // --- urgentes (bloque del panel) ---
+
+    /** Alerta ACTIVA con id, antigüedad en días y variante con disponible y umbral (stock mínimo) dados. */
+    private static Alerta alertaUrgente(long id, TipoAlerta tipo, int disponible, int umbral, int diasAntiguedad) {
+        Variante v = new Variante(producto(), "LIV001-" + id, Talla.M, "NEGRO", umbral);
+        v.aplicarMovimiento(disponible, 0);
+        org.springframework.test.util.ReflectionTestUtils.setField(v, "id", 100 + id);
+        Alerta a = new Alerta(v, tipo, AHORA.minusDays(diasAntiguedad));
+        org.springframework.test.util.ReflectionTestUtils.setField(a, "id", id);
+        return a;
+    }
+
+    @Test
+    void urgentes_stockBajoOrdenaPorPosicionConLoEnCamino() {
+        // 9: disponible 1 + 8 en camino = 9 de 10 (90 %); 10: disponible 3 sin pedido = 3 de 10 (30 %)
+        simularActivas(java.util.List.of(), java.util.List.of(alertaUrgente(9, TipoAlerta.STOCK_BAJO, 1, 10, 5),
+                alertaUrgente(10, TipoAlerta.STOCK_BAJO, 3, 10, 1)));
+        when(pedidos.enCaminoPorVariante()).thenReturn(java.util.Map.of(109L, 8L));
+
+        assertThat(servicio.urgentes(5)).extracting(AlertaResponse::id).containsExactly(10L, 9L);
+    }
+
+    private void simularActivas(java.util.List<Alerta> agotadas, java.util.List<Alerta> bajas) {
+        when(alertas.buscar(eq(EstadoAlerta.ACTIVA), eq(TipoAlerta.AGOTADO), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(agotadas));
+        when(alertas.buscar(eq(EstadoAlerta.ACTIVA), eq(TipoAlerta.STOCK_BAJO), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(bajas));
+    }
+
+    @Test
+    void urgentes_agotadasPorUmbralYAntiguedadYLuegoBajasPorCobertura() {
+        simularActivas(
+                java.util.List.of(alertaUrgente(6, TipoAlerta.AGOTADO, 0, 0, 40), // sin demanda: última agotada
+                        alertaUrgente(1, TipoAlerta.AGOTADO, 0, 5, 1),
+                        alertaUrgente(2, TipoAlerta.AGOTADO, 0, 5, 10)),
+                java.util.List.of(alertaUrgente(3, TipoAlerta.STOCK_BAJO, 4, 5, 30), // cobertura 80 %
+                        alertaUrgente(4, TipoAlerta.STOCK_BAJO, 1, 10, 2), // 10 %
+                        alertaUrgente(5, TipoAlerta.STOCK_BAJO, 2, 4, 5))); // 50 %
+
+        var r = servicio.urgentes(10);
+
+        assertThat(r).extracting(AlertaResponse::id).containsExactly(2L, 1L, 6L, 4L, 5L, 3L);
+        assertThat(servicio.urgentes(null)).hasSize(5);
+        assertThat(r).allSatisfy(a -> assertThat(a.atendidaPor()).isNull());
+    }
+
+    @Test
+    void urgentes_respetaElLimiteYEmpataPorAntiguedad() {
+        simularActivas(java.util.List.of(),
+                java.util.List.of(alertaUrgente(7, TipoAlerta.STOCK_BAJO, 1, 2, 1),
+                        alertaUrgente(8, TipoAlerta.STOCK_BAJO, 2, 4, 9)));
+
+        assertThat(servicio.urgentes(1)).extracting(AlertaResponse::id).containsExactly(8L);
+    }
+
+    @Test
+    void urgentes_limiteFueraDeRango_lanza400() {
+        assertThatThrownBy(() -> servicio.urgentes(0))
+                .isInstanceOf(co.livorno.controlstock.comun.excepcion.SolicitudInvalidaException.class);
+        assertThatThrownBy(() -> servicio.urgentes(21))
+                .isInstanceOf(co.livorno.controlstock.comun.excepcion.SolicitudInvalidaException.class);
+        verifyNoInteractions(alertas);
     }
 
     @Test

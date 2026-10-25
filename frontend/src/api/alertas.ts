@@ -16,6 +16,12 @@ export async function listarAlertas(filtros: FiltrosAlertas): Promise<PaginaAler
   return data
 }
 
+/** Alertas de stock activas más urgentes (AGOTADO por umbral y antigüedad, luego STOCK_BAJO por cobertura). */
+export async function obtenerAlertasUrgentes(limite: number): Promise<AlertaResponse[]> {
+  const { data } = await cliente.get<AlertaResponse[]>('/alertas/urgentes', { params: { limite } })
+  return data
+}
+
 export async function obtenerResumenAlertas(): Promise<ResumenAlertasResponse> {
   const { data } = await cliente.get<ResumenAlertasResponse>('/alertas/resumen')
   return data

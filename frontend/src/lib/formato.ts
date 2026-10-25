@@ -20,3 +20,15 @@ export function formatearFecha(valor: Date | string, conHora = false): string {
     ...(conHora ? { timeStyle: 'short' } : {}),
   }).format(fecha)
 }
+
+const formatoNumero = new Intl.NumberFormat('es-CO')
+const formatoPorcentaje = new Intl.NumberFormat('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+
+export function formatearNumero(valor: number): string {
+  return formatoNumero.format(valor)
+}
+
+/** Porcentaje con un decimal; un guion cuando el backend manda null (base cero). */
+export function formatearPorcentaje(valor: number | null): string {
+  return valor === null ? '—' : `${formatoPorcentaje.format(valor)} %`
+}

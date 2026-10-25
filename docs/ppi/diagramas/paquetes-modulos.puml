@@ -1,0 +1,81 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+title Diagrama de paquetes - Módulos del backend y dependencias permitidas (co.livorno.controlstock)
+
+package "comun" as comun {
+  package "comun.exportacion\n(DocumentoTabular, GeneradorExcel,\nGeneradorPdf, ExportadorDocumentos)" as exportacion
+}
+package "auth" as auth
+package "usuario" as usuario
+package "catalogo" as catalogo {
+  interface ConsultaReservasActivas
+}
+package "inventario" as inventario {
+  interface ConsultaPedidosEnCamino
+}
+package "venta" as venta
+package "compra" as compra {
+  interface FuenteSugerenciaCompra
+}
+package "analitica" as analitica
+package "reporte\n(nuevo, ADR-011)" as reporte
+package "semilla\n(@Profile seed)" as semilla
+
+auth ..> usuario
+auth ..> comun
+usuario ..> comun
+catalogo ..> comun
+inventario ..> catalogo
+inventario ..> usuario
+inventario ..> comun
+venta ..> inventario
+venta ..> catalogo
+venta ..> usuario
+venta ..> comun
+compra ..> inventario
+compra ..> catalogo
+compra ..> usuario
+compra ..> comun
+analitica ..> inventario
+analitica ..> catalogo
+analitica ..> usuario
+analitica ..> comun
+reporte ..> exportacion
+reporte ..> inventario : puerto\nConsultaPedidosEnCamino
+semilla ..> auth
+semilla ..> usuario
+semilla ..> catalogo
+semilla ..> inventario
+semilla ..> venta
+semilla ..> compra
+semilla ..> analitica
+
+catalogo ..> ConsultaReservasActivas : consulta
+inventario ..|> ConsultaReservasActivas : implementa
+inventario ..> ConsultaPedidosEnCamino : consulta
+compra ..|> ConsultaPedidosEnCamino : implementa
+compra ..> FuenteSugerenciaCompra : consulta
+analitica ..|> FuenteSugerenciaCompra : implementa
+
+note bottom of exportacion
+  No depende de ningún módulo (ADR-011).
+  Usa Apache POI y OpenPDF.
+end note
+note bottom of reporte
+  ArchUnit (ADR-011): nadie depende de reporte;
+  reporte no depende de analitica ni de semilla
+  y no invoca MovimientoService ni escrituras JDBC.
+end note
+note bottom of semilla
+  ArchUnit (ADR-008, ADR-009): nadie fuera de semilla depende de ella;
+  solo semilla y analitica dependen de analitica.
+end note
+note bottom of catalogo
+  ArchUnit (ADR-007, ADR-010): catalogo no depende de inventario ni venta;
+  inventario no depende de venta; catalogo, inventario, venta y usuario
+  no dependen de compra; compra no depende de venta ni de analitica.
+end note
+@enduml

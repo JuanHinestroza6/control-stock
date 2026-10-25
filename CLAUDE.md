@@ -1,7 +1,7 @@
 # Control Stock — Livorno Clothing
 
 Sistema web de gestión de inventario para Livorno Clothing (moda, Medellín; vende por Instagram, TikTok y WhatsApp).
-Proyecto académico PPI — Ingeniería en Software, Tecnológico de Antioquia. Equipo de 5 personas.
+Proyecto académico PPI — Ingeniería en Software, Tecnológico de Antioquia. Equipo de 3 personas.
 
 Diferenciadores del proyecto (no recortar sin consultar): inventario por variantes (talla × color), kardex inmutable,
 apartados (stock reservado vs. disponible), clasificación ABC, punto de reorden dinámico y predicción de demanda.

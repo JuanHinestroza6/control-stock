@@ -58,4 +58,19 @@ public class ConsultasTendencias {
                 rs.getBigDecimal("unidades").longValueExact(),
                 rs.getBigDecimal("ingreso").setScale(2, RoundingMode.HALF_UP)));
     }
+
+    /** Nombre de la categoría, o null si no existe (solo para rotular los filtros de la exportación). */
+    public String nombreCategoria(Long categoriaId) {
+        return primero("SELECT nombre FROM categoria WHERE id = :id", categoriaId);
+    }
+
+    /** Código y nombre del producto, o null si no existe. */
+    public String nombreProducto(Long productoId) {
+        return primero("SELECT CONCAT(codigo, ' - ', nombre) FROM producto WHERE id = :id", productoId);
+    }
+
+    private String primero(String sql, Long id) {
+        List<String> r = jdbc.query(sql, new MapSqlParameterSource("id", id), (rs, n) -> rs.getString(1));
+        return r.isEmpty() ? null : r.get(0);
+    }
 }

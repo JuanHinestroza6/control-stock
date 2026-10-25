@@ -1,0 +1,69 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+title Diagrama de componentes - Control Stock
+
+package "Navegador (SPA React 18 + Vite + TypeScript)" {
+  component "Páginas\n(inventario, productos, ventas, reservas,\nalertas, analítica, compras, usuarios,\ncuenta, login, panel)" as Paginas
+  component "TanStack Query\n(caché y estado del servidor)" as Query
+  component "Cliente API (Axios)\nsrc/api, JWT en la cabecera" as Axios
+  Paginas --> Query
+  Query --> Axios
+}
+
+package "Servidor de aplicación (JAR Spring Boot 4.1.1, Java 21)" {
+  component "Seguridad\n(Spring Security + JWT,\n@PreAuthorize por rol)" as Seg
+  package "API REST por módulos (web, servicio, repositorio)" {
+    component "auth / usuario" as MAuth
+    component "catalogo" as MCat
+    component "inventario\n(MovimientoService, reservas, alertas)" as MInv
+    component "venta" as MVen
+    component "analitica\n(ABC, ROP, pronóstico, tendencias)" as MAna
+    component "compra" as MCom
+    component "reporte\n(rentabilidad, libro de ventas,\nvalorización, panel)" as MRep
+  }
+  package "Generadores de documentos (comun.exportacion)" {
+    component "GeneradorPdf\n(OpenPDF)" as Pdf
+    component "GeneradorExcel\n(Apache POI)" as Xls
+  }
+  package "Tareas programadas (@Scheduled)" {
+    component "AnaliticaNocturnaTarea\n(02:00)" as T1
+    component "VencimientoReservasTarea\n(cada 15 min)" as T2
+    component "AnonimizacionReservasTarea\n(02:30)" as T3
+  }
+  component "Flyway\n(migraciones)" as Fly
+}
+
+database "MySQL 8.4" as BD
+
+Axios --> Seg : HTTPS / JSON (/api)
+Seg --> MAuth
+Seg --> MCat
+Seg --> MInv
+Seg --> MVen
+Seg --> MAna
+Seg --> MCom
+Seg --> MRep
+MRep --> Pdf
+MRep --> Xls
+MAna --> Pdf : exportar tendencias
+MAna --> Xls
+T1 --> MAna
+T2 --> MInv
+T3 --> MInv
+MAuth --> BD : JDBC (JPA)
+MCat --> BD
+MInv --> BD
+MVen --> BD
+MAna --> BD
+MCom --> BD
+MRep --> BD : SQL de solo lectura
+Fly --> BD : migraciones V1 en adelante
+
+note bottom of MRep
+  Los reportes se generan bajo demanda,
+  de forma síncrona y en memoria (ADR-011).
+end note
+@enduml

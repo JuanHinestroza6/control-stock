@@ -34,3 +34,17 @@ title <Título en español>
 - Generar desde el código, nunca de memoria. Si algo del documento no existe en el código, señalarlo.
 - Nombres en español, iguales a los del código.
 - Validar sintaxis: si `plantuml` está instalado, `plantuml -checkonly archivo.puml`.
+
+## Validación local (verificada)
+
+`plantuml` no está en el PATH; se usa el JAR de la extensión de VS Code (Git Bash, desde la raíz):
+
+```
+java -jar "$USERPROFILE/.vscode/extensions/jebbs.plantuml-2.18.1/plantuml.jar" -checkonly docs/ppi/diagramas/*.puml
+```
+
+Sin salida y código 0 = sintaxis correcta. Graphviz no está instalado: para renderizar agregar `!pragma layout smetana`.
+
+Sin la extensión de VS Code (p. ej. el portátil), el mismo JAR desde Maven Central (queda en `~/.m2`, desde `backend/`):
+`./mvnw dependency:get -Dartifact=net.sourceforge.plantuml:plantuml:1.2024.7` y luego, desde la raíz del repositorio (`cd ..`),
+`java -jar ~/.m2/repository/net/sourceforge/plantuml/plantuml/1.2024.7/plantuml-1.2024.7.jar -checkonly docs/ppi/diagramas/*.puml`.

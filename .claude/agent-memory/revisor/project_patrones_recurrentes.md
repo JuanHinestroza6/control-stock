@@ -1,6 +1,6 @@
 ---
 name: project-patrones-recurrentes
-description: Errores que el equipo repite (versión optimista tomada de la prop refrescada, tope limit(N) por id, collation, IAE=500, ADR≠código, concurrencia sin prueba, ArchUnit vacua, cast en JPQL, @Size antes de strip, listener sin bloqueo, locks implícitos de InnoDB por FK y UPDATE con subconsulta, tipos TS no nulos)
+description: Errores que el equipo repite (versión optimista tomada de la prop refrescada, tope limit(N) por id, collation, IAE=500, ADR≠código, concurrencia sin prueba, ArchUnit vacua, cast en JPQL, @Size antes de strip, listener sin bloqueo, locks implícitos de InnoDB, tipos TS no nulos, ventanas con dos relojes, IT sin cubrir ramas del CASE)
 metadata:
   type: project
 ---
@@ -66,3 +66,15 @@ Fase 6 (rama fase-6-prediccion-compras, 2026-10-21), sin críticos:
 Se repitió el 14a con otra forma: inserts analíticos con FK a `producto` (S) antes de las variantes vs la entrada que
 actualiza `producto.precioCompra` (X) después de las variantes. También: un "bug conocido" del equipo (no se puede
 vaciar la observación del plan) no se reproducía en el código; verificar antes de confirmar pendientes heredados.
+
+Fase 7 después del corte (rama fase-7-cierre-entrega, 2026-10-24, portátil sin Docker), sin críticos:
+18. Ventanas de tiempo derivadas de dos relojes distintos para compararse entre sí: la semilla cuenta "unidades perdidas
+    comparables" con `fin + 1` y la analítica de cierre corre con `LocalDate.now(clock)` del sistema; con `fecha-fin`
+    explícita de otro mes la razón sale desalineada sin aviso. Pedir que la ventana salga del mismo corte (o n/d).
+19. SQL con clasificación por tipo (CASE m.tipo IN ...) y pruebas de integración que no se corren localmente (sin
+    Docker): verificar que la IT ejercite cada rama (VENTA_RESERVA, LIBERACION, inactivas, otra categoría que el filtro
+    debe excluir). El cuadre saldo = flujos solo detecta errores si el tipo aparece en los datos.
+20. Helpers de prueba que hacen UPDATE al kardex (`DatosReporte.fecharMovimientos`) para fechar al pasado: aceptable como
+    preparación, pero vigilar que no se copie a código de producción ni se use fuera de preparación.
+Bien hecho (mantener): exportar() y consultar() comparten una transacción readOnly (snapshot REPEATABLE READ coherente
+entre resumen, conteo y detalle); orden por prioridad de negocio antes del tope (el 17 no se repitió).

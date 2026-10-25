@@ -16,9 +16,22 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Salir' })).toBeInTheDocument()
   })
 
-  it('un módulo sin construir muestra Próximamente', () => {
-    renderizarApp(<App />, { ruta: '/reportes', rol: 'ADMIN' })
-    expect(screen.getByRole('heading', { name: 'Próximamente' })).toBeInTheDocument()
+  it('Reportes muestra sus pestañas a ADMIN y CONTABILIDAD', () => {
+    for (const rol of ['ADMIN', 'CONTABILIDAD'] as const) {
+      const { unmount } = renderizarApp(<App />, { ruta: '/reportes', rol })
+      expect(screen.getByRole('heading', { level: 1, name: 'Reportes' })).toBeInTheDocument()
+      expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Rentabilidad', 'Libro de ventas', 'Valorización', 'Movimientos'])
+      expect(screen.queryByRole('heading', { name: 'Próximamente' })).not.toBeInTheDocument()
+      unmount()
+    }
+  })
+
+  it('Reportes niega el acceso a INVENTARIO y VENDEDOR', () => {
+    for (const rol of ['INVENTARIO', 'VENDEDOR'] as const) {
+      const { unmount } = renderizarApp(<App />, { ruta: '/reportes', rol })
+      expect(screen.getByRole('heading', { name: 'Acceso denegado' })).toBeInTheDocument()
+      unmount()
+    }
   })
 
   it('un módulo fuera del rol muestra acceso denegado', () => {

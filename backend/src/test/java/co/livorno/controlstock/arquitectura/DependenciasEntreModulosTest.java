@@ -96,4 +96,53 @@ class DependenciasEntreModulosTest {
                 }
             })
             .because("el stock y el kardex solo cambian por los servicios; la semilla solo lee con JDBC (ADR-008)");
+
+    @ArchTest
+    static final ArchRule nadieDependeDeReporte = noClasses()
+            .that().resideOutsideOfPackage("co.livorno.controlstock.reporte..")
+            .should().dependOnClassesThat().resideInAPackage("co.livorno.controlstock.reporte..")
+            .because("reporte es un modelo de lectura que está arriba de todo (ADR-011)");
+
+    @ArchTest
+    static final ArchRule reporteNoDependeDeAnaliticaNiSemilla = noClasses()
+            .that().resideInAPackage("co.livorno.controlstock.reporte..")
+            .should().dependOnClassesThat().resideInAnyPackage("co.livorno.controlstock.analitica..",
+                    "co.livorno.controlstock.semilla..")
+            .allowEmptyShould(true)
+            .because("el panel reutiliza datos por SQL y puertos; la exportación de tendencias vive en analitica.web (ADR-011)");
+
+    @ArchTest
+    static final ArchRule reporteNoInvocaMovimientoService = noClasses()
+            .that().resideInAPackage("co.livorno.controlstock.reporte..")
+            .should().dependOnClassesThat().haveFullyQualifiedName(
+                    "co.livorno.controlstock.inventario.servicio.MovimientoService")
+            .allowEmptyShould(true)
+            .because("los reportes solo leen; el stock solo cambia por MovimientoService (regla de oro 1)");
+
+    @ArchTest
+    static final ArchRule reporteNoEscribeConJdbc = noClasses()
+            .that().resideInAPackage("co.livorno.controlstock.reporte..")
+            .should().callMethodWhere(new DescribedPredicate<JavaCall<?>>(
+                    "invoca update/batchUpdate/execute de JdbcTemplate o NamedParameterJdbcTemplate") {
+                @Override
+                public boolean test(JavaCall<?> llamada) {
+                    return (llamada.getTargetOwner().isAssignableTo(org.springframework.jdbc.core.JdbcTemplate.class)
+                            || llamada.getTargetOwner().isAssignableTo(
+                                    org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate.class))
+                            && java.util.Set.of("update", "batchUpdate", "execute").contains(llamada.getName());
+                }
+            })
+            .allowEmptyShould(true)
+            .because("los reportes son de solo lectura (ADR-011)");
+
+    @ArchTest
+    static final ArchRule exportacionNoDependeDeModulosDeNegocio = noClasses()
+            .that().resideInAPackage("co.livorno.controlstock.comun.exportacion..")
+            .should().dependOnClassesThat().resideInAnyPackage("co.livorno.controlstock.auth..",
+                    "co.livorno.controlstock.usuario..", "co.livorno.controlstock.catalogo..",
+                    "co.livorno.controlstock.inventario..", "co.livorno.controlstock.venta..",
+                    "co.livorno.controlstock.analitica..", "co.livorno.controlstock.compra..",
+                    "co.livorno.controlstock.reporte..", "co.livorno.controlstock.semilla..")
+            .allowEmptyShould(true)
+            .because("los generadores de PDF y Excel son genéricos; cada módulo arma su DocumentoTabular (ADR-011)");
 }

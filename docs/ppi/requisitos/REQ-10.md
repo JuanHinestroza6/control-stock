@@ -1,25 +1,45 @@
-# REQ-10 — Planeación de Compras (FO-ERS)
+# REQ-10 — Optimizar la Planeación de Compras (FO-ERS)
 
 > Estado a la fecha: implementado en la Fase 6 (backend y frontend), rama `fase-6-prediccion-compras`. Decisiones en
 > ADR-010. Incluye el pronóstico de demanda (SES y Holt-Winters multiplicativo con backtesting), la sugerencia de compra
 > con política (s, S), el plan de compras con su ciclo de vida y la recepción de pedidos.
-> Los datos de stakeholder, necesidad y prioridad provienen del documento Word; los que aparecen entre corchetes deben
-> confirmarse contra el Word y no se asumen. Los casos de uso CU-16, CU-17 y CU-18 son **nuevos** (no están en el Word;
-> ver la convención de códigos en `docs/dominio.md`).
+> Los datos de stakeholder, necesidad, prioridad y el texto de CU-01 provienen del documento Word (anexo del plan de la
+> fase 7). CU-01 es el caso de uso del Word; CU-16, CU-17 y CU-18 son **nuevos** y lo desglosan en lo implementado (ver
+> la convención de códigos en `docs/dominio.md`).
 
 | Campo | Contenido |
 |---|---|
 | **Código** | REQ-10 |
-| **Nombre** | Planeación de Compras |
+| **Nombre** | Optimizar la Planeación de Compras |
 | **Tipo** | Funcional |
-| **Stakeholder** | [confirmar con el Word] |
-| **Necesidad** | [confirmar con el Word] |
-| **Casos de uso** | CU-16 «Consultar el pronóstico de demanda» (nuevo); CU-17 «Gestionar el plan de compras» (nuevo); CU-18 «Recibir un pedido» (nuevo) |
+| **Stakeholder** | Asistente de gerencia |
+| **Necesidad** | NEC-10 |
+| **Casos de uso** | CU-01 «Optimizar planeación de compras» (Word, principal); detalle implementado en CU-16 «Consultar el pronóstico de demanda», CU-17 «Gestionar el plan de compras» y CU-18 «Recibir un pedido» (nuevos) |
 | **Relacionados** | REQ-04 (la alerta STOCK_BAJO usa la posición de inventario y el punto de reorden usa el pronóstico); REQ-02 (la recepción genera entradas en el kardex); REQ-14 (la clase ABC prioriza la sugerencia y fija el nivel de servicio); REQ-09 (tendencias); REQ-11 (productos activos, `leadTimeDias`, `loteMinimo`); REQ-06 (roles) |
-| **Prioridad** | [confirmar con el Word] |
+| **Prioridad** | Alta |
 | **Módulos** | `compra` (`PlanCompraService`, `PlanCompraController`, `PedidosEnCaminoJpa`, entidades `PlanCompra` y `DetallePlan`); `analitica` (`PronosticoService`, `SelectorPronostico`, `SuavizadoExponencial`, `HoltWintersMultiplicativo`, `CorrectorCensura`, `Desagregador`, `SugerenciaCompraAnalitica`, `CalculadoraSugerenciaCompra`, `AnaliticaController`); `inventario` (`ConsultaPedidosEnCamino`, `OperacionInventarioService.registrarEntradaDePlan`, evento `PosicionCambiada`, `AlertaService`); migraciones V15 y V16; frontend: `paginas/compras`, `paginas/analitica` (pestaña «Pronóstico»), `api/compras`, `api/analitica` |
 
 ## Descripción
+
+Word: «El sistema debe sugerir la cantidad óptima de compra de productos basada en demanda proyectada y niveles de
+inventario».
+
+### Flujo CU-01 «Optimizar planeación de compras» (Word → sistema)
+
+| Paso | Actor (Administrador; en el sistema también Inventario) | Sistema |
+|---|---|---|
+| 1–2 | Solicita generar una planeación (Compras → «Generar sugerencia») | Verifica los niveles de inventario: posición = disponible + en camino frente al punto de reorden |
+| 3–5 | Espera las sugerencias | Analiza el pronóstico de demanda y el plazo de reposición (`leadTimeDias`) y muestra las variantes con cantidades sugeridas (política (s, S), lote mínimo) en un plan BORRADOR (CU-16, CU-17) |
+| 6–7 | Revisa, ajusta y confirma (ADMIN aprueba) | Guarda el plan APROBADO, que funciona como orden de compra preliminar y cuenta como «en camino»; al llegar la mercancía se recibe (CU-18) |
+
+- **Alternativa 1 (faltan datos de ventas)**: con menos de 3 meses de historia no hay pronóstico (`SIN_HISTORIA`); el
+  punto de reorden usa la demanda histórica (fuente `HISTORICA`) o, sin demanda, el stock mínimo, y la sugerencia
+  justifica cada línea. El sistema no bloquea la planeación.
+- **Alternativa 2 (sin permisos)**: VENDEDOR recibe 403; CONTABILIDAD solo lee; solo ADMIN aprueba (INVENTARIO 403 al
+  aprobar).
+- **Extensión «Registrar proveedor»**: fuera de alcance.
+- **Poscondición**: el plan queda registrado con sus líneas por variante, asociado al inventario (en camino y entradas
+  `PLAN_COMPRA/{id}` al recibir) y disponible para consulta y ejecución.
 
 El sistema debe ayudar al encargado de inventario a decidir qué reponer y cuánto, a partir de la demanda pronosticada,
 y llevar el pedido desde su preparación hasta su recepción. El pronóstico proyecta la demanda de cada producto para el
@@ -166,8 +186,14 @@ VENDEDOR recibe 403 en todos los anteriores. CONTABILIDAD solo lee (403 en toda 
 - Flujo de compra verificado por API en la T2: el encargado de inventario generó la sugerencia PC-003674 (20 líneas, 0 omitidas, 0 excluidas por tope), el administrador la aprobó y el encargado de inventario la recibió: 20 ENTRADAS con referencia `PLAN_COMPRA/3674` (152 unidades). Ejemplo LIV002-L-BLA: físico 10, en camino 0, estado BAJO; aprobado: en camino 15; recibido: físico 25, en camino 0, estado OK. Matriz de roles correcta (compras, tendencias y pronóstico: ADMIN, INVENTARIO y CONTABILIDAD 200, VENDEDOR 403, sin token 401; sugerir y recalcular restringidos; INVENTARIO 403 al aprobar). Tendencias de 24 meses: 25 puntos; detalle del pronóstico de LIV001: HOLT_WINTERS con 16 variantes.
 - La T2 se ejecutó por API y base de datos; la revisión visual por la interfaz la realiza el usuario después.
 
-- Datos del Word por confirmar: stakeholder, necesidad y prioridad de REQ-10; el Word no registra casos de uso para la
-  planeación de compras (o el material del repositorio no los consigna), por lo que se asignan CU-16, CU-17 y CU-18.
+- Datos del Word: Asistente de gerencia, NEC-10, CU-01, prioridad Alta. CU-16, CU-17 y CU-18 desglosan CU-01 en lo
+  implementado (pronóstico, plan y recepción).
+- Alcance frente al Word: en el sistema también INVENTARIO crea y recibe planes; solo ADMIN aprueba (D7 de la fase 6).
+  «Registrar proveedor» (extensión de CU-01) queda fuera de alcance.
+- Fase 7 (B10): el resumen de la semilla informa ahora las unidades perdidas comparables (12 meses completos antes del
+  mes del corte de la analítica de cierre, sin variantes agotables a propósito ni el descontinuado) y la razón de la
+  corrección por agotados. La corrección también ve las variantes agotables (siguen activas) y el denominador no, así
+  que la razón tiende a quedar algo alta. La cifra de la semilla de 36 meses se registra en la T2 de la fase 7.
 - Inconsistencias del Word: REQ-08 y REQ-09 con nombre y descripción cruzados (ver `REQ-09.md`); NEC-010 debería ser
   NEC-10.
 - **Riesgo aceptado: el backtest no cubre noviembre y diciembre.** Los seis meses evaluados van de abril a septiembre con

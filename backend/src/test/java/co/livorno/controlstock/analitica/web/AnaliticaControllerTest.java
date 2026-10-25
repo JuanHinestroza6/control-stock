@@ -49,6 +49,7 @@ class AnaliticaControllerTest {
     @MockitoBean co.livorno.controlstock.analitica.servicio.RecalculoAnaliticoService recalculo;
     @MockitoBean co.livorno.controlstock.usuario.repositorio.UsuarioRepository usuarioRepository;
     @MockitoBean co.livorno.controlstock.analitica.servicio.TendenciasService tendencias;
+    @MockitoBean co.livorno.controlstock.analitica.servicio.ExportarTendenciasService exportarTendencias;
     @MockitoBean co.livorno.controlstock.analitica.servicio.ConsultaPronosticoService pronosticos;
 
     private static Authentication como(String rol) {
@@ -131,5 +132,62 @@ class AnaliticaControllerTest {
         mvc.perform(get("/api/analitica/mas-vendidos?desde=ayer").with(authentication(como("ADMIN"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errores[0].campo").value("desde"));
+    }
+
+    private static co.livorno.controlstock.comun.exportacion.ArchivoExportado archivoXlsx() {
+        return new co.livorno.controlstock.comun.exportacion.ArchivoExportado(new byte[] {1, 2, 3},
+                co.livorno.controlstock.comun.exportacion.ExportadorDocumentos.TIPO_XLSX,
+                "tendencias_2025-01_2026-09.xlsx");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ADMIN", "INVENTARIO", "CONTABILIDAD"})
+    void exportarTendencias_rolesAutorizados_devuelveArchivoConEncabezados(String rol) throws Exception {
+        when(exportarTendencias.exportar(any(), any(), any(), any(), any(), any())).thenReturn(archivoXlsx());
+
+        mvc.perform(get("/api/analitica/tendencias/exportar?formato=XLSX&desde=2025-01&categoriaId=2")
+                        .with(authentication(como(rol))))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Cache-Control", "no-store"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Content-Disposition",
+                                org.hamcrest.Matchers.containsString("tendencias_2025-01_2026-09.xlsx")));
+        verify(exportarTendencias).exportar(eq("2025-01"), eq(null), eq(2L), eq(null),
+                eq(co.livorno.controlstock.comun.exportacion.FormatoExportacion.XLSX), eq("U"));
+    }
+
+    @Test
+    void exportarTendencias_vendedor_devuelve403() throws Exception {
+        mvc.perform(get("/api/analitica/tendencias/exportar?formato=PDF").with(authentication(como("VENDEDOR"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void exportarTendencias_sinToken_devuelve401() throws Exception {
+        mvc.perform(get("/api/analitica/tendencias/exportar?formato=PDF")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void exportarTendencias_formatoInvalidoOAusente_devuelve400ProblemDetail() throws Exception {
+        mvc.perform(get("/api/analitica/tendencias/exportar?formato=DOC").with(authentication(como("ADMIN"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                        .contentTypeCompatibleWith(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON));
+        mvc.perform(get("/api/analitica/tendencias/exportar").with(authentication(como("ADMIN"))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void exportarTendencias_filtrosInvalidos_devuelve400SinArchivo() throws Exception {
+        when(exportarTendencias.exportar(any(), any(), any(), any(), any(), any())).thenThrow(
+                new SolicitudInvalidaException("desde", "El mes inicial no puede ser posterior al final."));
+
+        mvc.perform(get("/api/analitica/tendencias/exportar?formato=PDF&desde=2026-05&hasta=2026-01")
+                        .with(authentication(como("CONTABILIDAD"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errores[0].campo").value("desde"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .doesNotExist("Content-Disposition"));
     }
 }

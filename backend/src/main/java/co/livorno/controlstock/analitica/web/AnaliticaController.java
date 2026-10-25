@@ -10,7 +10,11 @@ import co.livorno.controlstock.analitica.dto.PronosticoProductoResponse;
 import co.livorno.controlstock.analitica.dto.TendenciaResponse;
 import co.livorno.controlstock.analitica.modelo.MetodoPronostico;
 import co.livorno.controlstock.analitica.servicio.ConsultaPronosticoService;
+import co.livorno.controlstock.analitica.servicio.ExportarTendenciasService;
 import co.livorno.controlstock.analitica.servicio.TendenciasService;
+import co.livorno.controlstock.comun.exportacion.FormatoExportacion;
+import co.livorno.controlstock.comun.seguridad.UsuarioActual;
+import co.livorno.controlstock.comun.web.RespuestaArchivo;
 import co.livorno.controlstock.analitica.dto.ReordenVarianteResponse;
 import co.livorno.controlstock.analitica.dto.ResumenAbcResponse;
 import co.livorno.controlstock.analitica.modelo.ClaseAbc;
@@ -44,6 +48,8 @@ public class AnaliticaController {
     private final RecalculoAnaliticoService recalculoService;
     private final TendenciasService tendenciasService;
     private final ConsultaPronosticoService pronosticoService;
+    private final ExportarTendenciasService exportarTendencias;
+    private final UsuarioActual usuarioActual;
 
     @GetMapping("/mas-vendidos")
     @PreAuthorize("hasAnyRole('ADMIN','INVENTARIO','VENDEDOR','CONTABILIDAD')")
@@ -100,6 +106,18 @@ public class AnaliticaController {
             @RequestParam(required = false) Long categoriaId,
             @RequestParam(required = false) Long productoId) {
         return tendenciasService.consultar(desde, hasta, categoriaId, productoId);
+    }
+
+    @GetMapping("/tendencias/exportar")
+    @PreAuthorize("hasAnyRole('ADMIN','INVENTARIO','CONTABILIDAD')")
+    public ResponseEntity<byte[]> exportarTendencias(
+            @RequestParam(required = false) String desde,
+            @RequestParam(required = false) String hasta,
+            @RequestParam(required = false) Long categoriaId,
+            @RequestParam(required = false) Long productoId,
+            @RequestParam FormatoExportacion formato) {
+        return RespuestaArchivo.de(exportarTendencias.exportar(desde, hasta, categoriaId, productoId, formato,
+                usuarioActual.obtener().nombre()));
     }
 
     @GetMapping("/pronosticos")

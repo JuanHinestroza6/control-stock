@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatearFecha, formatearMoneda } from './formato'
+import { formatearFecha, formatearMoneda, formatearNumero, formatearPorcentaje } from './formato'
 
 describe('formatearMoneda', () => {
   it('formatea en pesos colombianos sin decimales', () => {
@@ -24,5 +24,17 @@ describe('formatearFecha', () => {
 
   it('devuelve cadena vacía con una fecha inválida', () => {
     expect(formatearFecha('no-es-fecha')).toBe('')
+  })
+})
+
+describe('formatearNumero y formatearPorcentaje', () => {
+  it('formatea miles y porcentajes con un decimal', () => {
+    expect(formatearNumero(12345)).toBe('12.345')
+    expect(formatearPorcentaje(12.5)).toBe('12,5 %')
+    expect(formatearPorcentaje(-3)).toBe('-3,0 %')
+  })
+
+  it('muestra un guion cuando el porcentaje es null', () => {
+    expect(formatearPorcentaje(null)).toBe('—')
   })
 })

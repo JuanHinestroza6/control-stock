@@ -39,6 +39,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -223,6 +224,9 @@ public class SimuladorDiario {
         private long lineasEvitablesPerdidas;
         private long lineasPerdidas;
         private long unidadesPerdidas;
+        // Unidades perdidas evitables (sin agotables ni descontinuado) por mes, para compararlas con la corrección por
+        // agotados de la analítica de cierre en su misma ventana de 12 meses (ADR-011, D5).
+        private final Map<YearMonth, Long> perdidasEvitablesPorMes = new TreeMap<>();
         private long anuladas;
         private long nDevoluciones;
         private long noAptas;
@@ -287,6 +291,7 @@ public class SimuladorDiario {
             }
             return new ResultadoSimulacion(dias, nVentas, unidadesVendidas, lineasPedidas, lineasPerdidas,
                     lineasEvitablesPedidas, lineasEvitablesPerdidas, unidadesPerdidas,
+                    Map.copyOf(perdidasEvitablesPorMes),
                     anuladas, nDevoluciones, noAptas, entradas, ajustes, alzas, desactivados.size(), ingreso,
                     reservasCreadas, reservasConvertidas, reservasCanceladas, reservasVencidas, planesCreados, planesRecibidos,
                     planesCreados - planesRecibidos, unidadesEnCamino, pendiente);
@@ -493,6 +498,10 @@ public class SimuladorDiario {
                         lineasEvitablesPerdidas++;
                     }
                     unidadesPerdidas += l.cantidad() - vendible;
+                    if (evitable) {
+                        perdidasEvitablesPorMes.merge(YearMonth.from(diaActual), (long) (l.cantidad() - vendible),
+                                Long::sum);
+                    }
                 }
                 if (vendible > 0) {
                     BigDecimal precio = l.descuentoPorcentaje() > 0
