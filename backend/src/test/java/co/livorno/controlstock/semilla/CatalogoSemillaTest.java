@@ -13,12 +13,12 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
-/** Pruebas puras del catálogo fijo de demostración (skill datos-semilla). */
+/** Pruebas puras del catálogo fijo de demostración (docs/especificaciones/datos-semilla.md). */
 class CatalogoSemillaTest {
 
     private static final List<ProductoSemilla> PRODUCTOS = CatalogoSemilla.productos();
 
-    /** Rango de precio de venta por categoría (COP): skill datos-semilla y plan de la Fase 4. */
+    /** Rango de precio de venta por categoría (COP): docs/especificaciones/datos-semilla.md y plan de la Fase 4. */
     private static final Map<String, long[]> RANGO_PRECIO = Map.of(
             "Camisetas", new long[] {59_900, 89_900},
             "Hoodies", new long[] {129_900, 179_900},

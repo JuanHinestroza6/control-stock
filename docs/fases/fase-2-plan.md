@@ -29,7 +29,7 @@ REQ-08 (devoluciones). Reglas: `docs/dominio.md` secciones "Tipos de movimiento"
 
 ## Paso manual del usuario (antes de cerrar B1)
 B1 agrega al `pom.xml` (scope `test`) `com.tngtech.archunit:archunit-junit5:1.5.1` (
-versión verificada en Maven Central el 2026-10-02). El sandbox trabaja offline: el usuario ejecuta en su terminal, dentro
+versión verificada en Maven Central el 2026-10-02). El entorno de compilación automatizado trabaja sin red: el usuario ejecuta en su terminal, dentro
 de `backend`, `$env:MAVEN_OPTS="-Djavax.net.ssl.trustStoreType=Windows-ROOT"; .\mvnw.cmd test-compile` y avisa. Hasta
 entonces B1 no puede compilar las pruebas; B2 puede avanzar en paralelo sin la regla.
 
@@ -154,9 +154,9 @@ Convenciones de la Fase 1 (página VIA_DTO, dinero con 2 decimales, fechas ISO-8
 - `App.tsx`: rutas reales de inventario y ventas; `ProximamentePage` queda para el resto.
 
 ## Tareas (cada una cierra con un commit y pruebas en verde)
-Paso 0 (`documentador-ppi` o coordinador): copiar este plan, ADR-006, `dominio.md` y el skill `reglas-inventario`.
+Paso 0 (coordinación): copiar este plan, ADR-006, `dominio.md` y `docs/especificaciones/reglas-inventario.md`.
 
-Backend (`backend-dev`):
+Backend:
 - B1 `Variante.aplicarMovimiento` + pruebas de invariantes + ArchUnit en el `pom.xml` + `ReglasArquitecturaTest`.
   **Requiere el paso manual del usuario** (`.\mvnw.cmd test-compile`).
 - B2 V8 + `TipoMovimiento` (efectos) + `Movimiento` (`@Immutable`, fábrica) + `MovimientoRepository` (`Repository`).
@@ -171,17 +171,17 @@ Backend (`backend-dev`):
 - B9 Anulación.
 - B10 V10 + `Devolucion` + `DevolucionService` + endpoint.
 
-Frontend (`frontend-dev`), en paralelo con `vi.mock` de `api/*`:
+Frontend, en paralelo con `vi.mock` de `api/*`:
 - F1 Tipos, API, hooks y permisos. F2 `InventarioPage`. F3 `BuscadorVariante`. F4 `MatrizCantidades` + página de entradas.
 - F5 `ModalAjuste`. F6 Kardex + `BadgeTipoMovimiento`. F7 Nueva venta (`CarritoVenta`). F8 Listado y detalle de ventas.
 - F9 `ModalDevolucion` y `ModalAnularVenta`. F10 Rutas en `App.tsx` y prueba de navegación por rol.
 
-Pruebas (`tester`):
+Pruebas:
 - T1 (tras B3) Concurrencia y consistencia del stock con Testcontainers.
 - T2 (tras B10) Integración de punta a punta y matriz de roles.
 - T3 Prueba manual con el backend real.
 
-Documentación (`documentador-ppi`, al final): fichas REQ-02 y REQ-08, actualización de REQ-01, diagrama de secuencia
+Documentación (al final): fichas REQ-02 y REQ-08, actualización de REQ-01, diagrama de secuencia
 "registrar venta" y diagrama de clases de inventario y ventas.
 
 Recorte si falta tiempo (en este orden): precio editable en la UI (el backend lo soporta), entrada por matriz (una línea

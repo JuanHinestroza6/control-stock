@@ -9,7 +9,8 @@ debe cerrar la meta de alertas que ADR-009 dejó pendiente (34,4 % de variantes 
 Había nueve cuestiones abiertas:
 1. Qué demanda se pronostica y cómo tratar la censura por agotados (~2,5–3 % de ventas perdidas en la semilla).
 2. Qué modelo estacional usar y cómo elegir entre SES y Holt-Winters con una historia corta: la semilla de 24 meses
-   empieza a mitad de mes y solo deja **23 meses completos**; con el skill literal (24 de entrenamiento + 3 de prueba)
+   empieza a mitad de mes y solo deja **23 meses completos**; con la versión inicial de
+   `docs/especificaciones/algoritmos-analitica.md` tomada al pie de la letra (24 de entrenamiento + 3 de prueba)
    Holt-Winters nunca sería elegible.
 3. Si el punto de reorden debe usar la demanda pronosticada (ADR-009 dejó como riesgo el ROP rezagado al entrar a la
    temporada alta y la demanda censurada).
@@ -17,7 +18,8 @@ Había nueve cuestiones abiertas:
    ya se haya pedido.
 5. El ciclo de vida del plan: el dominio no tenía cancelación (un pedido nunca entregado quedaría "en camino" para
    siempre) ni recepción con cantidades distintas a las pedidas, y prohibía entradas sobre variantes inactivas.
-6. Qué variantes y cuántas unidades sugerir (el skill proponía una revisión periódica que rellena todo el catálogo).
+6. Qué variantes y cuántas unidades sugerir (la versión inicial de `docs/especificaciones/algoritmos-analitica.md`
+   proponía una revisión periódica que rellena todo el catálogo).
 7. Quién recibe un pedido (la matriz solo decía "INVENTARIO crea borrador").
 8. Dependencias entre módulos: `compra` necesita la sugerencia (analitica) e `inventario` necesita lo que viene en
    camino (compra), pero ADR-009 prohíbe depender de `analitica` y `compra` depende de `inventario` para recibir.
@@ -57,7 +59,8 @@ Había nueve cuestiones abiertas:
 6. **Sugerencia (s, S).** Candidatas: variantes activas de productos activos con `posición ≤ umbral` que no estén en otro
    BORRADOR (se informan como omitidas). Cantidad hasta `S = umbral + demanda pronosticada de R = 30 días después del
    lead time`, redondeada hacia arriba al múltiplo de `loteMinimo`; las de cantidad 0 no entran. Equivale a la fórmula
-   del skill (`μ(L+R) + SS`); solo cambia qué variantes entran. Cada línea lleva una justificación legible. Con más de 300
+   de `docs/especificaciones/algoritmos-analitica.md` (`μ(L+R) + SS`); solo cambia qué variantes entran. Cada línea lleva
+   una justificación legible. Con más de 300
    candidatas (tope del plan) entran las de mayor prioridad: agotadas (disponible 0) primero, luego clase ABC A, B, C y
    sin clase, luego mayor faltante relativo `(umbral − posición) / max(umbral, 1)` y por último el id; las excluidas se
    informan en `excluidasPorTope` y siguen siendo candidatas en la siguiente sugerencia.
@@ -88,12 +91,12 @@ Había nueve cuestiones abiertas:
 - Pronosticar sin corregir la censura — hereda el sesgo de las ventas perdidas; la corrección es una función pura
   verificable contra las unidades perdidas que informa la semilla.
 - Imputar la demanda día a día en los días sin stock — ruido puro en variantes de 0,02 u/día.
-- Holt-Winters aditivo (skill original) — supone un pico de amplitud fija en unidades; con una empresa que crece 1,5 %
-  mensual subestima diciembre cada año más. Descartado por el usuario a favor del multiplicativo.
+- Holt-Winters aditivo (versión inicial de `docs/especificaciones/algoritmos-analitica.md`) — supone un pico de
+  amplitud fija en unidades; con una empresa que crece 1,5 % mensual subestima diciembre cada año más. Descartado por el usuario a favor del multiplicativo.
 - Holt-Winters multiplicativo con meses en 0 (o con un épsilon) — un índice estacional 0 o casi 0 vuelve inestable la
   actualización (`y / s`) y no representa estacionalidad sino ausencia de demanda; SES es el modelo correcto ahí.
-- Backtest con los 3 últimos meses (skill literal) — el método lo decide un solo tramo de 3 puntos (julio–septiembre, el
-  más plano del año).
+- Backtest con los 3 últimos meses (versión inicial de `docs/especificaciones/algoritmos-analitica.md`) — el método lo
+  decide un solo tramo de 3 puntos (julio–septiembre, el más plano del año).
 - Backtest de 12 meses con origen móvil — cubriría noviembre–diciembre, pero exige ≥ 36 meses completos más el
   entrenamiento de 24: una semilla de casi 4 años.
 - Mantener la semilla en 24 meses con HW inicializado con un solo año — sin tendencia inicial confiable ni evaluación
@@ -105,7 +108,8 @@ Había nueve cuestiones abiertas:
 - Recepciones parciales con estado RECIBIDO_PARCIAL — otra máquina de estados para un caso que se resuelve con un
   segundo plan.
 - Dominio literal sin cancelación — el "en camino" inflado ocultaría alertas para siempre.
-- Sugerencia por revisión periódica para todas las variantes (skill literal) — planes de cientos de líneas de 1 unidad.
+- Sugerencia por revisión periódica para todas las variantes (versión inicial de
+  `docs/especificaciones/algoritmos-analitica.md`) — planes de cientos de líneas de 1 unidad.
 - Sugerencia solo para clases A y B — deja la cola sin reposición sugerida aunque esté en alerta.
 - Matriz literal (solo ADMIN edita, aprueba y recibe) — INVENTARIO ya registra entradas; recibir es una entrada con
   referencia. La segregación que importa (quien pide no aprueba) se conserva.
@@ -121,8 +125,9 @@ Había nueve cuestiones abiertas:
   `estadoStock()` pueden diferir: una variante BAJO con pedido en camino no tiene alerta); "Máquinas de estado" con
   CANCELADO; entradas de planes sobre variantes inactivas; "Datos semilla" con 36 meses y planes; matriz y notas de la
   fase 6; trazabilidad REQ-09 y REQ-10.
-- Skill `algoritmos-analitica`: HW multiplicativo con su inicialización y exclusión por meses en 0, origen móvil,
-  corrección por agotados, ROP con pronóstico y política (s, S). Skill `datos-semilla`: 36 meses y reposición por planes.
+- `docs/especificaciones/algoritmos-analitica.md`: HW multiplicativo con su inicialización y exclusión por meses en 0,
+  origen móvil, corrección por agotados, ROP con pronóstico y política (s, S). `docs/especificaciones/datos-semilla.md`:
+  36 meses y reposición por planes.
 - La carga de la semilla sube de ~2 min a ~3,5–4 min.
 - Orden de trabajo con punto de corte: antes de la semilla de 36 meses la base de demo tiene 23 meses completos y no
   tiene planes, así que todos los productos salen SES (HW se valida con pruebas unitarias e integración con datos a

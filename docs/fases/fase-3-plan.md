@@ -125,9 +125,9 @@ Roles: **RS** `hasAnyRole('ADMIN','INVENTARIO','VENDEDOR')`; **VT** `hasAnyRole(
 - Ante 409 el formulario o modal no se limpia y muestra "Volver a confirmar".
 
 ## Tareas (cada una cierra con un commit y pruebas en verde)
-Paso 0 (coordinador): copiar este plan, ADR-007, `docs/dominio.md` y el skill `reglas-inventario`.
+Paso 0 (coordinador): copiar este plan, ADR-007, `docs/dominio.md` y `docs/especificaciones/reglas-inventario.md`.
 
-Backend (`backend-dev`):
+Backend:
 - B1 V11 + `Reserva` + `EstadoReserva` + `ReservaRepository`. `@DataJpaTest`: V1–V11 con `validate`, CHECK, bloqueo.
 - B2 `ReservaService` crear/cancelar/extender/listar/obtener + `ReservaController` + DTOs. Mockito + WebMvc por rol.
 - B3 `ConfiguracionTareas` + `VencimientoReservasTarea` + `vencer(id, ahora)`. (paralelo con B4 tras B2)
@@ -138,17 +138,17 @@ Backend (`backend-dev`):
   de commit (nunca dos migraciones con el mismo número).
 - B7 `AlertaController` (listar, resumen, atender).
 
-Frontend (`frontend-dev`), en paralelo con `vi.mock` de `api/*`:
+Frontend, en paralelo con `vi.mock` de `api/*`:
 - F1 Tipos, API, hooks, permisos e invalidaciones. F2 `ReservasPage` + `BadgeEstadoReserva`. F3 `ReservaNuevaPage`.
 - F4 `ModalCancelarReserva` y `ModalExtenderReserva`. F5 Conversión (selección + `ModalConvertirReservas`).
 - F6 Indicadores de reservado. F7 `AlertasPage` + campana. F8 Rutas en `App.tsx` y navegación por rol.
 
-Pruebas (`tester`):
+Pruebas:
 - T1 (tras B4) Concurrencia y consistencia de reservas con Testcontainers.
 - T2 (tras B7) Integración de punta a punta, listener de alertas y matriz de roles.
 - T3 Prueba manual con el backend real (la hace el usuario).
 
-Documentación (`documentador-ppi`, al final): ficha "Apartados", ficha REQ-04 (parcial: SIN_ROTACION en Fase 5), diagrama
+Documentación (al final): ficha "Apartados", ficha REQ-04 (parcial: SIN_ROTACION en Fase 5), diagrama
 de estados de Reserva, diagrama de secuencia "convertir reservas en venta".
 
 Recorte si falta tiempo (en este orden): extender, conversión múltiple (una reserva → una venta), `UmbralCambiado`,

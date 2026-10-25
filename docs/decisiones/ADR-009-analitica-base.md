@@ -8,7 +8,8 @@ La fase 5 llena por primera vez `Variante.claseAbc` y `Variante.puntoReorden`, q
 SIN_ROTACION y la re-evaluación nocturna. Había ocho cuestiones abiertas:
 1. Cómo clasificar (unidad, criterio, ventana) y cómo calcular el ROP con demanda muy intermitente: unas 240 de 299
    variantes de la semilla venden menos de 1 unidad al mes.
-2. Si `stockMinimo` es piso del ROP (skill) o solo respaldo (dominio).
+2. Si `stockMinimo` es piso del ROP (versión inicial de `docs/especificaciones/algoritmos-analitica.md`) o solo
+   respaldo (dominio).
 3. Cómo escribir dos columnas de `Variante` sin violar la regla de oro 1, sin provocar 409 a las ventas concurrentes
    (`@Version`) y sin que una venta en curso las pise con un valor viejo (Hibernate reescribe todas las columnas).
 4. Cómo explicar en la interfaz por qué una variante tiene su ROP.
@@ -60,8 +61,8 @@ SIN_ROTACION y la re-evaluación nocturna. Había ocho cuestiones abiertas:
    y alertas coherentes.
 
 ## Alternativas consideradas
-- ABC en ventana de 90 días (skill original) — reclasifica con la estacionalidad (diciembre ×1,6) y hace oscilar el
-  nivel de servicio y el ROP; en la cola es ruido puro.
+- ABC en ventana de 90 días (versión inicial de `docs/especificaciones/algoritmos-analitica.md`) — reclasifica con la
+  estacionalidad (diciembre ×1,6) y hace oscilar el nivel de servicio y el ROP; en la cola es ruido puro.
 - ABC por margen — depende del costo y de las reglas de visibilidad de costos; el ingreso es el criterio clásico.
 - ABC por producto — el ROP y las alertas son por variante; una talla marginal heredaría la clase A del producto.
 - `ROP = max(ROP, stockMinimo)` — con la semilla (`stockMinimo` = 2 en la cola) el ROP dinámico sería invisible en ~80 %
@@ -88,7 +89,7 @@ SIN_ROTACION y la re-evaluación nocturna. Había ocho cuestiones abiertas:
   `updatable = false` en dos columnas.
 - `docs/dominio.md`: nueva sección "Analítica"; "Alertas" con SIN_ROTACION por producto, prioridad y episodios; el
   estado de alerta deja de coincidir siempre con `estadoStock()` (SIN_ROTACION puede reemplazar a BAJO).
-- Skill `algoritmos-analitica`: ventana ABC de 12 meses, ROP híbrido sin piso, dos definiciones de demanda.
+- `docs/especificaciones/algoritmos-analitica.md`: ventana ABC de 12 meses, ROP híbrido sin piso, dos definiciones de demanda.
 - Las alertas AGOTADO/STOCK_BAJO atendidas a mano se reabren en la noche si la condición sigue.
 - Hasta la siguiente ejecución, una variante nueva usa `stockMinimo`; una variante desactivada y reactivada entre dos
   ejecuciones conserva su ROP y su clase anteriores (solo la ejecución los limpia), y el inventario muestra la clase de

@@ -2,8 +2,8 @@
 
 Rama `fase-5-analitica`. Requisitos: REQ-05 (productos más vendidos), REQ-14 nuevo "Clasificación ABC", REQ-04 (punto de
 reorden dinámico como umbral de alertas, SIN_ROTACION y re-evaluación nocturna). Reglas: `docs/dominio.md` (secciones
-"Alertas", "Datos semilla", matriz de roles), ADR-006, ADR-007, ADR-008 y ADR-009. Algoritmos: skill
-`algoritmos-analitica` (se actualiza en el Paso 0 según las decisiones).
+"Alertas", "Datos semilla", matriz de roles), ADR-006, ADR-007, ADR-008 y ADR-009. Algoritmos:
+`docs/especificaciones/algoritmos-analitica.md` (se actualiza en el Paso 0 según las decisiones).
 
 **Regla de oro 1:** la analítica nunca toca `stockFisico` ni `stockReservado`. Solo escribe `puntoReorden` y `claseAbc`
 con una sentencia dirigida desde el módulo `analitica` (ver B1/B3), sin pasar por `@Version`.
@@ -14,10 +14,12 @@ re-evaluar todas las alertas (incluida SIN_ROTACION) y publicar los productos m�
 efecto sobre el volumen de alertas.
 
 ## Contradicciones detectadas antes de planear
-1. **Skill vs. dominio (umbral):** el skill dice `ROP = max(ROP, stockMinimo)`; `docs/dominio.md` dice "umbral =
-   `puntoReorden`, o `stockMinimo` si no hay ROP" (respaldo, no piso). Gana el dominio salvo que se decida otra cosa
+1. **`docs/especificaciones/algoritmos-analitica.md` vs. dominio (umbral):** la especificación dice
+   `ROP = max(ROP, stockMinimo)`; `docs/dominio.md` dice "umbral = `puntoReorden`, o `stockMinimo` si no hay ROP"
+   (respaldo, no piso). Gana el dominio salvo que se decida otra cosa
    (D2). Con el piso, en la semilla el ROP no cambiaría nada en ~80 % de las variantes (su `stockMinimo` es 2).
-2. **Skill (ventana ABC 90 días) vs. propuesta de 12 meses:** ver D1. Se corrige el skill en el Paso 0.
+2. **Especificación (ventana ABC 90 días) vs. propuesta de 12 meses:** ver D1. Se corrige la especificación en el
+   Paso 0.
 3. **SIN_ROTACION:** el dominio la define por variante con `físico > 0` y nada dice de su convivencia con AGOTADO /
    STOCK_BAJO, ni de la re-evaluación nocturna frente a "atender a mano la cierra; el siguiente movimiento la reabre".
    Ver D3.
@@ -34,7 +36,7 @@ Se eligió la opción recomendada en las cuatro: D1 (a), D2 (b), D3 (a), D4 (a).
 ### D1 [ELEGIDA (a)] Clasificación ABC: unidad, criterio y ventana
 - **(a) Elegida:** por **variante**, por **ingreso neto** (Σ (cantidad − devuelta) × precioUnitario de ventas
   REGISTRADA), ventana **12 meses móviles** cerrados en el día anterior, cortes 80/95.
-- (b) Igual pero ventana de 90 días (lo que dice el skill hoy).
+- (b) Igual pero ventana de 90 días (lo que dice la especificación hoy).
 - (c) Por producto (la clase se copia a todas sus variantes), 12 meses.
 - Porqué (a): el campo `claseAbc` y el ROP viven en la variante, y la clase alimenta el nivel de servicio del ROP de esa
   variante. 12 meses cubren un ciclo estacional completo: diciembre (×1,6) o una promoción no voltean las clases ni hacen
@@ -43,7 +45,7 @@ Se eligió la opción recomendada en las cuatro: D1 (a), D2 (b), D3 (a), D4 (a).
   se puede defender con Pareto.
 
 ### D2 [ELEGIDA (b)] Modelo del punto de reorden
-- (a) Skill literal: normal para todo, `ROP = ceil(d̄·L + z·σ·√L)`, piso `max(ROP, stockMinimo)`.
+- (a) Especificación literal: normal para todo, `ROP = ceil(d̄·L + z·σ·√L)`, piso `max(ROP, stockMinimo)`.
 - **(b) Elegida:** ventana 90 días diaria; **normal** si la demanda esperada en el lead time `μL = d̄·L ≥ 5`,
   **cuantil de Poisson(μL)** al nivel de servicio de la clase si `μL < 5` (demanda intermitente); **sin piso**:
   `stockMinimo` es solo el respaldo cuando `puntoReorden` es null (dominio literal); historia mínima 30 días.
@@ -86,7 +88,7 @@ inventario** (disponible + pedidos aprobados en camino), que llega con el plan d
   real (pedidos en camino) en la fase donde existen los pedidos. Cambiar la reposición de la semilla en la fase 5 no
   serviría: la fracción `L/(Q/d)` no depende de cuándo se pide.
 
-## Decisiones resueltas por el arquitecto (se documentan en ADR-009)
+## Decisiones técnicas resueltas por el equipo (se documentan en ADR-009)
 - R1 **Escritura dirigida.** `Variante.puntoReorden` y `claseAbc` pasan a `@Column(updatable = false)`: ninguna entidad
   cargada (una venta en curso) puede pisarlos con un valor viejo. Solo los escribe
   `analitica.repositorio.AnaliticaVarianteRepository` con un `UPDATE variante SET punto_reorden = ?, clase_abc = ? WHERE id
@@ -346,10 +348,10 @@ Roles: **AN** `hasAnyRole('ADMIN','INVENTARIO','CONTABILIDAD')`; **MV** `hasAnyR
 
 ## Tareas (cada una cierra con un commit y pruebas en verde)
 Paso 0 (coordinador): copiar este plan a `docs/fases/fase-5-plan.md`, ADR-009, actualizar `docs/dominio.md` (secciones
-"Analítica" nueva, "Alertas", trazabilidad REQ-14) y el skill `algoritmos-analitica` (ventana ABC, sin piso, Poisson,
+"Analítica" nueva, "Alertas", trazabilidad REQ-14) y `docs/especificaciones/algoritmos-analitica.md` (ventana ABC, sin piso, Poisson,
 definiciones de demanda) según D1–D4.
 
-Backend (`backend-dev`):
+Backend:
 - B1 V14 + entidades `EjecucionAnalitica`/`AnaliticaVariante` + repositorios base + `Variante` `updatable=false` +
   `PropiedadesAnalitica` + reglas ArchUnit. Pruebas: `@DataJpaTest` V1–V14 con `validate` y CHECK; guardar una
   `Variante` cargada no cambia `punto_reorden` fijado por SQL; ArchUnit en verde.
@@ -368,7 +370,7 @@ Analítica (`analitica`), en paralelo con B1:
 - A1 `ClasificadorAbc` con pruebas a mano (ejemplo 500/200/150/100/50; primera > 80 %; empates; total 0; vacío).
 - A2 `SerieDemanda`, `DistribucionPoisson`, `CalculadoraReorden` con pruebas a mano y prueba Monte Carlo (abajo).
 
-Frontend (`frontend-dev`), en paralelo con `vi.mock` de `api/*` desde el día 1:
+Frontend, en paralelo con `vi.mock` de `api/*` desde el día 1:
 - F1 Tipos, API, hooks, permisos; `sinRotacion` y `claseAbc` en tipos existentes; invalidaciones tras recalcular
   (`analitica`, `inventario`, `alertas`).
 - F2 `AnaliticaPage` con pestañas por rol (VENDEDOR solo "Más vendidos") + `PanelEjecucion` (última ejecución, estado,
@@ -381,7 +383,7 @@ Frontend (`frontend-dev`), en paralelo con `vi.mock` de `api/*` desde el día 1:
 - F6 Inventario (columnas Clase y Umbral con fuente), nota en `ModalStockMinimo` ("Con ROP calculado, el stock mínimo
   solo aplica si no hay ROP"), Alertas y campana con SIN_ROTACION ("El producto no vende hace 60+ días").
 
-Pruebas (`tester`):
+Pruebas:
 - T1 (tras B7, B8) `AnaliticaFlujoIntegracionTest`: datos por servicios reales, recalcular por HTTP como ADMIN, endpoints,
   alertas coherentes, matriz de roles completa (403), métrica guardada = conteo SQL.
 - T2 (usuario) Corrida real: `docker compose down -v`, semilla `dev,seed`, anotar el resumen (clases, ROP, % en alerta
@@ -392,7 +394,7 @@ Pruebas (`tester`):
   left join alerta al on al.variante_id = a.variante_id and al.estado = 'ACTIVA' and al.tipo in ('AGOTADO','STOCK_BAJO')
   group by a.clase_abc, a.metodo_reorden order by 1, 2;`
 
-Documentación (`documentador-ppi`, tras T2):
+Documentación (tras T2):
 - D1 Fichas `docs/ppi/requisitos/REQ-05.md` y `REQ-14.md` (Clasificación ABC; stakeholder, necesidad, caso de uso y
   prioridad **"Por asignar"**), actualización de `REQ-04.md` (ROP dinámico, SIN_ROTACION, re-evaluación nocturna, métrica
   con los números de T2), `README.md` y `datos-demostracion.md` (clases y % en alerta).
@@ -453,7 +455,7 @@ SIN_ROTACION (se reabre cada noche); columnas σ/z/nivel de servicio en la pesta
 - ADR-009 aceptado (2026-10-14).
 
 ## Criterios de aceptación
-- `./mvnw verify` y `npm run test`/`lint`/`build` en verde; `/revisar` sin críticos.
+- `./mvnw verify` y `npm run test`/`lint`/`build` en verde; revisión de código sin críticos.
 - Tras la semilla: 100 % de variantes activas con clase; ROP en todas las de ≥ 30 días; alertas = `tipoEsperado`;
   ejecución SEMILLA EXITOSA con la métrica guardada.
 - Recalcular como ADMIN en < 15 s (meta < 5 s); consultas de analítica < 3 s (RNF-03) con la base semilla.
@@ -462,5 +464,5 @@ SIN_ROTACION (se reabre cada noche); columnas σ/z/nivel de servicio en la pesta
 - Métrica de alertas registrada antes/después (47 % → valor de T2) y la decisión D4 documentada en REQ-04.
 
 ## Asignación sugerida
-- `backend-dev`: B1–B8. `analitica`: A1, A2 (y apoyo en B3). `frontend-dev`: F1–F6. `tester`: T1 y la guía de T2.
-- `documentador-ppi`: D1 (REQ-05, REQ-14, REQ-04, datos de demostración). Coordinador: Paso 0 y D2.
+- Backend: B1–B8. Algoritmos: A1, A2 (y apoyo en B3). Frontend: F1–F6. Pruebas: T1 y la guía de T2.
+- Documentación: D1 (REQ-05, REQ-14, REQ-04, datos de demostración). Coordinación: Paso 0 y D2.

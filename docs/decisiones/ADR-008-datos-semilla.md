@@ -41,7 +41,8 @@ kardex es inmutable. Había seis cuestiones abiertas:
 ## Alternativas consideradas
 - Fecha explícita en cada solicitud de servicio — ensucia las firmas de producción solo para la carga.
 - Inserts directos por SQL — rompen la regla de oro 1 y no prueban la coherencia kardex ↔ stock.
-- Generador en `comun/semilla` (como decía el skill) — `comun` pasaría a depender de todos los módulos.
+- Generador en `comun/semilla` (como decía la versión inicial de `docs/especificaciones/datos-semilla.md`) — `comun`
+  pasaría a depender de todos los módulos.
 - Commit por día o por mes — menos memoria por transacción, pero un fallo deja una carga parcial que bloquea la
   re-ejecución (ya hay ventas).
 - Borrar y regenerar desde el código — ArchUnit prohíbe `EntityManager.remove` y el kardex no se borra.

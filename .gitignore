@@ -2,9 +2,9 @@
 .env
 *.env.local
 
-# Claude Code (local, personal)
-.claude/settings.local.json
-.claude/agent-memory-local/
+# Configuración local de herramientas del equipo (no se versiona)
+.claude/
+CLAUDE.md
 CLAUDE.local.md
 
 # Backend

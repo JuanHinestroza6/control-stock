@@ -1,7 +1,7 @@
 # Plan APROBADO — Fase 0 (Setup)
 
 ## Decisiones confirmadas por el usuario
-- Spring Boot 4.1.1 (Spring Security 7, Jackson 3, Testcontainers 2, starters separados p. ej. spring-boot-starter-flyway). Los skills están escritos para Boot 3: usar APIs de Boot 4 (p. ej. @MockitoBean, no @MockBean).
+- Spring Boot 4.1.1 (Spring Security 7, Jackson 3, Testcontainers 2, starters separados p. ej. spring-boot-starter-flyway). Las guías de convenciones se escribieron para Boot 3 (hoy `docs/especificaciones/convenciones-backend.md`, ya actualizada): usar APIs de Boot 4 (p. ej. @MockitoBean, no @MockBean).
 - MySQL 8.4 (docker compose y Testcontainers: `mysql:8.4`).
 - JWT con spring-boot-starter-oauth2-resource-server, HS256. JWT_SECRET >= 32 bytes o la app no arranca. Claims: sub=id usuario, rol, nombre, exp. Convertidor JWT carga el usuario por id en cada request: inactivo → 401; aplica rol vigente (ROLE_x).
 - Token 8 h, sin refresh. Frontend guarda la sesión en localStorage, valida expiración al cargar; interceptor 401 limpia sesión y redirige a /login.
@@ -46,7 +46,7 @@ frontend/src:
 - GET /api/auth/yo (isAuthenticated()) → UsuarioSesionResponse
 - GET /actuator/health público sin detalles
 - Sin logout.
-- V2 del admin (hallazgo del revisor; alinear con ADR-003): pasar ADMIN_EMAIL/ADMIN_PASSWORD como placeholders de Flyway
+- V2 del admin (hallazgo de la revisión de código; alinear con ADR-003): pasar ADMIN_EMAIL/ADMIN_PASSWORD como placeholders de Flyway
   (`spring.flyway.placeholders.admin-email: ${ADMIN_EMAIL:}` y `admin-password: ${ADMIN_PASSWORD:}`, default vacío) y leerlos con
   `context.getConfiguration().getPlaceholders()`. V2 valida que no estén vacíos SOLO si va a insertar (no existe ningún ADMIN);
   así la app no exige la contraseña admin en cada arranque. Quitar `app.admin.*` de application.yml si queda sin uso.

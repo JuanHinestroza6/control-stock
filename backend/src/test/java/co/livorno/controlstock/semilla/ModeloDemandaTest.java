@@ -249,8 +249,8 @@ class ModeloDemandaTest {
 
     @Test
     void claseAPorIngreso_tieneEntre5y7Productos() {
-        // ABC del skill sobre el ingreso simulado por producto (precio de lista × unidades): A = acumulado ≤ 80 %,
-        // el primero siempre es A. Con la semilla 42 quedan 6 productos A.
+        // ABC de referencia (docs/especificaciones/algoritmos-analitica.md) sobre el ingreso simulado por producto
+        // (precio de lista × unidades): A = acumulado ≤ 80 %, el primero siempre es A. Con la semilla 42 quedan 6 productos A.
         double[] ingresos = sim.ingresoPorProducto.clone();
         Arrays.sort(ingresos);
         double total = sumar(ingresos);

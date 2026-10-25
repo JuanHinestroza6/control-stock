@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * Catálogo fijo de demostración: 30 productos, 299 variantes (skill {@code datos-semilla}, ADR-008).
+ * Catálogo fijo de demostración: 30 productos, 299 variantes (docs/especificaciones/datos-semilla.md, ADR-008).
  *
  * <p>Las 6 categorías son las de la migración V3 y se buscan por nombre. Precios en COP con terminación 900; costo entre
  * 40 % y 55 % del precio. {@code rangoDemanda} es una permutación de 1..30 mezclada entre categorías: los 6 primeros

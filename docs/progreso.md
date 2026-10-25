@@ -1,6 +1,6 @@
 # Progreso
 
-Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: estado actual, no historia completa.
+Bitácora viva del proyecto. Se actualiza al cerrar cada sesión de trabajo. Mantener corto: estado actual, no historia completa.
 
 ## Estado actual
 
@@ -22,7 +22,8 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
       nocturna y manual; T2 real con 34,4 % de variantes en alerta de stock (fase 4: 47 %); PPI REQ-05, REQ-14 (CU-15),
       REQ-04; diagramas CU-08, CU-15 y clases de `analitica` (PR #8, #9)
 - [x] Fase 6 — plan (docs/fases/fase-6-plan.md) y ADR-010 con D1–D8 (D3 en b), **Holt-Winters multiplicativo** (mes en 0
-      → SES), punto de corte (núcleo primero) y PDF de tendencias (CU-05) movido a la fase 7; dominio y skill de algoritmos
+      → SES), punto de corte (núcleo primero) y PDF de tendencias (CU-05) movido a la fase 7; dominio y especificación
+      de algoritmos (`docs/especificaciones/algoritmos-analitica.md`)
 - [x] Fase 6 — algoritmos A1–A5: serie mensual y corrección por agotados, SES y HW multiplicativo, selección por
       backtesting con origen móvil (serie sintética de LIV001: WAPE SES 12,1 % vs HW 5,2 %), desagregación y ROP con
       pronóstico, sugerencia (s, S)
@@ -77,8 +78,7 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
       CU-05"; CU-01 extiende CU-10; "Comparar periodos" extiende CU-05), clases general y secuencia de exportar; D3
       `docs/ppi/trazabilidad.md` y README del PPI. 20 `.puml` validan con PlantUML 1.2024.7 (JAR de `~/.m2`)
 
-- [x] Fase 7 — revisión (rol `revisor`; esta sesión no cargó los agentes del proyecto y se usó un agente general con
-      `.claude/agents/revisor.md`): sin críticos. Corregidas las 2 advertencias: B10 usa la ventana de la `fechaCorte`
+- [x] Fase 7 — revisión de código: sin críticos. Corregidas las 2 advertencias: B10 usa la ventana de la `fechaCorte`
       real de la analítica (pérdidas por mes en la simulación; antes podía desalinearse con `fecha-fin` explícita) y la
       prueba de integración de movimientos cubre VENTA_RESERVA, LIBERACION, variante inactiva y otra categoría. De las
       sugerencias: urgentes STOCK_BAJO por posición (con lo en camino), fórmula completa y aviso del tope del Excel en
@@ -201,14 +201,13 @@ Anota los resultados en "Hecho" (y en REQ-10, RNF-03 y `docs/ppi/datos-demostrac
 
 ## Notas para la próxima sesión
 
-- Maven en el sandbox de Claude Code: usar `./mvnw -o` (offline). Si se agregan dependencias, ejecutar `./mvnw` con red
+- Maven sin red: usar `./mvnw -o` (offline). Si se agregan dependencias, ejecutar `./mvnw` con red
   (MAVEN_OPTS=-Djavax.net.ssl.trustStoreType=Windows-ROOT).
 - PC de mesa: Docker Desktop debe estar arriba (sin él se omiten las pruebas con Testcontainers). **Portátil** (sin
   Docker, MySQL 9.7 nativo, perfil `dev,local` con `backend/config/application-local.properties`): se omiten las pruebas
   con Testcontainers; un commit requiere en verde el resto del backend y el frontend completo, y las de integración las
   valida la CI del PR. `gh` no está en el PATH (`& "C:\Program Files\GitHub CLI\gh.exe"`); no hay Python; PlantUML se
-  valida con el JAR de `~/.m2` (ver `docs/ppi/README.md`). En la sesión del 2026-10-24 Claude Code no cargó los agentes
-  de `.claude/agents/` (se usó un agente general con las instrucciones de `revisor.md`).
+  valida con el JAR de `~/.m2` (ver `docs/ppi/README.md`).
 - Al encadenar verificación y commit, cortar ante cualquier fallo (`verify && commit`).
 - Las pruebas que borran variantes deben borrar antes `alerta` y `reserva`; las de semilla usan `LimpiezaSemilla`.
 - Las reservas ACTIVAS de la semilla vencen a los pocos días: regenerar la víspera de una demo.

@@ -66,7 +66,8 @@ class CalculadoraSugerenciaCompraTest {
     }
 
     /*
-     * Equivalencia con la fórmula del skill: S = μ(L + R) + SS. Con μL = 23 y SS = 7,67 (A4):
+     * Equivalencia con la fórmula de referencia (docs/especificaciones/algoritmos-analitica.md, ADR-010):
+     * S = μ(L + R) + SS. Con μL = 23 y SS = 7,67 (A4):
      *   μL + SS + demanda R = 23 + 7,67 + 68 = 98,67 y S = ceil(23 + 7,67) + 68 = 31 + 68 = 99 (solo el ceil del ROP).
      * Aquí se verifica el lado práctico: lo que se pide deja la posición en S.
      */

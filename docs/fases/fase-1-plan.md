@@ -20,7 +20,7 @@ REQ-12 CA-5/CA-6 (CU-12). Reglas: `docs/dominio.md` secciones "Catálogo" y "Usu
   (422); siempre ≥ 1 ADMIN activo (422, con bloqueo pesimista sobre los ADMIN activos).
 - Contraseñas: 12–72 caracteres y ≤ 72 bytes UTF-8, no empieza por `cambiar`. La que asigna el ADMIN es temporal
   (`debeCambiarPassword`). Revocación de tokens por `passwordCambiadoEn` vs `iat` (ADR-005).
-- V3 carga las 6 categorías base del skill datos-semilla; el generador de la Fase 4 las reutiliza (no las crea).
+- V3 carga las 6 categorías base de `docs/especificaciones/datos-semilla.md`; el generador de la Fase 4 las reutiliza (no las crea).
 
 ## Migraciones (InnoDB, utf8mb4, collation utf8mb4_0900_ai_ci, DATETIME(6))
 - `V3__crear_tabla_categoria.sql`: `categoria(id BIGINT AI PK, nombre VARCHAR(60) NOT NULL, creado_en, actualizado_en,
@@ -172,7 +172,7 @@ Convenciones:
 - `App.tsx`: rutas reales para productos, usuarios y cuenta; el resto sigue con `ProximamentePage`.
 
 ## Tareas (cada una cierra con un commit y pruebas en verde)
-Backend (`backend-dev`), en orden; B5 puede ir en paralelo desde el inicio:
+Backend, en orden; B5 puede ir en paralelo desde el inicio:
 - B1 `comun`: Page VIA_DTO, `SolicitudInvalidaException`, `PropertyReferenceException` → 400, `Ordenamiento`. Prueba del JSON de página.
 - B2 V3 + `Categoria` (entidad, repositorio, servicio, controlador, DTOs). Pruebas de servicio, WebMvc por rol, migración.
 - B3 V4 + `Producto` + `ProductoRepository` (consulta agregada filtrada). `@DataJpaTest` con Testcontainers.
@@ -189,7 +189,7 @@ Backend (`backend-dev`), en orden; B5 puede ir en paralelo desde el inicio:
 - B12 `UsuarioController` + WebMvc (todo rol no ADMIN → 403).
 - B13 `PUT /api/auth/yo/password` (token nuevo, 422).
 
-Frontend (`frontend-dev`), en paralelo con el backend usando `vi.mock` de `api/*`:
+Frontend, en paralelo con el backend usando `vi.mock` de `api/*`:
 - F1 `Pagina<T>`, `Tabla`, `Paginacion`, `Selector`, `Badge`, estados.
 - F2 `Modal`, `DialogoConfirmacion`.
 - F3 Tipos, API y hooks del catálogo + página de categorías.
@@ -203,12 +203,12 @@ Frontend (`frontend-dev`), en paralelo con el backend usando `vi.mock` de `api/*
 - F11 Usuarios: listado y formulario crear/editar.
 - F12 Usuarios: estado, rol y restablecer contraseña (acciones ocultas sobre el propio usuario).
 
-Pruebas (`tester`):
+Pruebas:
 - T1 (tras B8) Integración catálogo de punta a punta.
 - T2 (tras B13) Integración usuarios y seguridad: revocación, cambio obligatorio, matriz de roles.
 - T3 Prueba manual con backend real; ajustes de contrato.
 
-Documentación (`documentador-ppi`, al final): ficha REQ-11; CA de REQ-06 y REQ-12; diagrama de clases.
+Documentación (al final): ficha REQ-11; CA de REQ-06 y REQ-12; diagrama de clases.
 
 Recorte si falta tiempo (en este orden): F3 página de categorías (las 6 vienen en V3), búsqueda `q`, F12 restablecer en UI.
 
