@@ -7,6 +7,7 @@ import co.livorno.controlstock.analitica.modelo.EjecucionAnalitica;
 import co.livorno.controlstock.analitica.modelo.EstadoEjecucion;
 import co.livorno.controlstock.analitica.modelo.OrigenEjecucion;
 import co.livorno.controlstock.analitica.servicio.EjecucionAnaliticaService;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.TreeMap;
@@ -134,7 +135,9 @@ public class GeneradorDatosSemilla {
                 ejecucion.getEnAlertaStock(), ejecucion.getPorcentajeAlertaStock(),
                 porTipo.getOrDefault("SIN_ROTACION", 0L), ejecucion.getDuracionMs(),
                 ejecucion.getConHoltWinters(), ejecucion.getConSes(), ejecucion.getWapeGlobal(),
-                ejecucion.getEnAlertaSinTransito(), ejecucion.getConPedidoEnCamino());
+                ejecucion.getEnAlertaSinTransito(), ejecucion.getConPedidoEnCamino(),
+                jdbc.queryForObject("select coalesce(sum(unidades_corregidas_12m - unidades_observadas_12m), 0)"
+                        + " from analitica_producto", BigDecimal.class));
         return resumen.conCierre(activas == null ? 0 : activas, porTipo.getOrDefault("AGOTADO", 0L),
                 porTipo.getOrDefault("STOCK_BAJO", 0L), System.currentTimeMillis() - t0, analitica);
     }

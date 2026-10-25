@@ -302,6 +302,8 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. Desde la Fas
 - **Corrección por agotados**: `corregida = observada / max(disponibilidad, 0,5)`, con `disponibilidad` = fracción de días
   con stock de las variantes activas ponderada por su participación, reconstruida desde el kardex (día sin stock: abre en 0
   y ningún movimiento lo deja > 0). Se guardan ambas series.
+  La semilla compara lo que agrega (Σ corregidas − observadas, 12 meses) con sus "unidades perdidas comparables" (misma
+  ventana, sin variantes agotables a propósito ni el descontinuado) y muestra la razón en el resumen (ADR-011, D5).
 - **Método**: SES u **Holt-Winters multiplicativo** (m = 12), elegido por backtesting con origen móvil (cortes n − 6 y
   n − 3, 3 meses cada uno, WAPE sobre 6 puntos; empate < 0,001 → SES). HW solo compite con n ≥ 30 meses, sin ningún mes
   en 0 y con nivel positivo; si no, SES y se guarda el motivo (`POCA_HISTORIA`, `MES_EN_CERO`, `NIVEL_NO_POSITIVO`).

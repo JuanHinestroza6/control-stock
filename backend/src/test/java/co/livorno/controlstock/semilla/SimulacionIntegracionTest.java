@@ -90,6 +90,8 @@ class SimulacionIntegracionTest {
         assertThat(r.alzasDePrecio()).isEqualTo(1);
         assertThat(r.anuladas()).isPositive();
         assertThat(r.unidadesPerdidas()).isGreaterThanOrEqualTo(0);
+        assertThat(r.unidadesPerdidasComparables()).isBetween(0L, r.unidadesPerdidas());
+        assertThat(resumen.texto()).contains("comparables con la corrección").contains("corrección por agotados");
 
         // stock = suma del kardex; reservado = 0; nada negativo
         assertThat(contar("""

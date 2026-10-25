@@ -71,4 +71,6 @@ la medición de rendimiento (RNF-03: < 3 s con hasta 10.000 registros). Había v
 - Quedan fuera (observación en las fichas): gastos y validación fiscal (CU-07), envío por correo (CU-06), almacenamiento
   de reportes generados y bloqueo por inconsistencias (la integridad la garantizan el kardex inmutable y el verificador).
 - Corrección por agotados (pendiente de la fase 6): no se cambia el algoritmo; la semilla informa las unidades perdidas
-  comparables (12 meses, variantes activas, sin las agotadas a propósito ni productos inactivos).
+  comparables (12 meses, variantes activas, sin las agotadas a propósito ni productos inactivos). Implementado (B10):
+  el resumen muestra esas unidades, lo que suma la corrección (Σ corregidas − observadas de `analitica_producto`) y la
+  razón entre ambas (esperado 0,5×–2×); la ventana son los 12 meses completos antes del mes de `fecha-fin + 1`.
