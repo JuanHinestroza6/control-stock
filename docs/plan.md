@@ -1,6 +1,6 @@
 # Plan de desarrollo — 5 semanas hasta la primera entrega
 
-Cada fase termina con: pruebas en verde, `/revisar` sin críticos, `docs/progreso.md` actualizado y demo funcional.
+Cada fase termina con: pruebas en verde, revisión de código sin críticos, `docs/progreso.md` actualizado y demo funcional.
 Backend y frontend avanzan en paralelo dentro de cada semana.
 
 ## Semana 1 — Fase 0 (setup) + Fase 1 (núcleo)

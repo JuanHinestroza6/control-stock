@@ -84,7 +84,7 @@ Rama: `fase-7-cierre-entrega`.
   - Además, medición real sobre la semilla con `Measure-Command`.
 - **R9 Índices**: V17 solo si el `EXPLAIN` lo pide.
 - **R10 Ley 1581**: ningún reporte selecciona datos de cliente. Una prueba busca el nombre del cliente en los bytes del PDF y del XLSX.
-- **R11 PlantUML**: el comando `-checkonly` con el jar de la extensión se documenta en el README del PPI y en el skill `diagramas-uml`.
+- **R11 PlantUML**: el comando `-checkonly` con el jar de la extensión se documenta en el README del PPI y en `docs/especificaciones/diagramas-uml.md`.
 
 ## Métricas (solo ventas REGISTRADA)
 | Métrica | Fórmula |
@@ -132,8 +132,8 @@ Visibilidad en el panel:
   - Copiar este plan a `docs/fases/fase-7-plan.md`.
   - Escribir ADR-011.
   - En `dominio.md`: sección "Reportes y panel", fila del panel en la matriz y trazabilidad de REQ-03, REQ-07 y RNF-03.
-  - Agregar el patrón `/exportar` al skill `convenciones-spring`.
-- **Backend (`backend-dev`)**:
+  - Documentar el patrón `/exportar` en `docs/especificaciones/convenciones-backend.md`.
+- **Backend**:
   - B0: POI y OpenPDF en el pom (**el usuario corre `dependency:resolve` con red**), esqueleto de `reporte` y ArchUnit.
   - B1: `GeneradorExcel`.
   - B2: `GeneradorPdf`.
@@ -148,7 +148,7 @@ Visibilidad en el panel:
     - B10: perdidas comparables en la semilla (`analitica`).
     - B11: V17 si hace falta.
   - B1, B3, B4, B5 y B8 pueden ir en paralelo cuando B0 esté listo.
-- **Frontend (`frontend-dev`)**, en paralelo con `vi.mock`:
+- **Frontend**, en paralelo con `vi.mock`:
   - F1: tipos, API, hooks, permisos, `lib/descarga.ts` y ruta.
   - F2: panel por rol.
   - F3: Rentabilidad.
@@ -156,11 +156,11 @@ Visibilidad en el panel:
   - F5: Valorización.
   - F6: exportar desde Tendencias.
   - F7: Movimientos (después del corte).
-- **Pruebas (`tester`)**:
+- **Pruebas**:
   - T1: rendimiento con `EXPLAIN`.
   - T2: flujo integrado con servicios reales (ejemplo a mano, conciliación, sin datos de cliente, matriz de roles).
   - T3: guía T2 real y guion de sustentación.
-- **Documentación (`documentador-ppi`)**:
+- **Documentación**:
   - D1: fichas REQ-03, REQ-07 y RNF-03; completar REQ-09 y REQ-10; REQ-01 con el panel.
   - D2: diagramas de paquetes, componentes, despliegue, casos de uso general, clases general y secuencia "exportar". Puede empezar pronto.
   - D3: trazabilidad final, README del PPI y `progreso.md`.
@@ -175,7 +175,7 @@ Si falta tiempo, se recorta en este orden:
 5. Excel de tendencias.
 
 ## Verificación
-- `./mvnw -o verify` y `npm run test`, `lint` y `build` en verde. `/revisar` sin críticos.
+- `./mvnw -o verify` y `npm run test`, `lint` y `build` en verde. revisión de código sin críticos.
 - Las cifras coinciden con el ejemplo a mano y la conciliación libro ↔ rentabilidad se cumple. El neto de rentabilidad es igual al de Más vendidos.
 - El panel del VENDEDOR no muestra costos. Las exportaciones no traen datos de cliente. T1 < 3 s.
 - T2 real del usuario sobre la semilla de 36 meses:

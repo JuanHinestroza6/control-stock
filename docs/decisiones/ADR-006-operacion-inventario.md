@@ -7,8 +7,9 @@
 La Fase 2 introduce el kardex (`Movimiento`), las entradas, los ajustes, las ventas, las anulaciones y las devoluciones.
 Todas cambian el stock de `Variante`. Las reglas de oro 1, 2 y 7 exigen un único punto de escritura del stock, un kardex
 inmutable y bloqueo optimista. Había cinco cuestiones abiertas:
-1. El skill pedía un `Variante.aplicar()` paquete-privado, pero `Variante` vive en `catalogo.modelo` y `MovimientoService`
-   en `inventario.servicio`: Java no permite esa visibilidad entre paquetes.
+1. La versión inicial de `docs/especificaciones/reglas-inventario.md` pedía un `Variante.aplicar()` paquete-privado,
+   pero `Variante` vive en `catalogo.modelo` y `MovimientoService` en `inventario.servicio`: Java no permite esa
+   visibilidad entre paquetes.
 2. El dominio no tenía un tipo de movimiento para la anulación de una venta.
 3. Qué hacer cuando dos operaciones chocan sobre la misma variante.
 4. Cómo garantizar la inmutabilidad del kardex.
@@ -54,7 +55,7 @@ inmutable y bloqueo optimista. Había cinco cuestiones abiertas:
 
 ## Consecuencias
 - Nueva dependencia de test `com.tngtech.archunit:archunit-junit5` 1.5.1: el usuario debe descargarla una vez con
-  `.\mvnw.cmd test-compile` desde su terminal (el sandbox de Claude Code trabaja offline).
+  `.\mvnw.cmd test-compile` desde su terminal (el entorno de compilación automatizado trabaja sin red).
 - `dominio.md` agrega ANULACION_VENTA, `Movimiento.costoUnitario`, `Movimiento.usuarioId` nullable,
   `Venta.anuladaEn/anuladaPor/motivoAnulacion` y `DetalleVenta.precioLista`.
 - Un costo de entrada 0 (muestra o regalo) se guarda en el movimiento pero NO actualiza `precioCompra` (decisión del usuario), para no generar márgenes del 100 % en las ventas siguientes.

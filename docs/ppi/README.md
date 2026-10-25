@@ -1,6 +1,6 @@
 # Material para el documento PPI
 
-El agente `documentador-ppi` deja aquí secciones en Markdown y diagramas PlantUML (`.puml`)
+El equipo deja aquí secciones en Markdown y diagramas PlantUML (`.puml`)
 listos para renderizar y pegar en el documento Word del PPI.
 
 - [`requisitos/`](requisitos/) — fichas FO-ERS individuales: REQ-01 a REQ-14 (REQ-03 y REQ-07, reportes de la fase 7; REQ-09 «Analizar Tendencias Históricas de Venta»; REQ-10 con CU-01 del Word y CU-16, CU-17 y CU-18 nuevos; REQ-13 y REQ-14, requisitos nuevos) y RNF-03 (rendimiento).

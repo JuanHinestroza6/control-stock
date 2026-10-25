@@ -12,7 +12,7 @@ la última 3.5 (3.5.16) terminó su soporte OSS el 2026-06-30, y MySQL 8.0 lleg�
 Backend con Spring Boot 4.1.1 (Java 21) y base de datos MySQL 8.4 LTS (imagen `mysql:8.4` en Docker Compose y Testcontainers).
 
 ## Alternativas consideradas
-- Spring Boot 3.5.16 — coincide con tutoriales y skills, pero sin parches de seguridad públicos y no generable desde Initializr.
+- Spring Boot 3.5.16 — coincide con tutoriales y guías de convenciones, pero sin parches de seguridad públicos y no generable desde Initializr.
 - Spring Boot 4.0.x — soporte OSS solo hasta 2026-12-31, antes de terminar el semestre siguiente.
 - MySQL 8.0 — fuera de soporte. MySQL 9.x Innovation — ciclos cortos de soporte; 8.4 es la LTS (hasta 2032).
 

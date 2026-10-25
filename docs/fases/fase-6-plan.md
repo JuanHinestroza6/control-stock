@@ -3,7 +3,7 @@
 Rama `fase-6-prediccion-compras`. Requisitos: REQ-10 (planeación de compras), REQ-09 (tendencias históricas), REQ-04
 (cierre de la meta de alertas con la posición de inventario, D4 de ADR-009). Reglas: `docs/dominio.md` (secciones
 "Analítica", "Alertas", "Datos semilla", "Máquinas de estado", matriz de roles), ADR-006, ADR-007, ADR-008 y ADR-009.
-Algoritmos: skill `algoritmos-analitica` §4 y §5 (se actualiza en el Paso 0 según las decisiones).
+Algoritmos: `docs/especificaciones/algoritmos-analitica.md` §4 y §5 (se actualiza en el Paso 0 según las decisiones).
 
 **Regla de oro 1:** el pronóstico y la sugerencia nunca tocan stock. La recepción de un plan genera ENTRADAS por
 `OperacionInventarioService` → `MovimientoService` (referencia `PLAN_COMPRA/{id}`). El ROP y la clase se siguen
@@ -18,15 +18,15 @@ en alerta de stock a la meta de ~10–15 % midiendo la posición de inventario (
 ## Contradicciones y hallazgos detectados antes de planear
 1. **Holt-Winters nunca sería elegible con la semilla actual.** La semilla tiene 24 meses que empiezan a mitad de mes
    (`inicio = fin − 24 meses + 1 día`): al pronosticar el 15 de octubre quedan **23 meses completos** (noviembre a
-   septiembre). El skill exige 24 meses para HW y reserva 3 de prueba: harían falta 27. Con los datos actuales todo
-   saldría SES y el diferenciador "Holt-Winters" no se vería. Ver D2.
+   septiembre). `docs/especificaciones/algoritmos-analitica.md` exigía 24 meses para HW y reservaba 3 de prueba:
+   harían falta 27. Con los datos actuales todo saldría SES y el diferenciador "Holt-Winters" no se vería. Ver D2.
 2. **Plan de compras sin cancelación.** El dominio define `BORRADOR → APROBADO → RECIBIDO`. Un pedido aprobado que el
    proveedor nunca entrega quedaría "en camino" para siempre y taparía la alerta de su variante. Ver D5.
 3. **Matriz de roles:** INVENTARIO solo "crea borrador" en el plan de compras, pero es el rol que registra las entradas en
    bodega. ¿Quién recibe un pedido? Ver D7.
-4. **Skill §5 (sugerencia):** la fórmula "pedir hasta cubrir L + R" aplicada a todas las variantes es una política de
-   revisión periódica (cada plan rellena todo el catálogo, con cientos de líneas de 1 unidad), mientras que las alertas
-   disparan por ROP (revisión continua). Ver D6.
+4. **`docs/especificaciones/algoritmos-analitica.md` §5 (sugerencia):** la fórmula "pedir hasta cubrir L + R"
+   aplicada a todas las variantes es una política de revisión periódica (cada plan rellena todo el catálogo, con
+   cientos de líneas de 1 unidad), mientras que las alertas disparan por ROP (revisión continua). Ver D6.
 5. **Estado de stock vs. alerta:** el dominio dice que `Variante.estadoStock()` usa "el mismo umbral que las alertas". Con
    STOCK_BAJO por posición, una variante con pedido en camino puede verse BAJO sin alerta. Ver D4.
 6. **Entradas sobre variantes inactivas → 422** (dominio). Si una variante se desactiva después de aprobar su pedido, la
@@ -78,7 +78,7 @@ cambios:
   sobre 6 puntos. HW (multiplicativo) es elegible si el entrenamiento más corto tiene ≥ 24 meses (n ≥ 30) y ningún mes
   de la serie es 0. Hasta B12 (después del corte) la semilla sigue en 24 meses: en la demo todo sale SES y HW se valida
   solo con pruebas unitarias (ver "Tareas").
-- (b) Skill literal (últimos 3 meses de prueba) con semilla de 30 meses: HW elegible (26 de entrenamiento), pero el WAPE
+- (b) Especificación literal (últimos 3 meses de prueba) con semilla de 30 meses: HW elegible (26 de entrenamiento), pero el WAPE
   sale de 3 puntos (julio–septiembre, los meses más planos): una sola racha de ruido decide el método.
 - (c) Semilla de 24 meses y HW con inicialización de una sola temporada: sin tendencia inicial confiable y sin backtest
   real para HW.
@@ -127,10 +127,10 @@ cambios:
   las que tendrían AGOTADO o STOCK_BAJO). Cantidad = hasta `S = umbral + demanda pronosticada de R días después del lead
   time` (R = 30, configurable), redondeada hacia arriba al múltiplo de `loteMinimo`; las de cantidad 0 no entran. Se
   omiten (y se informan) las variantes que ya están en otro BORRADOR. Justificación legible por línea.
-- (b) Skill literal: toda variante con `cobertura(L + R) + SS − disponible − en camino > 0` (revisión periódica).
+- (b) Especificación literal: toda variante con `cobertura(L + R) + SS − disponible − en camino > 0` (revisión periódica).
 - (c) (a) solo para clases A y B.
 - Porqué (a): "el plan resuelve las alertas": aprobarlo cierra los STOCK_BAJO de sus variantes y la posición sube por
-  encima del ROP. Con ROP = `ceil(μL + SS)`, `S` coincide con la fórmula del skill (`μ(L+R) + SS`), solo cambia qué
+  encima del ROP. Con ROP = `ceil(μL + SS)`, `S` coincide con la fórmula de la especificación (`μ(L+R) + SS`), solo cambia qué
   variantes entran. (b) genera planes de cientos de líneas de 1 unidad para la cola.
 
 ### D7 [ELEGIDA (a)] Roles del plan de compras
@@ -156,7 +156,7 @@ cambios:
   siquiera se hacen: por eso las variantes del final quedan en alerta). Verificable: en camino = el arreglo `enCamino`
   del simulador.
 
-## Decisiones resueltas por el arquitecto (se documentan en ADR-010)
+## Decisiones técnicas resueltas por el equipo (se documentan en ADR-010)
 - R1 **Módulo `compra` y puertos.** `compra` depende de `catalogo`, `inventario` y `usuario`. Dos puertos con el patrón de
   `ConsultaReservasActivas`:
   - `inventario.servicio.ConsultaPedidosEnCamino` (lo implementa `compra`): `enCamino(varianteId)` y
@@ -199,7 +199,7 @@ cambios:
   interfaz rotula cada gráfico ("ventas netas" vs. "demanda").
 - R8 **Recharts** llega en esta fase (ADR-001), cargado de forma diferida (`React.lazy`) solo en las pestañas con
   gráficos. **Lo instala el usuario** desde su terminal (`npm install recharts` dentro de `frontend/`; requiere red y
-  una versión compatible con React 18); F1 empieza pidiéndoselo y el agente no lo instala.
+  una versión compatible con React 18); F1 empieza pidiéndoselo y no se instala sin su confirmación.
 - R9 **Rendimiento:** la disponibilidad diaria se reconstruye en memoria desde el kardex (una consulta ordenada por
   `idx_movimiento_variante_fecha`, ~60–80 mil filas con 36 meses). HW por rejilla: 125 combinaciones × 3 ajustes × 30
   productos × 35 meses, despreciable. Meta del recálculo manual con pronóstico: < 8 s (límite 15 s, R7 de ADR-009).
@@ -489,9 +489,10 @@ Roles: **AN** `hasAnyRole('ADMIN','INVENTARIO','CONTABILIDAD')`; **GI** `hasAnyR
 ## Tareas (cada una cierra con un commit y pruebas en verde; < 1 h)
 Paso 0 (coordinador, tras aprobar D1–D8): copiar este plan a `docs/fases/fase-6-plan.md`, ADR-010, actualizar
 `docs/dominio.md` (secciones "Pronóstico" y "Plan de compras" nuevas; "Alertas" con la posición; "Máquinas de estado" con
-CANCELADO; "Datos semilla" 36 meses y planes; matriz y notas de la fase 6; trazabilidad REQ-09/REQ-10) y los skills
-`algoritmos-analitica` (§4 Holt-Winters **multiplicativo** con índices como razones de media 1 y exclusión por mes en 0,
-origen móvil, corrección; §5 política s,S) y `datos-semilla` (36 meses y planes, aplicable desde B12).
+CANCELADO; "Datos semilla" 36 meses y planes; matriz y notas de la fase 6; trazabilidad REQ-09/REQ-10) y las
+especificaciones `docs/especificaciones/algoritmos-analitica.md` (§4 Holt-Winters **multiplicativo** con índices como
+razones de media 1 y exclusión por mes en 0, origen móvil, corrección; §5 política s,S) y
+`docs/especificaciones/datos-semilla.md` (36 meses y planes, aplicable desde B12).
 
 ### Orden de trabajo y punto de corte
 **Núcleo** (primero): A1–A5, B1–B11, F1–F6, T1. **Al terminar el núcleo se para y se reporta al usuario** (estado,
@@ -522,7 +523,7 @@ Analítica (`analitica`), en paralelo desde el día 1:
 - A4 `Desagregador` y `CalculadoraReorden` con `μL` pronosticado (ejemplo ROP 31; horizonte agotado → última tasa).
 - A5 `CalculadoraSugerenciaCompra` (ejemplo 90; lote; SIN_DEMANDA agotada no entra; ROP null; justificación).
 
-Backend (`backend-dev`):
+Backend:
 - B1 V15 + entidades de pronóstico + columnas nuevas + `PropiedadesPronostico`; `@DataJpaTest` V1–V15 con `validate` y
   los CHECK.
 - B2 (tras B1) `ConsultasDemandaMensual` y `ConsultasDisponibilidad`: Testcontainers con datos a mano (anulada fuera,
@@ -546,9 +547,9 @@ Backend (`backend-dev`):
 - B12 (**después del corte**; tras B7, B8, B4) Semilla: 36 meses, reposición por planes, pedidos que llegan tras `fin`, verificador (en camino =
   simulador) y resumen. Prueba de semilla corta (3 meses) en verde y mismo resultado con la misma semilla aleatoria.
 
-Frontend (`frontend-dev`), en paralelo con `vi.mock` de `api/*`:
-- F1 **Empieza pidiéndole al usuario que ejecute `npm install recharts` dentro de `frontend/` desde su terminal** (el
-  agente no lo instala) y espera la confirmación; luego tipos, API, hooks, permisos; `enCamino` en tipos existentes;
+Frontend, en paralelo con `vi.mock` de `api/*`:
+- F1 **Empieza pidiéndole al usuario que ejecute `npm install recharts` dentro de `frontend/` desde su terminal** (no
+  se instala sin su confirmación) y espera la confirmación; luego tipos, API, hooks, permisos; `enCamino` en tipos existentes;
   invalidaciones (`compras`, `inventario`, `alertas`, `analitica`).
 - F2 Pestaña Tendencias: gráfico de líneas mensual (unidades/ingreso, año anterior punteado), filtros categoría y
   producto, tabla accesible con los mismos datos.
@@ -563,13 +564,13 @@ Frontend (`frontend-dev`), en paralelo con `vi.mock` de `api/*`:
 - F7 (**después del corte**) Inventario y Reorden con "en camino" y posición; Alertas con el texto nuevo de STOCK_BAJO ("posición ≤ umbral");
   `PanelEjecucion` con pronóstico (HW/SES, WAPE global) y el % de alerta con y sin tránsito.
 
-Pruebas (`tester`):
+Pruebas:
 - T1 (tras B9–B11; cierra el núcleo) `CompraFlujoIntegracionTest`: datos por servicios reales (no la semilla) → recalcular → sugerencia → editar → aprobar
   (STOCK_BAJO cerrada, AGOTADO intacta) → recibir (stock = kardex, referencia, `precioCompra`, en camino 0) → cancelar
   otro APROBADO (alerta reabierta); métrica = conteo SQL; matriz de roles completa.
 - T2 (usuario, **después del corte**, tras B12 y F7) Corrida real (abajo, "Criterios de aceptación").
 
-Documentación (`documentador-ppi`, **después del corte**, tras T2):
+Documentación (**después del corte**, tras T2):
 - D1 Fichas `REQ-09.md` (Tendencias históricas) y `REQ-10.md` (Planeación de compras), actualización de `REQ-04.md`
   (posición de inventario y métrica final) y `datos-demostracion.md` (36 meses, planes, pronóstico).
 - D2 Diagramas: estados del plan de compras, clases de `compra`, secuencia "sugerir → aprobar → recibir". `progreso.md`.
@@ -580,7 +581,7 @@ agotados (D1 → b, se documenta el sesgo). No se recortan: pronóstico SES/HW c
 recibido, STOCK_BAJO por posición.
 
 ## Pruebas
-- Puras (A1–A5): ejemplos a mano de cada sección; casos borde del skill (serie vacía, un valor, toda en cero,
+- Puras (A1–A5): ejemplos a mano de cada sección; casos borde de la especificación (serie vacía, un valor, toda en cero,
   constante, < 24 meses cae a SES, devoluciones > ventas recortadas a 0, producto nuevo sin historia).
 - Validación del método (A3): con la demanda esperada del modelo de la semilla para un producto de cabeza (36 meses,
   estacionalidad multiplicativa y tendencia conocidas), HW multiplicativo obtiene menor WAPE que SES; con ruido Poisson
@@ -601,8 +602,8 @@ recibido, STOCK_BAJO por posición.
 ## Riesgos y decisiones
 - Meta 10–15 % no garantizada: AGOTADO ya pesa ~9 % (agotables intencionales de la semilla). Se mide y se explica con el
   desglose por tipo, clase y "agotada sin demanda"; no se cambia la definición para llegar al número (D4).
-- Carga de la semilla de 36 meses ~3,5–4 min (meta de 2 min del skill ya superada en la fase 5); se acepta porque corre
-  una vez. Si pasa de 6 min, bajar a 30 meses (D2 b).
+- Carga de la semilla de 36 meses ~3,5–4 min (meta de 2 min de `docs/especificaciones/datos-semilla.md` ya superada
+  en la fase 5); se acepta porque corre una vez. Si pasa de 6 min, bajar a 30 meses (D2 b).
 - HW multiplicativo exige series sin meses en 0: los productos de cola (demanda intermitente) y los estancados caen a
   SES. Es lo correcto (un índice estacional de 0 no es estacionalidad) y queda explicado por producto
   (`motivo_sin_hw`); la ejecución informa cuántos usan HW. Riesgo: que en la demo HW aparezca en pocos productos; se
@@ -632,7 +633,7 @@ recibido, STOCK_BAJO por posición.
 
 ## Criterios de aceptación
 Al cerrar el **núcleo** (punto de corte, se reporta al usuario):
-- `./mvnw verify` y `npm run test`/`lint`/`build` en verde; `/revisar` sin críticos.
+- `./mvnw verify` y `npm run test`/`lint`/`build` en verde; revisión de código sin críticos.
 - Todo producto activo con ≥ 3 meses tiene pronóstico de 3 meses y su desagregación; el WAPE y el motivo por el que HW no
   compitió se ven en la interfaz; HW multiplicativo cubierto por las pruebas de A2/A3 y B3.
 - T1 en verde (flujo de compra completo, alertas por posición, matriz de roles).
@@ -656,5 +657,5 @@ Al cerrar la fase (después del corte):
   group by p.estado;`
 
 ## Asignación sugerida
-- `analitica`: A1–A5 (y apoyo en B3/B4/B9). `backend-dev`: B1–B12. `frontend-dev`: F1–F7. `tester`: T1 y la guía de T2.
-- `documentador-ppi`: D1–D2. Coordinador: Paso 0 y `progreso.md`.
+- Algoritmos: A1–A5 (y apoyo en B3/B4/B9). Backend: B1–B12. Frontend: F1–F7. Pruebas: T1 y la guía de T2.
+- Documentación: D1–D2. Coordinación: Paso 0 y `progreso.md`.

@@ -17,8 +17,8 @@ import java.util.Objects;
 import java.util.Random;
 
 /**
- * Modelo de demanda de los datos semilla (skill {@code datos-semilla}, plan de la Fase 4). Puro: sin Spring ni base de
- * datos; toda la aleatoriedad sale del {@link Random} inyectado (semilla 42 en el generador), así la misma semilla da
+ * Modelo de demanda de los datos semilla (docs/especificaciones/datos-semilla.md, plan de la Fase 4). Puro: sin Spring
+ * ni base de datos; toda la aleatoriedad sale del {@link Random} inyectado (semilla 42 en el generador), así la misma semilla da
  * la misma secuencia. Solo recorre listas y arreglos en orden fijo.
  *
  * <pre>
@@ -47,7 +47,7 @@ public final class ModeloDemanda {
     private static final double PERFIL_CABEZA_ULTIMO = 1.0;
     private static final double FRACCION_GRUPO = 0.2;
 
-    /** Estacionalidad colombiana de moda, enero..diciembre (skill datos-semilla). */
+    /** Estacionalidad colombiana de moda, enero..diciembre (docs/especificaciones/datos-semilla.md). */
     private static final double[] FACTOR_MES = {0.8, 0.7, 0.8, 0.85, 1.0, 1.25, 1.0, 0.9, 0.95, 1.0, 1.3, 1.6};
 
     /** Crecimiento mensual de la empresa: tendencia = 1,015^mes. */

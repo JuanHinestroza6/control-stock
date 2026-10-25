@@ -2,7 +2,7 @@
 
 Rama `fase-4-datos-semilla`. Base para REQ-05, REQ-09, REQ-10 y la clasificación ABC (Fases 5–6); ejercita REQ-01, REQ-02,
 REQ-04, REQ-08 y Apartados con volumen real. Reglas: `docs/dominio.md` sección "Datos semilla", ADR-006, ADR-007 y
-ADR-008. Especificación de la demanda: skill `datos-semilla`.
+ADR-008. Especificación de la demanda: `docs/especificaciones/datos-semilla.md`.
 
 **Regla de oro 1:** el generador solo usa servicios reales; el stock cambia solo con `MovimientoService.registrar(...)`.
 
@@ -66,10 +66,10 @@ app:
 
 ## Datos y distribución
 - Catálogo con `ProductoService.crear` y `VarianteService.generar`: 2–4 colores × S–XL (UNICA en accesorios), unas 300
-  variantes; precios en COP del skill; costo 40–55 %; lead time 10–30 días; `stockMinimo` por producto ≈ 2 semanas de
+  variantes; precios en COP de la especificación; costo 40–55 %; lead time 10–30 días; `stockMinimo` por producto ≈ 2 semanas de
   demanda esperada (mínimo 2). Fecha de creación = inicio de la historia.
-- Ventas (`VentaService.registrar`), unas 12 mil: tickets/día ~ Poisson(base × mes × día × 1,015^mes) con los factores del
-  skill; líneas por ticket 1/2/3 (70/22/8 %); producto por pesos Zipf calibrados (20 % de productos ≈ 75–80 % de
+- Ventas (`VentaService.registrar`), unas 12 mil: tickets/día ~ Poisson(base × mes × día × 1,015^mes) con los factores de
+  la especificación; líneas por ticket 1/2/3 (70/22/8 %); producto por pesos Zipf calibrados (20 % de productos ≈ 75–80 % de
   unidades); talla S/M/L/XL 20/35/30/15, primer color 50 %; cantidad 1 (85 %) o 2; hora 09:00–21:00; 15 % de las líneas
   con descuento 5–20 % (redondeado a 100). Sin disponible se vende lo que haya; el resto cuenta como venta perdida.
 - Estancados: 2–3 productos con demanda ≈ 0 los últimos 3 meses y físico > 0. Descontinuado: 1 producto deja de
@@ -89,9 +89,10 @@ app:
   anuladas, devoluciones, movimientos, ingreso, reservas por estado, alertas activas por tipo, duración).
 
 ## Tareas (cada una cierra con un commit y pruebas en verde)
-Paso 0 (coordinador): copiar este plan, ADR-008, `docs/dominio.md`, el skill `datos-semilla` y `CLAUDE.md`.
+Paso 0 (coordinador): copiar este plan, ADR-008, `docs/dominio.md`, `docs/especificaciones/datos-semilla.md` y la guía
+del proyecto.
 
-Backend (`backend-dev`):
+Backend:
 - B1 `RelojSimulado`, `PropiedadesSemilla`, `ComoUsuario`, `application-seed.yml`, `.env.example`, listener condicional,
   regla ArchUnit del módulo. Pruebas: reloj (avanza, no retrocede, vuelve al sistema); contexto sin `seed` usa el reloj
   del sistema y registra `AlertaListener`; con `por-evento=false` no lo registra.
@@ -102,13 +103,13 @@ Backend (`backend-dev`):
 Analítica (`analitica`), en paralelo con B1:
 - B2 `ModeloDemanda` + `CatalogoSemilla` con pruebas puras.
 
-Pruebas (`tester`):
+Pruebas:
 - B6 (tras B5) `SemillaIntegracionTest` con invariantes.
 - T1 (usuario) Corrida completa con `dev,seed` sobre base vacía: medir tiempo, revisar el resumen y la interfaz con los
   cuatro usuarios demo (inventario, kardex, ventas, devoluciones, reservas, alertas). Ajustar `tickets-dia-base` si pasa
   de 2 min.
 
-Documentación (`documentador-ppi`, tras T1):
+Documentación (tras T1):
 - D1 Sección "Datos de demostración" para el documento PPI y el ensayo de sustentación: volumen real del resumen de T1,
   cómo regenerar (`docker compose down -v`, `SEED_PASSWORD`, fecha final fija) y usuarios demo.
 

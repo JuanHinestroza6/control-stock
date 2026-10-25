@@ -1,8 +1,0 @@
-- [Entorno y versiones](project_entorno_y_versiones.md) — JDK 21 y Docker ya disponibles; Maven offline en sandbox; Boot 4.1.1 + MySQL 8.4
-- [Decisiones Fase 0](project_decisiones_fase0.md) — JWT resource-server 8h, admin por migración Java, auditoría con Clock
-- [Decisiones Fase 1](project_decisiones_fase1.md) — aprobadas: cascada al desactivar, revocación por iat, password temporal, V3–V6
-- [Decisiones Fase 2](project_decisiones_fase2.md) — aprobadas: aplicarMovimiento + ArchUnit, ANULACION_VENTA, costo en entradas, precioLista, V8–V10
-- [Decisiones Fase 3](project_decisiones_fase3.md) — aprobadas: reservas con lock de fila, conversión en módulo venta, alertas AFTER_COMMIT, V11–V12
-- [Decisiones Fase 4](project_decisiones_fase4.md) — aprobadas: módulo semilla, RelojSimulado @Primary, tx única, alertas al final, IDENTITY sin batch
-- [Decisiones Fase 5](project_decisiones_fase5.md) — aprobadas: ABC 12 m, ROP normal/Poisson sin piso, updatable=false, SIN_ROTACION por producto, meta alertas a fase 6
-- [Decisiones Fase 6](project_decisiones_fase6.md) — aprobadas D1–D8, HW multiplicativo, punto de corte antes de semilla 36 m, posición, CANCELADO, puertos, V15–V16
