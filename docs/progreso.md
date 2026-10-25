@@ -5,9 +5,9 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
 ## Estado actual
 
 - Semana: 5
-- Fase en curso: 7 — Cierre de entrega, **núcleo terminado** (punto de corte del plan). Rama `fase-7-cierre-entrega`,
-  sin push. Plan: docs/fases/fase-7-plan.md; ADR-011
-- Última actualización: 2026-10-21
+- Fase en curso: 7 — Cierre de entrega: núcleo y después del corte terminados (falta revisión, guía T2 y guion). Rama
+  `fase-7-cierre-entrega`, sin push. Plan: docs/fases/fase-7-plan.md; ADR-011
+- Última actualización: 2026-10-24 (portátil: Windows 10 LTSC, sin Docker, MySQL 9.7 nativo, perfil `dev,local`)
 
 ## Hecho
 
@@ -66,20 +66,29 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
       recorrido completo, sin índices nuevos; T2 flujo por HTTP (conciliación, Ley 1581 en bytes, matriz de roles).
       Diagramas de paquetes, componentes, despliegue y casos de uso general. Backend 1380/1380, frontend 635/635
 
+- [x] Fase 7 — después del corte (2026-10-24, en el portátil sin Docker; las pruebas con Testcontainers las corre la CI):
+      panel sin duplicación (agotadas y bajo stock solo en las tarjetas de Inventario; bloque "Alertas más urgentes" con
+      `GET /api/alertas/urgentes`: AGOTADO por umbral y antigüedad, STOCK_BAJO por cobertura); esperas de Testing Library
+      a 3 s (fallos intermitentes por carga); B9 + F7 movimientos del periodo (saldo inicial, entradas y su valor,
+      ventas, anulaciones, devoluciones, ajustes, saldo final; detalle del kardex solo en Excel; cuadre verificado en
+      vivo contra el kardex: 1.321 → 1.496); B10 unidades perdidas comparables y razón de la corrección en el resumen de
+      la semilla; D1 fichas REQ-03, REQ-07, RNF-03 nuevas y REQ-01, REQ-09, REQ-10 completas (sin "[confirmar con el
+      Word]"), títulos del Word de CU-03, CU-04, CU-09 y CU-10; D2 casos de uso general corregido (sin "CU-06 extiende
+      CU-05"; CU-01 extiende CU-10; "Comparar periodos" extiende CU-05), clases general y secuencia de exportar; D3
+      `docs/ppi/trazabilidad.md` y README del PPI. 20 `.puml` validan con PlantUML 1.2024.7 (JAR de `~/.m2`)
+
 ## En curso
 
-- [ ] Fase 7 — después del corte: B9 movimientos del periodo (+ F7), B10 unidades perdidas comparables en la semilla,
-      T3 guía T2 real y guion de sustentación, D1 fichas (REQ-03, REQ-07, RNF-03, REQ-09, REQ-10, REQ-01), D2 clases
-      general y secuencia "exportar", D3 trazabilidad final; revisión (`revisor`)
+- [ ] Fase 7 — revisión (`revisor`) y correcciones; guía T2 para el portátil y guion de sustentación (T3)
 
 ## Próximos pasos
 
-1. El usuario hace la revisión visual (paso 4 de la guía T2) y el merge del PR #10; luego `git switch main && git pull`.
-2. Revisar la corrección por agotados en la fase 7 si se quiere acercar al rango esperado (hoy ≈ 0,3× de las unidades
-   perdidas; posibles causas: piso de disponibilidad 0,5, solo variantes activas, quiebres cortos no visibles por día).
-3. Completar en REQ-09 y REQ-10 stakeholder, necesidad, prioridad y el título de CU-05 (quedaron "[confirmar con el
-   Word]"); validar la sintaxis de los `.puml` nuevos (no hay `plantuml` local).
-4. Fase 7: dashboard, reportes PDF/Excel (incluye el PDF de tendencias, CU-05), rendimiento y documento PPI.
+1. Revisión con `revisor` y corrección de lo que encuentre; guía T2 para el portátil y guion de sustentación (T3).
+2. El usuario corre la T2 de la fase 7 (incluye la cifra real de B10: unidades perdidas comparables y razón de la
+   corrección por agotados, hoy ≈ 0,3× contra todas las perdidas de 36 meses).
+3. Push y PR de `fase-7-cierre-entrega` cuando el usuario lo pida; la CI corre las pruebas con Testcontainers (nuevas:
+   `MovimientosPeriodoServiceIntegracionTest`, movimientos en `ReportesFlujoIntegracionTest` y `RendimientoReportesTest`,
+   `/alertas/urgentes` en `ReservasAlertasIntegracionTest`). El merge lo hace el usuario.
 
 ## Prueba T2 — fase 6 (PowerShell 5, desde la raíz del repo) — hecha por API (2026-10-21); falta el paso 4 visual
 

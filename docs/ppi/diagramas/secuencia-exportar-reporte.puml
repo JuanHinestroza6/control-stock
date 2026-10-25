@@ -1,0 +1,66 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+skinparam sequenceMessageAlign left
+title Secuencia: exportar un reporte (libro de ventas a Excel; igual para PDF y los demás reportes)
+
+actor "Contabilidad\n(o ADMIN)" as Usuario
+participant "Frontend\n(PestanaLibroVentas,\nBotonExportar)" as Front
+participant "api/reportes +\nlib/descarga" as Descarga
+participant "ReporteController" as Ctrl
+participant "LibroVentasService" as Servicio
+participant "ValidadorRangoReporte" as Validador
+participant "ConsultasReporte" as Consultas
+database "MySQL" as BD
+participant "ExportadorDocumentos" as Exportador
+participant "GeneradorExcel\n/ GeneradorPdf" as Generador
+
+Usuario -> Front : pulsa «Exportar Excel»\n(con los filtros vigentes)
+Front -> Descarga : exportarLibroVentas(filtros, XLSX)
+Descarga -> Ctrl : GET /api/reportes/libro-ventas/exportar\n?desde&hasta&agrupacion&formato=XLSX\n(JWT, responseType blob)
+note right of Ctrl
+  @PreAuthorize ADMIN o CONTABILIDAD
+  (otro rol: 403; sin token: 401)
+end note
+Ctrl -> Servicio : exportar(filtro, XLSX, nombre del usuario)
+activate Servicio
+note right of Servicio : @Transactional(readOnly = true)
+Servicio -> Validador : validar(desde, hasta)
+alt rango inválido (desde > hasta, futuro o > 731 días)
+  Validador --> Ctrl : SolicitudInvalidaException
+  Ctrl --> Descarga : 400 ProblemDetail
+else rango válido
+  Validador --> Servicio : rango efectivo
+  Servicio -> Consultas : ventasPorPeriodo, devolucionesPorPeriodo,\nventasAnuladas, contarLineasVenta
+  Consultas -> BD : SELECT agregados por rango\n[desde 00:00, hasta + 1 día) (solo lectura)
+  BD --> Consultas : filas
+  Consultas --> Servicio : resumen, anuladas, n.º de líneas
+  alt XLSX y más de 50.000 líneas de detalle
+    Servicio --> Ctrl : ExcepcionNegocio
+    Ctrl --> Descarga : 422 ProblemDetail «Acote el rango»
+  else dentro del límite
+    Servicio -> Consultas : detalleVentas, detalleDevoluciones\n(solo para Excel)
+    Consultas -> BD : SELECT líneas del rango (sin datos de cliente)
+    BD --> Consultas : filas
+    Servicio -> Servicio : DocumentoTabular (título, filtros, autor,\nfecha, secciones, totales, notas)
+    Servicio -> Exportador : exportar(documento, XLSX, "libro-ventas_desde_hasta")
+    Exportador -> Generador : generar(documento)
+    Generador --> Exportador : bytes (SXSSF, fila fija,\nautofiltro, hoja Notas)
+    Exportador --> Servicio : ArchivoExportado
+    Servicio --> Ctrl : ArchivoExportado
+    deactivate Servicio
+    Ctrl --> Descarga : 200 bytes + Content-Disposition\n+ Cache-Control: no-store
+    Descarga -> Descarga : leerArchivo (nombre del encabezado)\nguardarArchivo (enlace temporal)
+    Descarga --> Front : archivo descargado
+    Front --> Usuario : se descarga libro-ventas_….xlsx
+  end
+end
+
+opt error (400, 422 o 500 llegan como blob)
+  Descarga -> Descarga : normalizarErrorBlob → ProblemDetail
+  Descarga --> Front : error legible
+  Front --> Usuario : muestra el error y ofrece\nel otro formato (CU-06, alt. 2)
+end
+@enduml

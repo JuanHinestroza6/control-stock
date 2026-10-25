@@ -9,7 +9,7 @@
 | **Tipo** | Funcional |
 | **Stakeholder** | Vendedor |
 | **Necesidad** | NEC-02 |
-| **Caso de uso** | CU-03 |
+| **Caso de uso** | CU-03 «Registrar entradas y salidas» |
 | **Relacionados** | REQ-01 (consulta de stock y kardex); REQ-08 (devoluciones); REQ-06 (permisos por rol) |
 | **Prioridad** | Alta |
 | **Módulos** | `inventario` (`MovimientoService`, `OperacionInventarioService`), `venta` (`VentaService`); frontend: `paginas/inventario`, `paginas/ventas`, `componentes/dominio/ModalAjuste` |

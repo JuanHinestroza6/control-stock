@@ -459,15 +459,15 @@ ADMIN y CONTABILIDAD. Exportar tendencias: los mismos roles que verlas.
 
 | Requisito PPI | Módulo |
 |---|---|
-| REQ-01 Visualizar stock y atributos en tiempo real (CU-04) | catalogo, inventario |
-| REQ-02 Registrar automáticamente operaciones de stock (CU-03) | inventario |
+| REQ-01 Visualizar stock y atributos en tiempo real (CU-04 «Visualizar inventario en tiempo real»; panel de inicio en Fase 7) | catalogo, inventario, reporte (panel) |
+| REQ-02 Registrar automáticamente operaciones de stock (CU-03 «Registrar entradas y salidas») | inventario |
 | REQ-03 Generar reportes de rentabilidad (CU-06; Fase 7, ADR-011) | reporte |
-| REQ-04 Emitir alertas de nivel mínimo de stock (CU-10) | inventario (alertas) + analitica (ROP) |
+| REQ-04 Emitir alertas de nivel mínimo de stock (CU-10 «Alertas automáticas de stock bajo»; extensión CU-01) | inventario (alertas) + analitica (ROP) |
 | REQ-05 Identificar Productos de Mayor Venta (CU-08) | analitica |
 | REQ-06 Controlar el acceso y roles de usuario (CU-02) | auth, usuario |
-| REQ-07 Elaborar reportes contables automáticos (CU-07; Fase 7: libro de ventas y valorización) | reporte |
-| REQ-08 Gestionar el registro de devoluciones (CU-09) | venta |
-| REQ-09 Analizar tendencias históricas de venta (CU-05; Fase 6, PDF en Fase 7) | analitica |
+| REQ-07 Elaborar reportes contables automáticos (CU-07; Fase 7: libro de ventas, valorización y movimientos del periodo) | reporte |
+| REQ-08 Gestionar el registro de devoluciones (CU-09 «Registrar devoluciones») | venta |
+| REQ-09 Analizar tendencias históricas de venta (CU-05, extensión «Comparar periodos»; consulta Fase 6, PDF y Excel Fase 7) | analitica |
 | REQ-10 Optimizar la planeación de compras (CU-01 del Word; detalle en CU-16, CU-17, CU-18 nuevos; Fase 6, ADR-010) | compra + analitica (pronóstico, sugerencia) + inventario (posición, recepción) |
 | REQ-11 Gestión de productos (CU-11) | catalogo |
 | REQ-12 Registrar y gestionar usuarios (CU-12) | usuario |
@@ -483,7 +483,9 @@ Nota: en el documento PPI, REQ-08 y REQ-09 tienen nombre y descripción cruzados
 - `CU-xx`: casos de uso. Nuevos, no presentes en el Word: CU-13 "Iniciar sesión" (fase 0, ligado a RNF-02), CU-14
   "Gestionar apartados" (fase 3, REQ-13), CU-15 "Clasificar productos (ABC)" (fase 5, REQ-14), CU-16 "Consultar el
   pronóstico de demanda", CU-17 "Gestionar el plan de compras" y CU-18 "Recibir un pedido" (fase 6, REQ-10). Las
-  tendencias históricas (REQ-09) usan el CU-05 del Word; su exportación a PDF es de la fase 7.
+  tendencias históricas (REQ-09) usan el CU-05 del Word; su exportación a PDF es de la fase 7. Relaciones del diagrama
+  general (confirmadas con el Word): CU-01 incluye CU-16, CU-17 y CU-18; CU-01 extiende CU-10 («crear solicitud de compra
+  directa»); «Comparar periodos» extiende CU-05. CU-06 ya no extiende CU-05.
 - `NEC-xx`: necesidades del Word, con dos dígitos (NEC-010 del Word es NEC-10). Nueva: NEC-11 "Apartar prendas para
   clientes que reservan por redes sociales" (REQ-13).
 

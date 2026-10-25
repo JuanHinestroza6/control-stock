@@ -1,0 +1,239 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+skinparam packageStyle rectangle
+hide empty methods
+title Diagrama de clases general - Control Stock (entidades de dominio por módulo)
+
+package "usuario" {
+  class Usuario {
+    id : Long
+    nombre : String
+    email : String
+    rol : Rol
+    activo : boolean
+    debeCambiarPassword : boolean
+  }
+  enum Rol {
+    ADMIN
+    INVENTARIO
+    VENDEDOR
+    CONTABILIDAD
+  }
+}
+
+package "catalogo" {
+  class Categoria {
+    id : Long
+    nombre : String
+  }
+  class Producto {
+    id : Long
+    codigo : String
+    nombre : String
+    precioCompra : BigDecimal
+    precioVenta : BigDecimal
+    leadTimeDias : int
+    loteMinimo : int
+    activo : boolean
+  }
+  class Variante {
+    id : Long
+    sku : String
+    talla : Talla
+    color : String
+    stockFisico : int
+    stockReservado : int
+    stockMinimo : int
+    puntoReorden : Integer
+    claseAbc : Character
+    activo : boolean
+    version : long
+    --
+    stockDisponible() : int
+  }
+  enum Talla {
+    XS
+    S
+    M
+    L
+    XL
+    XXL
+    UNICA
+  }
+}
+
+package "inventario" {
+  class Movimiento <<inmutable>> {
+    id : Long
+    tipo : TipoMovimiento
+    cantidad : int
+    fisicoAntes : int
+    fisicoDespues : int
+    reservadoAntes : int
+    reservadoDespues : int
+    costoUnitario : BigDecimal
+    fecha : LocalDateTime
+    referenciaTipo : String
+    referenciaId : Long
+  }
+  class Reserva {
+    id : Long
+    cantidad : int
+    clienteNombre : String
+    clienteContacto : String
+    venceEn : LocalDateTime
+    estado : EstadoReserva
+  }
+  class Alerta {
+    id : Long
+    tipo : TipoAlerta
+    estado : EstadoAlerta
+    creadaEn : LocalDateTime
+    atendidaEn : LocalDateTime
+  }
+  enum TipoMovimiento {
+    ENTRADA
+    VENTA
+    VENTA_RESERVA
+    DEVOLUCION
+    AJUSTE_POSITIVO
+    AJUSTE_NEGATIVO
+    RESERVA
+    LIBERACION
+    ANULACION_VENTA
+  }
+  enum EstadoReserva {
+    ACTIVA
+    CONVERTIDA
+    CANCELADA
+    VENCIDA
+  }
+  enum TipoAlerta {
+    STOCK_BAJO
+    AGOTADO
+    SIN_ROTACION
+  }
+}
+
+package "venta" {
+  class Venta {
+    id : Long
+    fecha : LocalDateTime
+    total : BigDecimal
+    estado : EstadoVenta
+    anuladaEn : LocalDateTime
+    motivoAnulacion : String
+  }
+  class DetalleVenta {
+    id : Long
+    cantidad : int
+    precioLista : BigDecimal
+    precioUnitario : BigDecimal
+    costoUnitario : BigDecimal
+  }
+  class Devolucion {
+    id : Long
+    cantidad : int
+    motivo : String
+    aptaParaVenta : boolean
+    fecha : LocalDateTime
+  }
+  enum EstadoVenta {
+    REGISTRADA
+    ANULADA
+  }
+}
+
+package "compra" {
+  class PlanCompra {
+    id : Long
+    estado : EstadoPlan
+    origen : OrigenPlan
+    creadoEn : LocalDateTime
+    aprobadoEn : LocalDateTime
+    recibidoEn : LocalDateTime
+    version : int
+  }
+  class DetallePlan {
+    id : Long
+    cantidadSugerida : Integer
+    cantidadAprobada : int
+    costoEstimado : BigDecimal
+    justificacion : String
+    cantidadRecibida : Integer
+    costoRecibido : BigDecimal
+  }
+  enum EstadoPlan {
+    BORRADOR
+    APROBADO
+    RECIBIDO
+    CANCELADO
+  }
+}
+
+package "analitica" {
+  class EjecucionAnalitica {
+    id : Long
+    origen : OrigenEjecucion
+    estado : EstadoEjecucion
+    fechaCorte : LocalDate
+    porcentajeAlertaStock : BigDecimal
+    duracionMs : Long
+  }
+  class AnaliticaVariante {
+    claseAbc : char
+    demandaMedia : BigDecimal
+    stockSeguridad : BigDecimal
+    puntoReorden : Integer
+    metodoReorden : MetodoReorden
+  }
+  class AnaliticaProducto {
+    metodo : MetodoPronostico
+    errorWape : BigDecimal
+    unidadesObservadas12m : int
+    unidadesCorregidas12m : BigDecimal
+  }
+  class Pronostico {
+    periodo : LocalDate
+    cantidadProyectada : BigDecimal
+    metodo : MetodoPronostico
+  }
+}
+
+Categoria "1" -- "0..*" Producto
+Producto "1" *-- "1..*" Variante
+Variante "1" -- "0..*" Movimiento : kardex >
+Variante "1" -- "0..*" Reserva
+Variante "1" -- "0..*" Alerta
+Venta "1" *-- "1..*" DetalleVenta
+DetalleVenta "0..*" -- "1" Variante
+DetalleVenta "1" -- "0..*" Devolucion
+Usuario "1" -- "0..*" Venta : vende >
+PlanCompra "1" *-- "1..*" DetallePlan
+DetallePlan "0..*" -- "1" Variante
+EjecucionAnalitica "1" -- "0..*" AnaliticaVariante
+EjecucionAnalitica "1" -- "0..*" AnaliticaProducto
+AnaliticaVariante "0..1" -- "1" Variante
+AnaliticaProducto "0..1" -- "1" Producto
+Pronostico "0..*" -- "1" Producto
+Pronostico "0..*" -- "0..1" Variante
+
+note bottom of Movimiento
+  Inmutable: sin UPDATE ni DELETE; los errores
+  se corrigen con un AJUSTE. El stock solo cambia
+  por MovimientoService (@Version en Variante).
+  Fuente del reporte de movimientos del periodo.
+end note
+note bottom of DetalleVenta
+  costoUnitario: último costo de entrada
+  vigente al vender (ADR-006).
+end note
+note top of PlanCompra
+  APROBADO = en camino; al recibir genera
+  ENTRADAS con referencia PLAN_COMPRA/{id}.
+end note
+note "El módulo reporte no tiene entidades:\nconsultas SQL de solo lectura sobre\nventa, devolucion, movimiento, variante\ny plan_compra (ADR-011)." as NotaReporte
+@enduml

@@ -12,7 +12,7 @@
 | **Tipo** | Funcional |
 | **Stakeholder** | Asistente de gerencia |
 | **Necesidad** | NEC-04 |
-| **Caso de uso** | CU-10 |
+| **Caso de uso** | CU-10 «Alertas automáticas de stock bajo» (extensión: CU-01 «crear solicitud de compra directa») |
 | **Relacionados** | REQ-01 (estado de stock); REQ-02 (movimientos que disparan la evaluación); REQ-13 (apartados modifican el disponible); REQ-10 (planes aprobados = en camino; pronóstico del punto de reorden) |
 | **Prioridad** | Media |
 | **Módulos** | `inventario` (`AlertaService`, `AlertaListener`, `AlertaController`), `catalogo` (evento `UmbralCambiado`), `analitica` (cálculo del punto de reorden y ejecución nocturna), `compra` (pedidos en camino, evento `PosicionCambiada`); frontend: `paginas/alertas`, campana en `componentes/layout/Topbar`, `hooks/useAlertas`, `paginas/analitica` (pestaña Reorden) |

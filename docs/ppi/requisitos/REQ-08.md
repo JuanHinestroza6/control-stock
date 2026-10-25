@@ -12,7 +12,7 @@
 | **Tipo** | Funcional |
 | **Stakeholder** | Vendedor |
 | **Necesidad** | NEC-08 |
-| **Caso de uso** | CU-09 |
+| **Caso de uso** | CU-09 «Registrar devoluciones» |
 | **Relacionados** | REQ-02 (movimientos y kardex); REQ-01 (stock visible); REQ-03 y REQ-07 (reportes que consumirán las devoluciones) |
 | **Prioridad** | Baja |
 | **Módulos** | `venta` (`DevolucionService`, `Devolucion`), `inventario` (`MovimientoService`); frontend: `paginas/ventas/VentaDetallePage`, `componentes/dominio/ModalDevolucion` |
