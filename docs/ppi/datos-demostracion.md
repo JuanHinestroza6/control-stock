@@ -1,10 +1,11 @@
-# Datos de demostración (Fases 4, 5 y 6)
+# Datos de demostración (Fases 4 a 7)
 
 > Sección nueva del documento PPI. Implementada en la Fase 4 (rama `fase-4-datos-semilla`, corrida real T1 del
 > 2026-10-13), actualizada en la Fase 5 (rama `fase-5-analitica`, corrida real T2 del 2026-10-15, que reemplaza las
 > cifras de T1) y en la Fase 6 (rama `fase-6-prediccion-compras`: 36 meses de historia, reposición mediante planes de
 > compra reales, pedidos en camino al cerrar y pronóstico). Las cifras de la corrida T2 de la Fase 6 (2026-10-21) se midieron por API y base de datos; la revisión visual por la interfaz la realiza el usuario después. Decisiones en ADR-008, ADR-009
-> y ADR-010.
+> y ADR-010. La Fase 7 (ADR-011, B10) agrega al resumen las unidades perdidas comparables; su corrida T2 (2026-10-25, en
+> el portátil con MySQL nativo) se midió por API y base de datos y reemplaza las cifras de la Fase 6.
 
 | Campo | Contenido |
 |---|---|
@@ -92,6 +93,74 @@ migraciones.
    imprime el resumen y termina sola.
 4. Arrancar con normalidad usando el perfil `dev`.
 5. Para regenerar, se borra la base (`docker compose down -v`); el código no borra datos porque el kardex es inmutable.
+
+En el portátil sin Docker (MySQL nativo, perfil `local` con `backend/config/application-local.properties`), la base se
+vacía con `DROP DATABASE control_stock; CREATE DATABASE control_stock CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;`
+(el usuario `control_stock` tiene todos los permisos sobre su base) y se carga con los perfiles `dev,local,seed`; la
+clave de los usuarios demo es `app.semilla.password` del archivo local.
+
+## Resultados de la corrida real T2 de la Fase 7 (2026-10-25, semilla de 36 meses, portátil)
+
+Corrida con base vacía en el portátil (MySQL 9.7 nativo, sin Docker), perfiles `dev,local,seed`, semilla aleatoria por
+defecto y rango del 2023-10-25 al 2026-10-24, verificada por API (curl) y base de datos; la revisión visual por la
+interfaz la realiza el usuario después. Estas cifras reemplazan a las de la Fase 6 (que se conservan abajo como
+referencia). Incluye el cambio B10 de la Fase 7 (unidades perdidas comparables).
+
+| Indicador | Resultado T2 (Fase 7) | Referencia: T2 de la Fase 6 |
+|---|---|---|
+| Tiempo de carga con `dev,local,seed` | 3 min 01 s en total con el arranque de Maven (generación 141,6 s; analítica de cierre 3,3 s) | 4 min 26 s (PC de mesa, Docker) |
+| Ventas registradas (de ellas, anuladas) | 20.337 (139 anuladas) | 20.281 (139) |
+| Unidades vendidas / ingreso | 31.105 / $3.779.232.800 | 30.920 / $3.749.748.100 |
+| Devoluciones | 1.102 (210 no aptas) | 1.093 (216) |
+| Ventas perdidas | 2.441 líneas (2,5 % evitables), 2.788 unidades | 2.463 líneas, 2.817 unidades |
+| Reservas | 80 (33 convertidas, 18 canceladas, 17 vencidas, 12 activas) | 85 (10 activas) |
+| Planes de compra: creados / recibidos / en camino | 3.723 / 3.648 / 75 (705 unidades en camino) | 3.673 / 3.575 / 98 (1.060) |
+| Entradas / ajustes / alzas de precio / productos desactivados | 3.648 / 79 / 3 / 1 | 3.575 / 72 / 3 / 1 |
+| Movimientos del kardex al cierre | 33.011 | — |
+| Inventario al cierre | 1.720 unidades físicas; $105.508.200 a costo y $232.260.000 a precio de venta | — |
+
+### Pronóstico, alertas y corrección por agotados (Fase 7)
+
+Ejecución analítica de origen SEMILLA: EXITOSA en 3.269 ms. Recálculo manual como ADMIN por API: EXITOSA, 3.381 ms en el
+servidor (3,39 s en el cliente), con las mismas métricas (meta < 8 s; Fase 6: 6,5 s en el PC de mesa).
+
+| Indicador | Resultado | Fase 6 |
+|---|---|---|
+| Clase ABC (A / B / C) | 78 / 81 / 132 | 78 / 82 / 131 |
+| Punto de reorden (NORMAL / POISSON / SIN_DEMANDA) | 47 / 219 / 25 | 42 / 222 / 27 |
+| Productos con Holt-Winters / con SES | Holt-Winters 11 (LIV001, LIV002, LIV006, LIV009, LIV011, LIV014, LIV018, LIV019, LIV020, LIV023, LIV027); SES 18: 9 por `MES_EN_CERO` y 9 que compitieron y ganó SES | 7 / 22 |
+| WAPE global / medio por método | 0,1795 global; Holt-Winters 0,1930; SES que compitió 0,4221; SES por `MES_EN_CERO` 0,4792 | 0,1828; HW 0,1706; SES 0,4201 |
+| Alertas activas (AGOTADO / STOCK_BAJO / SIN_ROTACION) | 30 / 18 / 18 | 26 / 16 / 18 |
+| Variantes en alerta de stock, con posición | 48 de 291 = **16,5 %** | 14,4 % |
+| En alerta si no se contara lo que viene en camino | 102 de 291 = 35,1 % | 38,8 % |
+| Variantes con pedido en camino | 82 | 101 |
+| **Corrección por agotados (B10)** | Unidades observadas en 12 meses 11.604 → corregidas 11.888,13 (**+284,13**) frente a **270 unidades perdidas comparables** (12 meses completos antes de 2026-10, sin variantes agotables a propósito ni el descontinuado): razón **1,05×**, dentro del rango esperado de 0,5× a 2× | ≈ 0,3× (contra todas las perdidas de 36 meses) |
+
+El 16,5 % de variantes en alerta queda un poco por encima de la meta de ~10 % a 15 %; se informa tal cual, sin ajustar
+parámetros. Está cerca de la meta y varía con la fecha de corte de la semilla: en la Fase 6, con la misma lógica, fue
+14,4 %. AGOTADO pesa 30 de 291 variantes (10,3 %), de modo que la meta efectiva de ~11 % a 17 % de ADR-010 se cumple. La
+observación de la Fase 6 sobre la corrección por agotados (≈ 0,3×) se explicaba por comparar contra todas las unidades
+perdidas de 36 meses; con la ventana comparable de B10 la corrección recupera lo esperado.
+
+### Verificación por API (curl) y base de datos (Fase 7)
+
+- Login de los 4 usuarios demo con `app.semilla.password` (en el portátil `admin@livorno.co` es un usuario demo; el ADMIN
+  inicial de la migración V2 es el `admin-email` del archivo local, con su propia clave).
+- Panel por rol: ADMIN ve todo; VENDEDOR sin margen, sin valores a costo y sin compras; INVENTARIO sin ventas ni costos;
+  CONTABILIDAD sin apartados. «Alertas más urgentes» devuelve 5 AGOTADO ordenadas por umbral (LIV001-M-BLA 0/11
+  primero); CONTABILIDAD 403.
+- Matriz de roles de los 4 reportes (consulta y exportación): ADMIN y CONTABILIDAD 200, INVENTARIO y VENDEDOR 403 en las
+  32 combinaciones. Tendencias a PDF y Excel como INVENTARIO 200; VENDEDOR 403.
+- 14 exportaciones con código 200, content-type `application/pdf` o
+  `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` y tamaño mayor que 0 (tiempos en RNF-03).
+- Valorización contra SQL: 1.720 unidades y $105.508.200 a costo, iguales. Movimientos de 24 meses: saldo inicial 1.218
+  + entradas 22.151 − ventas 22.534 + anulaciones 150 + devoluciones 712 + ajustes 62 − 39 = saldo final 1.720 (el físico
+  actual); 23.299 movimientos en el detalle.
+- Libro de ventas frente a rentabilidad: la diferencia del ingreso neto y del costo es exactamente la de los bordes del
+  rango calculados por SQL (devoluciones dentro del rango de ventas anteriores, menos devoluciones posteriores de ventas
+  del rango). Rango de 731 días hasta hoy: diferencia −543.500 de neto y −251.500 de costo, iguales a las devoluciones
+  dentro del rango de ventas anteriores. Tercer trimestre de 2026: −1.025.000 = −1.836.000 + 811.000 de neto y −449.600 de
+  costo. Rentabilidad de 731 días: neto $2.666.479.800, costo $1.221.599.000, margen $1.444.880.800 (54,2 %).
 
 ## Resultados de la corrida real T2 de la Fase 6 (2026-10-21, semilla de 36 meses)
 

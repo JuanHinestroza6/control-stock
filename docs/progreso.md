@@ -5,10 +5,9 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
 ## Estado actual
 
 - Semana: 5
-- Fase en curso: 7 — Cierre de entrega: implementación, revisión, documentación, guía T2 y guion terminados (falta la
-  T2 real del usuario y el ensayo). Rama
-  `fase-7-cierre-entrega`, sin push. Plan: docs/fases/fase-7-plan.md; ADR-011
-- Última actualización: 2026-10-24 (portátil: Windows 10 LTSC, sin Docker, MySQL 9.7 nativo, perfil `dev,local`)
+- Fase en curso: 7 — Cierre de entrega: en `main` (PR #11) y T2 por API hecha (2026-10-25); falta la revisión visual del
+  usuario y el ensayo. Rama de esta actualización: `docs/cifras-t2-fase-7`. Plan: docs/fases/fase-7-plan.md; ADR-011
+- Última actualización: 2026-10-25 (portátil: Windows 10 LTSC, sin Docker, MySQL 9.7 nativo, perfil `dev,local`)
 
 ## Hecho
 
@@ -92,20 +91,28 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
       (Juan Francisco Hinestroza, Juan David Quinto y Santiago Granada Baena; `docs/ppi/guion-sustentacion.md`).
       Comprobado que `dev,local,seed` arranca y, con datos, no hace nada
 
+- [x] Fase 7 — PR #11 en `main` (CI: backend 1.403/1.403 con integración, frontend en verde; movimientos 121–725 ms)
+- [x] Fase 7 — T2 real (2026-10-25) **por API (curl) y base de datos en el portátil** (MySQL nativo, `dev,local,seed`);
+      la revisión visual por la interfaz la hace el usuario. Carga 3 min 01 s (generación 141,6 s; `clean` omitido por
+      falta de red); 20.337 ventas (139 anuladas), 2.788 unidades perdidas; planes 3.723 / 3.648 / 75 en camino (705 u.);
+      ABC 78 / 81 / 132; Holt-Winters 11, SES 18, WAPE global 17,95 %; alertas AGOTADO 30, STOCK_BAJO 18, SIN_ROTACION
+      18; **16,5 % en alerta de stock** (35,1 % sin lo en camino; cerca de la meta de 10–15 %, varía con la fecha de corte
+      de la semilla: fase 6 14,4 % con la misma lógica; no se ajustaron parámetros); **B10: +284,13 unidades de la
+      corrección frente a 270 perdidas comparables = 1,05×** (esperado 0,5×–2×). Login de los 4 demo; panel por rol
+      correcto; matriz de los 4 reportes 32/32; 14 exportaciones 200 con content-type y tamaño correctos; todo < 0,9 s
+      (más pesada: libro 24 meses a Excel 852 ms); recalcular 3,39 s; valorización = SQL; movimientos cuadran con el
+      físico; libro y rentabilidad concilian con los bordes del rango calculados por SQL. Cifras en
+      `docs/ppi/datos-demostracion.md`, RNF-03 y REQ-07
+
 ## En curso
 
-- [ ] Fase 7 — T2 real del usuario en el portátil (guía abajo) y ensayo cronometrado con el guion
+- [ ] Fase 7 — revisión visual del usuario (paso 4 de la guía T2) y ensayo cronometrado con el guion
 
 ## Próximos pasos
 
-1. El usuario corre la T2 de la fase 7 (guía abajo) y anota las cifras: B10 (unidades perdidas comparables y razón de la
-   corrección), tiempos de `Measure-Command`, valorización contra SQL; se pasan a REQ-10, RNF-03 y
-   `docs/ppi/datos-demostracion.md`.
-2. Ensayo cronometrado con `docs/ppi/guion-sustentacion.md`.
-3. Push y PR de `fase-7-cierre-entrega` cuando el usuario lo pida; la CI corre las pruebas con Testcontainers (nuevas:
-   `MovimientosPeriodoServiceIntegracionTest`, movimientos en `ReportesFlujoIntegracionTest` y `RendimientoReportesTest`,
-   `/alertas/urgentes` en `ReservasAlertasIntegracionTest`, B10 en `SimulacionIntegracionTest`). El merge lo hace el
-   usuario.
+1. Revisión visual por la interfaz con los 4 roles (paso 4 de la guía T2); la base de demo quedó cargada.
+2. Ensayo cronometrado con `docs/ppi/guion-sustentacion.md` (sus cifras «T2-f7» ya se pueden llenar con las de arriba).
+3. La víspera de la demo, regenerar la semilla (pasos 1–2 de la guía) para alinear reservas y SIN_ROTACION con la fecha.
 
 ## Prueba T2 — fase 7 en el portátil (PowerShell 5, MySQL nativo, perfiles `dev,local` y `dev,local,seed`)
 
@@ -115,7 +122,11 @@ Sin Docker: la base es el MySQL 9.7 nativo y la configuración sale de `backend/
 **Atención: el paso 1 BORRA todos los datos de la base local `control_stock`.** Credenciales (nunca en el repo): el
 ADMIN inicial es el `spring.flyway.placeholders.admin-email` de `application-local.properties` con su `admin-password`;
 los 4 usuarios demo (`admin@livorno.co`, `inventario@livorno.co`, `ventas@livorno.co`, `contabilidad@livorno.co`) usan
-`app.semilla.password`. La clave de MySQL es `spring.datasource.password`.
+`app.semilla.password`. La clave de MySQL es `spring.datasource.password`. **Ojo en el portátil:** el `admin-email` local
+no es `admin@livorno.co`, así que la semilla crea `admin@livorno.co` como usuario demo aparte, con `app.semilla.password`
+(no con `admin-password`, que es solo del ADMIN inicial); en el PC de mesa, con `ADMIN_EMAIL=admin@livorno.co`, la
+semilla reutiliza ese usuario y entra con `ADMIN_PASSWORD`. `.\mvnw.cmd clean` necesita red la primera vez (descarga
+`maven-clean-plugin`); sin red se puede omitir: `spring-boot:run` compila lo que cambió.
 
 1. Base vacía (el usuario `control_stock` tiene todos los permisos sobre su base; pide la clave):
    `& 'C:\tools\mysql\current\bin\mysql.exe' -u control_stock -p -e "DROP DATABASE control_stock; CREATE DATABASE control_stock CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"`
