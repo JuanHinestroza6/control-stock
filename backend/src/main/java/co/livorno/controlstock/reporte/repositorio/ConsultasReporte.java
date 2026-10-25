@@ -47,6 +47,16 @@ public class ConsultasReporte {
     public record DevolucionDetalle(LocalDateTime fecha, Long ventaId, String sku, String producto, int cantidad,
             boolean aptaParaVenta, BigDecimal precioUnitario, BigDecimal costoUnitario) {}
 
+    /** Estado del físico de un grupo en el periodo (unidades) y valor a costo de sus entradas. */
+    public record AcumuladoMovimientos(Long id, String codigo, String nombre, String categoria, long saldoInicial,
+            long entradas, BigDecimal valorEntradas, long ventas, long anulaciones, long devoluciones,
+            long ajustesPositivos, long ajustesNegativos, long saldoFinal) {}
+
+    /** Movimiento del kardex que cambia el físico (detalle del reporte de movimientos, solo Excel). */
+    public record MovimientoDetalle(LocalDateTime fecha, String sku, String producto, String tipo, int cantidad,
+            int fisicoAntes, int fisicoDespues, BigDecimal costoUnitario, String referenciaTipo, Long referenciaId,
+            String usuario) {}
+
     private static final String LINEAS_VENDIDAS = """
             SELECT d.variante_id AS variante_id, d.cantidad AS cantidad, d.precio_lista AS precio_lista,
                    d.precio_unitario AS precio_unitario, d.costo_unitario AS costo_unitario,
@@ -71,23 +81,9 @@ public class ConsultasReporte {
      */
     public List<AcumuladoRentabilidad> rentabilidad(LocalDate desde, LocalDate hasta, Long categoriaId,
             AgrupacionReporte agrupacion) {
-        String columnas;
-        String grupo;
-        switch (agrupacion) {
-            case CATEGORIA -> {
-                columnas = "c.id AS id, NULL AS codigo, c.nombre AS nombre, NULL AS categoria";
-                grupo = "c.id, c.nombre";
-            }
-            case PRODUCTO -> {
-                columnas = "p.id AS id, p.codigo AS codigo, p.nombre AS nombre, c.nombre AS categoria";
-                grupo = "p.id, p.codigo, p.nombre, c.nombre";
-            }
-            default -> {
-                columnas = "va.id AS id, va.sku AS codigo,"
-                        + " CONCAT(p.nombre, ' (', va.talla, ' ', va.color, ')') AS nombre, c.nombre AS categoria";
-                grupo = "va.id, va.sku, va.talla, va.color, p.nombre, c.nombre";
-            }
-        }
+        Grupo g = Grupo.de(agrupacion);
+        String columnas = g.columnas();
+        String grupo = g.grupo();
         String sql = "SELECT " + columnas + ","
                 + " SUM(l.cantidad) AS vendidas, SUM(l.devuelta) AS devueltas,"
                 + " SUM(l.cantidad * l.precio_lista) AS ventas_lista,"
@@ -211,23 +207,9 @@ public class ConsultasReporte {
      */
     public List<AcumuladoValorizacion> valorizacion(Long categoriaId, AgrupacionReporte agrupacion,
             boolean incluirInactivas) {
-        String columnas;
-        String grupo;
-        switch (agrupacion) {
-            case CATEGORIA -> {
-                columnas = "c.id AS id, NULL AS codigo, c.nombre AS nombre, NULL AS categoria";
-                grupo = "c.id, c.nombre";
-            }
-            case PRODUCTO -> {
-                columnas = "p.id AS id, p.codigo AS codigo, p.nombre AS nombre, c.nombre AS categoria";
-                grupo = "p.id, p.codigo, p.nombre, c.nombre";
-            }
-            default -> {
-                columnas = "va.id AS id, va.sku AS codigo,"
-                        + " CONCAT(p.nombre, ' (', va.talla, ' ', va.color, ')') AS nombre, c.nombre AS categoria";
-                grupo = "va.id, va.sku, va.talla, va.color, p.nombre, c.nombre";
-            }
-        }
+        Grupo g = Grupo.de(agrupacion);
+        String columnas = g.columnas();
+        String grupo = g.grupo();
         String sql = "SELECT " + columnas + ","
                 + " SUM(va.stock_fisico) AS fisicas, SUM(va.stock_reservado) AS reservadas,"
                 + " SUM(va.stock_fisico * p.precio_compra) AS valor_costo,"
@@ -276,6 +258,110 @@ public class ConsultasReporte {
         List<String> r = jdbc.query("SELECT nombre FROM categoria WHERE id = :id",
                 new MapSqlParameterSource("id", categoriaId), (rs, n) -> rs.getString("nombre"));
         return r.isEmpty() ? null : r.get(0);
+    }
+
+    // ---------- movimientos del periodo ----------
+
+    /** Cambio de físico con signo de un movimiento {@code m} (RESERVA y LIBERACION se excluyen en el WHERE). */
+    private static final String FISICO = "CASE WHEN m.tipo IN ('ENTRADA', 'DEVOLUCION', 'AJUSTE_POSITIVO',"
+            + " 'ANULACION_VENTA') THEN m.cantidad ELSE -m.cantidad END";
+    private static final String CAMBIA_FISICO = "m.tipo NOT IN ('RESERVA', 'LIBERACION')";
+
+    private static String unidadesDe(String condicion, String alias) {
+        return " SUM(CASE WHEN " + condicion + " THEN m.cantidad ELSE 0 END) AS " + alias + ",";
+    }
+
+    /**
+     * Estado del físico por grupo en {@code [desde, hasta]}: saldo final = físico actual − neto de los movimientos
+     * posteriores al rango; saldo inicial = saldo final − neto del rango. Entran las variantes (activas o no) con
+     * movimientos que cambian el físico en el rango o con saldo final distinto de 0. Categoría opcional.
+     */
+    public List<AcumuladoMovimientos> movimientos(LocalDate desde, LocalDate hasta, Long categoriaId,
+            AgrupacionReporte agrupacion) {
+        Grupo g = Grupo.de(agrupacion);
+        String saldoFinal = "(va.stock_fisico - COALESCE(pos.neto, 0))";
+        String sql = "SELECT " + g.columnas() + ","
+                + " SUM(" + saldoFinal + " - COALESCE(per.neto, 0)) AS saldo_inicial,"
+                + " COALESCE(SUM(per.entradas), 0) AS entradas,"
+                + " COALESCE(SUM(per.valor_entradas), 0) AS valor_entradas,"
+                + " COALESCE(SUM(per.ventas), 0) AS ventas, COALESCE(SUM(per.anulaciones), 0) AS anulaciones,"
+                + " COALESCE(SUM(per.devoluciones), 0) AS devoluciones,"
+                + " COALESCE(SUM(per.ajustes_positivos), 0) AS ajustes_positivos,"
+                + " COALESCE(SUM(per.ajustes_negativos), 0) AS ajustes_negativos,"
+                + " SUM(" + saldoFinal + ") AS saldo_final"
+                + " FROM variante va JOIN producto p ON p.id = va.producto_id"
+                + " JOIN categoria c ON c.id = p.categoria_id"
+                + " LEFT JOIN (SELECT m.variante_id AS variante_id,"
+                + unidadesDe("m.tipo = 'ENTRADA'", "entradas")
+                + " SUM(CASE WHEN m.tipo = 'ENTRADA' THEN m.cantidad * m.costo_unitario ELSE 0 END) AS valor_entradas,"
+                + unidadesDe("m.tipo IN ('VENTA', 'VENTA_RESERVA')", "ventas")
+                + unidadesDe("m.tipo = 'ANULACION_VENTA'", "anulaciones")
+                + unidadesDe("m.tipo = 'DEVOLUCION'", "devoluciones")
+                + unidadesDe("m.tipo = 'AJUSTE_POSITIVO'", "ajustes_positivos")
+                + unidadesDe("m.tipo = 'AJUSTE_NEGATIVO'", "ajustes_negativos")
+                + " SUM(" + FISICO + ") AS neto"
+                + " FROM movimiento m WHERE m.fecha >= :desde AND m.fecha < :hasta AND " + CAMBIA_FISICO
+                + " GROUP BY m.variante_id) per ON per.variante_id = va.id"
+                + " LEFT JOIN (SELECT m.variante_id AS variante_id, SUM(" + FISICO + ") AS neto"
+                + " FROM movimiento m WHERE m.fecha >= :hasta AND " + CAMBIA_FISICO
+                + " GROUP BY m.variante_id) pos ON pos.variante_id = va.id"
+                + " WHERE (per.variante_id IS NOT NULL OR " + saldoFinal + " <> 0)"
+                + (categoriaId != null ? " AND p.categoria_id = :categoriaId" : "")
+                + " GROUP BY " + g.grupo();
+        return jdbc.query(sql, limites(desde, hasta, categoriaId), (rs, n) -> new AcumuladoMovimientos(rs.getLong("id"), rs.getString("codigo"),
+                rs.getString("nombre"), rs.getString("categoria"), rs.getLong("saldo_inicial"),
+                rs.getLong("entradas"), rs.getBigDecimal("valor_entradas"), rs.getLong("ventas"),
+                rs.getLong("anulaciones"), rs.getLong("devoluciones"), rs.getLong("ajustes_positivos"),
+                rs.getLong("ajustes_negativos"), rs.getLong("saldo_final")));
+    }
+
+    private static String desdeMovimientosDelRango(Long categoriaId) {
+        return " FROM movimiento m JOIN variante va ON va.id = m.variante_id JOIN producto p ON p.id = va.producto_id"
+                + " WHERE m.fecha >= :desde AND m.fecha < :hasta AND " + CAMBIA_FISICO
+                + (categoriaId != null ? " AND p.categoria_id = :categoriaId" : "");
+    }
+
+    private static MapSqlParameterSource limites(LocalDate desde, LocalDate hasta, Long categoriaId) {
+        MapSqlParameterSource params = limites(desde, hasta);
+        if (categoriaId != null) {
+            params.addValue("categoriaId", categoriaId);
+        }
+        return params;
+    }
+
+    /** Movimientos del rango que cambian el físico (tamaño del detalle del reporte), con el filtro de categoría. */
+    public long contarMovimientos(LocalDate desde, LocalDate hasta, Long categoriaId) {
+        Long total = jdbc.queryForObject("SELECT COUNT(*)" + desdeMovimientosDelRango(categoriaId),
+                limites(desde, hasta, categoriaId), Long.class);
+        return total == null ? 0 : total;
+    }
+
+    /** Una fila por movimiento del rango que cambia el físico, en orden del kardex; sin la observación (texto libre). */
+    public List<MovimientoDetalle> detalleMovimientos(LocalDate desde, LocalDate hasta, Long categoriaId) {
+        String sql = "SELECT m.fecha, va.sku, p.nombre AS producto, m.tipo, m.cantidad, m.fisico_antes,"
+                + " m.fisico_despues, m.costo_unitario, m.referencia_tipo, m.referencia_id,"
+                + " (SELECT u.nombre FROM usuario u WHERE u.id = m.usuario_id) AS usuario"
+                + desdeMovimientosDelRango(categoriaId) + " ORDER BY m.fecha, m.id";
+        return jdbc.query(sql, limites(desde, hasta, categoriaId), (rs, n) -> new MovimientoDetalle(
+                rs.getObject("fecha", LocalDateTime.class), rs.getString("sku"), rs.getString("producto"),
+                rs.getString("tipo"), rs.getInt("cantidad"), rs.getInt("fisico_antes"), rs.getInt("fisico_despues"),
+                rs.getBigDecimal("costo_unitario"), rs.getString("referencia_tipo"),
+                rs.getObject("referencia_id", Long.class), rs.getString("usuario")));
+    }
+
+    /** Columnas de identificación y GROUP BY de una agrupación (alias c = categoría, p = producto, va = variante). */
+    private record Grupo(String columnas, String grupo) {
+        static Grupo de(AgrupacionReporte agrupacion) {
+            return switch (agrupacion) {
+                case CATEGORIA -> new Grupo("c.id AS id, NULL AS codigo, c.nombre AS nombre, NULL AS categoria",
+                        "c.id, c.nombre");
+                case PRODUCTO -> new Grupo("p.id AS id, p.codigo AS codigo, p.nombre AS nombre, c.nombre AS categoria",
+                        "p.id, p.codigo, p.nombre, c.nombre");
+                case VARIANTE -> new Grupo("va.id AS id, va.sku AS codigo,"
+                        + " CONCAT(p.nombre, ' (', va.talla, ' ', va.color, ')') AS nombre, c.nombre AS categoria",
+                        "va.id, va.sku, va.talla, va.color, p.nombre, c.nombre");
+            };
+        }
     }
 
     /** Límites {@code [desde 00:00, hasta + 1 día 00:00)} para un rango inclusivo. */

@@ -359,6 +359,13 @@ Después de cada movimiento se publica `StockCambiado(varianteId)`. Desde la Fas
 - **Valorización** (REQ-07): al momento de la consulta; físico × `precioCompra` actual (incluye lo reservado y, por
   defecto, las variantes inactivas con físico > 0), valor a precio de venta y margen potencial; lo en camino es
   informativo y no suma.
+- **Movimientos del periodo** (REQ-07, CU-03; después del corte): estado del físico por CATEGORIA, PRODUCTO o VARIANTE
+  (categoría opcional) con saldo inicial, entradas y su valor a costo (Σ cantidad × costo de la entrada), ventas (VENTA y
+  VENTA_RESERVA), anulaciones, devoluciones aptas, ajustes + y − y saldo final. Saldo final = físico actual − neto de los
+  movimientos posteriores al rango; saldo inicial = final − neto del rango (cuadre: inicial + flujos = final). RESERVA y
+  LIBERACION no cambian el físico y no entran; la devolución no apta no es movimiento. Lista los grupos con movimientos o
+  con saldo al cierre (incluye inactivas). El detalle del kardex (sin la observación, texto libre) solo en Excel, máximo
+  50.000 filas (422 "Acote el rango").
 - **Rangos**: inclusivos, máximo 731 días; `desde > hasta` o fecha futura → 400; por defecto del día 1 del mes en curso
   hasta hoy (America/Bogota). Un periodo sin ventas responde 200 con "No hay ventas en el periodo".
 - **Exportación**: `GET …/exportar?formato=PDF|XLSX`, mismos filtros y mismo servicio que la consulta (lo exportado = lo

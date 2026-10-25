@@ -23,12 +23,15 @@ import co.livorno.controlstock.comun.seguridad.UsuarioActual;
 import co.livorno.controlstock.comun.seguridad.UsuarioAutenticado;
 import co.livorno.controlstock.reporte.dto.AgrupacionReporte;
 import co.livorno.controlstock.reporte.dto.FiltroLibroVentas;
+import co.livorno.controlstock.reporte.dto.FiltroMovimientos;
+import co.livorno.controlstock.reporte.dto.MovimientosResponse;
 import co.livorno.controlstock.reporte.dto.FiltroRentabilidad;
 import co.livorno.controlstock.reporte.dto.FiltroValorizacion;
 import co.livorno.controlstock.reporte.dto.PeriodoLibro;
 import co.livorno.controlstock.reporte.dto.RentabilidadResponse;
 import co.livorno.controlstock.reporte.dto.ValorizacionResponse;
 import co.livorno.controlstock.reporte.servicio.LibroVentasService;
+import co.livorno.controlstock.reporte.servicio.MovimientosPeriodoService;
 import co.livorno.controlstock.reporte.servicio.RentabilidadService;
 import co.livorno.controlstock.reporte.servicio.ValorizacionService;
 import co.livorno.controlstock.reporte.web.ReporteController;
@@ -59,12 +62,13 @@ import org.springframework.test.web.servlet.MockMvc;
 class ReporteControllerTest {
 
     private static final String[] RUTAS = {"/api/reportes/rentabilidad", "/api/reportes/libro-ventas",
-        "/api/reportes/valorizacion"};
+        "/api/reportes/valorizacion", "/api/reportes/movimientos"};
 
     @Autowired MockMvc mvc;
     @MockitoBean RentabilidadService rentabilidad;
     @MockitoBean LibroVentasService libro;
     @MockitoBean ValorizacionService valorizacion;
+    @MockitoBean MovimientosPeriodoService movimientos;
     @MockitoBean co.livorno.controlstock.usuario.repositorio.UsuarioRepository usuarioRepository;
 
     private static Authentication como(String rol) {
@@ -84,6 +88,12 @@ class ReporteControllerTest {
                 List.of(), null, List.of(), LocalDateTime.of(2026, 10, 14, 9, 0));
     }
 
+    private static MovimientosResponse respuestaMovimientos() {
+        return new MovimientosResponse(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 14), null, null,
+                AgrupacionReporte.PRODUCTO, true, "No hay movimientos en el periodo", List.of(), null, 0, List.of(),
+                LocalDateTime.of(2026, 10, 14, 9, 0));
+    }
+
     private void simularServicios() {
         when(rentabilidad.consultar(any())).thenReturn(respuestaRentabilidad());
         when(libro.consultar(any())).thenReturn(null);
@@ -93,6 +103,8 @@ class ReporteControllerTest {
         when(rentabilidad.exportar(any(), any(), any())).thenReturn(pdf);
         when(libro.exportar(any(), any(), any())).thenReturn(pdf);
         when(valorizacion.exportar(any(), any(), any())).thenReturn(pdf);
+        when(movimientos.consultar(any())).thenReturn(respuestaMovimientos());
+        when(movimientos.exportar(any(), any(), any())).thenReturn(pdf);
     }
 
     @ParameterizedTest
@@ -108,6 +120,38 @@ class ReporteControllerTest {
         mvc.perform(get("/api/reportes/valorizacion").with(authentication(como(rol))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sinExistencias").value(true));
+        mvc.perform(get("/api/reportes/movimientos").with(authentication(como(rol))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sinMovimientos").value(true))
+                .andExpect(jsonPath("$.mensaje").value("No hay movimientos en el periodo"));
+    }
+
+    @Test
+    void movimientos_armaElFiltroYExportaConElUsuarioActual() throws Exception {
+        simularServicios();
+
+        mvc.perform(get("/api/reportes/movimientos").param("desde", "2026-09-01").param("hasta", "2026-09-30")
+                        .param("categoriaId", "3").param("agrupacion", "VARIANTE").with(authentication(como("ADMIN"))))
+                .andExpect(status().isOk());
+        verify(movimientos).consultar(eq(new FiltroMovimientos(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30),
+                3L, AgrupacionReporte.VARIANTE)));
+
+        mvc.perform(get("/api/reportes/movimientos/exportar").param("formato", "XLSX")
+                        .with(authentication(como("CONTABILIDAD"))))
+                .andExpect(status().isOk());
+        verify(movimientos).exportar(eq(new FiltroMovimientos(null, null, null, null)), eq(FormatoExportacion.XLSX),
+                eq("María Pérez"));
+    }
+
+    @Test
+    void exportarMovimientos_detalleSobreElLimite_devuelve422() throws Exception {
+        when(movimientos.exportar(any(), eq(FormatoExportacion.XLSX), any()))
+                .thenThrow(new ExcepcionNegocio("El reporte tiene 60000 movimientos. Acote el rango."));
+
+        mvc.perform(get("/api/reportes/movimientos/exportar").param("formato", "XLSX")
+                        .with(authentication(como("ADMIN"))))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("Acote el rango")));
     }
 
     @ParameterizedTest

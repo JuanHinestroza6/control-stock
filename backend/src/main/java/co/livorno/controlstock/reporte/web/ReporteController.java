@@ -6,13 +6,16 @@ import co.livorno.controlstock.comun.web.RespuestaArchivo;
 import co.livorno.controlstock.reporte.dto.AgrupacionReporte;
 import co.livorno.controlstock.reporte.dto.CriterioRentabilidad;
 import co.livorno.controlstock.reporte.dto.FiltroLibroVentas;
+import co.livorno.controlstock.reporte.dto.FiltroMovimientos;
 import co.livorno.controlstock.reporte.dto.FiltroRentabilidad;
 import co.livorno.controlstock.reporte.dto.FiltroValorizacion;
 import co.livorno.controlstock.reporte.dto.LibroVentasResponse;
+import co.livorno.controlstock.reporte.dto.MovimientosResponse;
 import co.livorno.controlstock.reporte.dto.PeriodoLibro;
 import co.livorno.controlstock.reporte.dto.RentabilidadResponse;
 import co.livorno.controlstock.reporte.dto.ValorizacionResponse;
 import co.livorno.controlstock.reporte.servicio.LibroVentasService;
+import co.livorno.controlstock.reporte.servicio.MovimientosPeriodoService;
 import co.livorno.controlstock.reporte.servicio.RentabilidadService;
 import co.livorno.controlstock.reporte.servicio.ValorizacionService;
 import java.time.LocalDate;
@@ -34,6 +37,7 @@ public class ReporteController {
     private final RentabilidadService rentabilidadService;
     private final LibroVentasService libroVentasService;
     private final ValorizacionService valorizacionService;
+    private final MovimientosPeriodoService movimientosService;
     private final UsuarioActual usuarioActual;
 
     @GetMapping("/rentabilidad")
@@ -98,6 +102,28 @@ public class ReporteController {
             @RequestParam FormatoExportacion formato) {
         return RespuestaArchivo.de(valorizacionService.exportar(
                 filtroValorizacion(categoriaId, agrupacion, incluirInactivas), formato, generadoPor()));
+    }
+
+    @GetMapping("/movimientos")
+    @PreAuthorize("hasAnyRole('ADMIN','CONTABILIDAD')")
+    public MovimientosResponse movimientos(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+            @RequestParam(required = false) Long categoriaId,
+            @RequestParam(required = false) AgrupacionReporte agrupacion) {
+        return movimientosService.consultar(new FiltroMovimientos(desde, hasta, categoriaId, agrupacion));
+    }
+
+    @GetMapping("/movimientos/exportar")
+    @PreAuthorize("hasAnyRole('ADMIN','CONTABILIDAD')")
+    public ResponseEntity<byte[]> exportarMovimientos(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+            @RequestParam(required = false) Long categoriaId,
+            @RequestParam(required = false) AgrupacionReporte agrupacion,
+            @RequestParam FormatoExportacion formato) {
+        return RespuestaArchivo.de(movimientosService.exportar(
+                new FiltroMovimientos(desde, hasta, categoriaId, agrupacion), formato, generadoPor()));
     }
 
     /** Por defecto la valorización incluye las inactivas con stock. */

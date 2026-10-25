@@ -9,7 +9,9 @@ import co.livorno.controlstock.comun.seguridad.UsuarioAutenticado;
 import co.livorno.controlstock.inventario.dto.CrearReservaRequest;
 import co.livorno.controlstock.inventario.dto.LineaReservaRequest;
 import co.livorno.controlstock.inventario.servicio.ReservaService;
+import co.livorno.controlstock.inventario.dto.AjusteRequest;
 import co.livorno.controlstock.inventario.dto.EntradaRequest;
+import co.livorno.controlstock.inventario.modelo.TipoMovimiento;
 import co.livorno.controlstock.inventario.dto.LineaEntradaRequest;
 import co.livorno.controlstock.inventario.servicio.OperacionInventarioService;
 import co.livorno.controlstock.venta.dto.AnularVentaRequest;
@@ -117,6 +119,21 @@ public class DatosReporte {
     public void entrada(Long varianteId, int cantidad, String costo) {
         como(adminId, "ADMIN", () -> operaciones.registrarEntrada(new EntradaRequest(null,
                 List.of(new LineaEntradaRequest(varianteId, cantidad, new BigDecimal(costo))))).size());
+    }
+
+    /** Ajuste manual como ADMIN (positivo o negativo). */
+    public void ajuste(Long varianteId, boolean positivo, int cantidad) {
+        como(adminId, "ADMIN", () -> operaciones.registrarAjuste(new AjusteRequest(varianteId,
+                positivo ? TipoMovimiento.AJUSTE_POSITIVO : TipoMovimiento.AJUSTE_NEGATIVO, cantidad,
+                "Conteo físico de prueba")).id());
+    }
+
+    /**
+     * Mueve al pasado los movimientos de la variante del tipo dado (solo preparación: los servicios fechan con el reloj
+     * del sistema; en producción el kardex nunca se edita).
+     */
+    public void fecharMovimientos(Long varianteId, String tipo, LocalDateTime fecha) {
+        jdbc.update("UPDATE movimiento SET fecha = ? WHERE variante_id = ? AND tipo = ?", fecha, varianteId, tipo);
     }
 
     /** Vende como VENDEDOR y fecha la venta en {@code fecha}. */

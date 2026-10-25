@@ -405,6 +405,8 @@ class ReportesFlujoIntegracionTest {
         rutas.put("rentabilidad", "/api/reportes/rentabilidad/exportar?" + RANGO + filtroCat + "&agrupacion=VARIANTE");
         rutas.put("libro-ventas", "/api/reportes/libro-ventas/exportar?" + RANGO + "&agrupacion=DIA");
         rutas.put("valorizacion", "/api/reportes/valorizacion/exportar?agrupacion=VARIANTE" + filtroCat);
+        // sin fechas: del día 1 del mes hasta hoy, donde están los movimientos reales del flujo (incluida la reserva)
+        rutas.put("movimientos", "/api/reportes/movimientos/exportar?agrupacion=VARIANTE" + filtroCat);
         rutas.put("tendencias", "/api/analitica/tendencias/exportar?desde=2015-01&hasta=2015-04" + filtroCat);
 
         for (Map.Entry<String, String> e : rutas.entrySet()) {
@@ -428,6 +430,8 @@ class ReportesFlujoIntegracionTest {
         sinDatosDeCliente("rentabilidad JSON", ok("GET", "/api/reportes/rentabilidad?" + RANGO + filtroCat
                 + "&agrupacion=VARIANTE", "ADMIN", null, 200));
         sinDatosDeCliente("libro JSON", ok("GET", "/api/reportes/libro-ventas?" + RANGO, "ADMIN", null, 200));
+        sinDatosDeCliente("movimientos JSON", ok("GET", "/api/reportes/movimientos?agrupacion=VARIANTE" + filtroCat,
+                "ADMIN", null, 200));
         sinDatosDeCliente("valorizacion JSON", ok("GET", "/api/reportes/valorizacion?agrupacion=VARIANTE" + filtroCat,
                 "ADMIN", null, 200));
     }
@@ -471,6 +475,8 @@ class ReportesFlujoIntegracionTest {
                 new Fila("libro-ventas/exportar XLSX", "/api/reportes/libro-ventas/exportar?" + RANGO + "&formato=XLSX", admCont),
                 new Fila("valorizacion", "/api/reportes/valorizacion?categoriaId=" + categoriaId, admCont),
                 new Fila("valorizacion/exportar PDF", "/api/reportes/valorizacion/exportar?formato=PDF&categoriaId=" + categoriaId, admCont),
+                new Fila("movimientos", "/api/reportes/movimientos?categoriaId=" + categoriaId, admCont),
+                new Fila("movimientos/exportar XLSX", "/api/reportes/movimientos/exportar?formato=XLSX&categoriaId=" + categoriaId, admCont),
                 new Fila("panel", "/api/panel", ROLES),
                 new Fila("tendencias/exportar PDF", "/api/analitica/tendencias/exportar?desde=2015-01&hasta=2015-04&formato=PDF",
                         List.of("ADMIN", "INVENTARIO", "CONTABILIDAD")),

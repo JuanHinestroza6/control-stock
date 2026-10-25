@@ -436,6 +436,10 @@ class RendimientoReportesTest {
         m.add(medir("libro MES 24m", "/api/reportes/libro-ventas?" + rango(true) + "&agrupacion=MES", "CONTABILIDAD"));
         m.add(medir("valorizacion VARIANTE", "/api/reportes/valorizacion?agrupacion=VARIANTE", "ADMIN"));
         m.add(medir("valorizacion PRODUCTO", "/api/reportes/valorizacion?agrupacion=PRODUCTO", "ADMIN"));
+        m.add(medir("movimientos 12m PRODUCTO", "/api/reportes/movimientos?" + rango(false) + "&agrupacion=PRODUCTO",
+                "CONTABILIDAD"));
+        m.add(medir("movimientos 24m VARIANTE", "/api/reportes/movimientos?" + rango(true) + "&agrupacion=VARIANTE",
+                "ADMIN"));
         for (String f : List.of("PDF", "XLSX")) {
             m.add(medir("exportar rentabilidad 24m VARIANTE " + f, "/api/reportes/rentabilidad/exportar?"
                     + rango(true) + "&agrupacion=VARIANTE&formato=" + f, "ADMIN"));
@@ -443,6 +447,8 @@ class RendimientoReportesTest {
                     + "&agrupacion=DIA&formato=" + f, "CONTABILIDAD"));
             m.add(medir("exportar valorizacion VARIANTE " + f, "/api/reportes/valorizacion/exportar?"
                     + "agrupacion=VARIANTE&formato=" + f, "ADMIN"));
+            m.add(medir("exportar movimientos 12m VARIANTE " + f, "/api/reportes/movimientos/exportar?"
+                    + rango(false) + "&agrupacion=VARIANTE&formato=" + f, "CONTABILIDAD"));
             m.add(medir("exportar tendencias " + f, "/api/analitica/tendencias/exportar?formato=" + f, "INVENTARIO"));
         }
         for (String rol : List.of("ADMIN", "INVENTARIO", "VENDEDOR", "CONTABILIDAD")) {
@@ -559,6 +565,8 @@ class RendimientoReportesTest {
             pedir("/api/reportes/libro-ventas?" + angosto + "&agrupacion=MES", "ADMIN");
             pedir("/api/reportes/libro-ventas/exportar?" + angosto + "&formato=XLSX", "ADMIN");
             pedir("/api/reportes/libro-ventas/exportar?" + angosto + "&formato=PDF", "ADMIN");
+            pedir("/api/reportes/movimientos?" + angosto + "&agrupacion=PRODUCTO", "ADMIN");
+            pedir("/api/reportes/movimientos/exportar?" + angosto + "&formato=XLSX", "ADMIN");
             for (String rol : List.of("ADMIN", "INVENTARIO", "VENDEDOR", "CONTABILIDAD")) {
                 pedir("/api/panel", rol);
             }

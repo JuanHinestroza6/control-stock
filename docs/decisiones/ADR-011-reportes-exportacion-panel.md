@@ -17,7 +17,9 @@ la medición de rendimiento (RNF-03: < 3 s con hasta 10.000 registros). Había v
 ## Decisión
 1. **Tres reportes de solo lectura** en un módulo nuevo `reporte` (consultas SQL agregadas, `readOnly`): **Rentabilidad**
    (REQ-03), **Libro de ventas** y **Valorización de inventario** a costo actual (REQ-07); después del corte, **Movimientos
-   del periodo**. Solo ventas REGISTRADA; las ANULADAS aparecen únicamente en la sección de anuladas del libro.
+   del periodo** (estado del físico desde el kardex: saldo inicial, entradas con su valor a costo, ventas, anulaciones,
+   devoluciones aptas, ajustes y saldo final; ver dominio). Solo ventas REGISTRADA; las ANULADAS aparecen únicamente en
+   la sección de anuladas del libro.
    Métricas por línea (q cantidad, pl `precioLista`, pu `precioUnitario`, c `costoUnitario`, d devuelto total, dn
    devuelto no apto): ventas a lista Σ q·pl; descuentos Σ q·(pl − pu); facturado Σ q·pu; devoluciones Σ d·pu;
    **ingreso neto** Σ (q − d)·pu (igual que Más vendidos y ABC); **costo de ventas** Σ (q − d)·c; **margen bruto** neto −
