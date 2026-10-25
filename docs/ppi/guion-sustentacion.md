@@ -9,8 +9,9 @@ uno; cada uno dirige sus bloques y prepara las preguntas de su tema:
 | JD | Juan David Quinto | Analítica, compras y resultados de la semilla |
 | SG | Santiago Granada Baena | Reportes, calidad y cierre |
 
-Las cifras marcadas «T2-f7» se actualizan con la corrida real de la guía T2 de la fase 7 (`docs/progreso.md`); las demás
-son de la T2 de la fase 6 y de la T1 de la fase 7.
+Las cifras de resultados son de la T2 de la fase 7 (2026-10-25, semilla de 36 meses; `docs/ppi/datos-demostracion.md`)
+y las de rendimiento, de la T1 de la fase 7 y de la CI del PR #11. Si la víspera se regenera la semilla, las cifras
+cambian un poco con la fecha de corte: conviene leerlas del resumen de esa carga.
 
 ## Antes de entrar (la víspera y 30 min antes)
 
@@ -32,7 +33,7 @@ son de la T2 de la fase 6 y de la T1 de la fase 7.
 | 4:15–5:00 | JF | Demo: apartados | VENDEDOR: apartar una prenda (stock reservado vs. disponible), convertirla en venta. Ley 1581: una tarea nocturna anonimiza las reservas cerradas hace 90 días o más; ningún reporte ni exportación incluye datos del cliente |
 | 5:00–7:00 | JD | Demo: analítica | Clasificación ABC por variante; punto de reorden (normal / Poisson); pestaña Pronóstico: LIV001 con Holt-Winters (serie observada y corregida por agotados, backtest, reparto por variante) frente a un producto con SES y su motivo |
 | 7:00–8:30 | JD | Demo: compras | INVENTARIO: «Generar sugerencia» (política (s, S), lote mínimo, justificación por línea); ADMIN: aprobar (queda «en camino» y la alerta STOCK_BAJO usa la posición); INVENTARIO: recibir → ENTRADAS `PLAN_COMPRA/{id}` en el kardex |
-| 8:30–10:00 | JD | Resultados | Semilla de 36 meses (~20.000 ventas): 14,4 % de variantes en alerta de stock (meta 10–15 %; sin contar lo en camino 38,8 %); WAPE global del pronóstico 18,3 % (Holt-Winters 17,1 %); recálculo analítico en 6,5 s. Corrección por agotados: «T2-f7» |
+| 8:30–10:00 | JD | Resultados | Semilla de 36 meses (20.337 ventas): 16,5 % de variantes en alerta de stock (cerca de la meta de 10–15 %; sin contar lo que viene en camino serían 35,1 %); WAPE global del pronóstico 17,95 % (Holt-Winters en 11 productos); recálculo analítico en 3,4 s. Corrección por agotados: suma 284 unidades frente a 270 perdidas comparables en 12 meses (1,05×, dentro de lo esperado de 0,5× a 2×) |
 | 10:00–12:00 | SG | Demo: reportes | CONTABILIDAD: Rentabilidad (margen por producto y gráfico del top 10); Libro de ventas por mes (la devolución cuenta en su fecha y concilia con la rentabilidad); Valorización (en camino informativo); **Movimientos** del periodo (saldo inicial + flujos = saldo final). Exportar a PDF y Excel; mostrar la hoja de detalle. INVENTARIO intenta `/reportes` → acceso denegado |
 | 12:00–13:45 | SG | Calidad | Pruebas: ~1.400 del backend (unitarias, WebMvc por rol, integración con MySQL real en Testcontainers) y 642 del frontend; CI en cada PR. RNF-03: todos los reportes < 0,5 s con 12.000 ventas (exige < 3 s) y EXPLAIN sin recorridos completos. Matriz de roles probada por HTTP |
 | 13:45–15:00 | SG | Cierre | Limitaciones honestas y trabajo futuro (abajo); agradecimiento y paso a preguntas |
@@ -54,8 +55,8 @@ como CONTABILIDAD. Uno de los otros dos maneja el equipo de la demo para que qui
 - Fuera de alcance: correo de reportes (CU-06), gastos y validación fiscal (CU-07), registro de proveedores (CU-01).
 - El margen usa el último costo de entrada (aproximado si el costo varía entre compras).
 - El backtest no cubre noviembre y diciembre: el error en temporada alta puede ser mayor que el WAPE informado.
-- La corrección por agotados recupera menos unidades de las perdidas (fase 6 ≈ 0,3×; ver «T2-f7» con la ventana
-  comparable).
+- El 16,5 % de variantes en alerta queda un poco por encima de la meta de 10–15 %: no se ajustaron parámetros para
+  bajarlo; varía con la fecha de corte de la semilla (en la fase 6, con la misma lógica, fue 14,4 %).
 
 ## Preguntas probables
 
@@ -69,6 +70,7 @@ como CONTABILIDAD. Uno de los otros dos maneja el equipo de la demo para que qui
 | ¿Los reportes son contables oficiales? | Son reportes de gestión compatibles con auditoría (marca de autor y fecha, totales, detalle); no reemplazan la contabilidad fiscal | SG |
 | ¿Cómo cumplen la Ley 1581? | Datos mínimos del cliente solo en apartados, anonimización nocturna de las reservas cerradas hace 90 días o más y ninguna exportación con datos personales (prueba que los busca en los bytes) | JF / SG |
 | ¿Cómo saben que responde en menos de 3 s? | Prueba automática con 12.000 ventas y 40.000 movimientos (peor de 5 corridas) y medición sobre la semilla | SG |
+| ¿Por qué 16,5 % en alerta si la meta era 10–15 %? | Está cerca y depende de la fecha de corte de la semilla (14,4 % en la fase 6 con la misma lógica); no se ajustaron parámetros para maquillarlo. Sin contar lo que viene en camino serían 35,1 %: los planes de compra bajan las alertas a menos de la mitad | JD |
 | ¿Qué harían con más tiempo? | Despliegue en la nube, proveedores y órdenes de compra formales, notificaciones por correo, pronóstico con eventos de temporada | JF |
 
 ## Ensayo

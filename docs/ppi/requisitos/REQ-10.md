@@ -193,7 +193,8 @@ VENDEDOR recibe 403 en todos los anteriores. CONTABILIDAD solo lee (403 en toda 
 - Fase 7 (B10): el resumen de la semilla informa ahora las unidades perdidas comparables (12 meses completos antes del
   mes del corte de la analítica de cierre, sin variantes agotables a propósito ni el descontinuado) y la razón de la
   corrección por agotados. La corrección también ve las variantes agotables (siguen activas) y el denominador no, así
-  que la razón tiende a quedar algo alta. La cifra de la semilla de 36 meses se registra en la T2 de la fase 7.
+  que la razón tiende a quedar algo alta. T2 de la fase 7 (2026-10-25): +284,13 unidades
+  de la corrección frente a 270 perdidas comparables = 1,05×, dentro del rango esperado (ver `datos-demostracion.md`).
 - Inconsistencias del Word: REQ-08 y REQ-09 con nombre y descripción cruzados (ver `REQ-09.md`); NEC-010 debería ser
   NEC-10.
 - **Riesgo aceptado: el backtest no cubre noviembre y diciembre.** Los seis meses evaluados van de abril a septiembre con

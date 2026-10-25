@@ -73,15 +73,15 @@ Tres reportes de solo lectura, cada uno con su hermano `…/exportar?formato=PDF
 
 | # | Criterio | Estado | Pruebas |
 |---|---|---|---|
-| CA-1 | Libro: ejemplo a mano por mes (venta 135.000 de neto el mes de la venta; −45.000 el mes de la devolución) y conciliación con la rentabilidad sobre el rango completo | Cumplido | `LibroVentasServiceIntegracionTest`, `ReportesFlujoIntegracionTest` |
+| CA-1 | Libro: ejemplo a mano por mes (venta 135.000 de neto el mes de la venta; −45.000 el mes de la devolución) y conciliación con la rentabilidad sobre el rango completo | Cumplido (y en la T2 de la fase 7 la diferencia libro − rentabilidad es exactamente la de los bordes del rango calculados por SQL) | `LibroVentasServiceIntegracionTest`, `ReportesFlujoIntegracionTest` |
 | CA-2 | Libro: anuladas aparte y fuera de las cifras; DIA y MES suman lo mismo; periodos sin movimiento se omiten | Cumplido | `LibroVentasServiceIntegracionTest` |
 | CA-3 | Libro: el Excel trae las hojas de detalle y devoluciones y el PDF no; más de 50.000 líneas → 422 solo en Excel | Cumplido | `LibroVentasServiceIntegracionTest`, `ReporteControllerTest` |
 | CA-4 | Valorización: incluye lo reservado, tres agrupaciones con el mismo total, inactivas opcionales, en camino informativo | Cumplido | `ValorizacionServiceIntegracionTest` |
-| CA-5 | Movimientos: el saldo final cuadra con los flujos y con el físico; descuenta lo posterior al rango; sin reservas ni devoluciones no aptas; tres agrupaciones con el mismo total | Cumplido en unitarias y verificado en vivo sobre la base local; la prueba de integración la corre la CI del PR | `MovimientosPeriodoServiceIntegracionTest`, `MovimientosPeriodoServiceTest` |
+| CA-5 | Movimientos: el saldo final cuadra con los flujos y con el físico; descuenta lo posterior al rango; sin reservas ni devoluciones no aptas; tres agrupaciones con el mismo total | Cumplido: unitarias, integración en la CI del PR #11 (con VENTA_RESERVA, LIBERACION, variante inactiva y otra categoría) y T2 de la fase 7 (24 meses: 1.218 + flujos = 1.720 = físico actual) | `MovimientosPeriodoServiceIntegracionTest`, `MovimientosPeriodoServiceTest` |
 | CA-6 | Movimientos: el Excel trae el detalle del kardex con tipo y referencia legibles; más de 50.000 → 422 solo en Excel | Cumplido | `MovimientosPeriodoServiceTest`, `ReporteControllerTest` |
 | CA-7 | Sin datos: 200 con mensaje, en pantalla y en los archivos | Cumplido | servicios anteriores, `PestanaLibroVentas.test.tsx`, `PestanaValorizacion.test.tsx`, `PestanaMovimientos.test.tsx` |
 | CA-8 | Solo ADMIN y CONTABILIDAD; ningún archivo ni respuesta trae datos del cliente | Cumplido | `ReporteControllerTest`, `ReportesFlujoIntegracionTest` |
-| CA-9 | Rendimiento < 3 s con ~12.000 ventas y ~40.000 movimientos | Cumplido (T1) en libro y valorización; movimientos: en la prueba, lo mide la CI (en vivo: 24 meses en 133 ms) | `RendimientoReportesTest` |
+| CA-9 | Rendimiento < 3 s con ~12.000 ventas y ~40.000 movimientos | Cumplido: T1 y CI del PR #11 (movimientos 121 a 725 ms) y T2 sobre la semilla (exportación más pesada 852 ms; ver RNF-03) | `RendimientoReportesTest` |
 
 ## Observaciones (alcance; el texto del Word no se cambia)
 
@@ -91,6 +91,11 @@ Tres reportes de solo lectura, cada uno con su hermano `…/exportar?formato=PDF
   verificador de la semilla y el cuadre del reporte de movimientos (saldo inicial + flujos = saldo final). Verificado en
   la base local: el saldo al 1 de septiembre (1.321) y el final (1.496) coinciden con el `fisico_despues` del último
   movimiento de cada variante.
+- **T2 de la fase 7 (2026-10-25, portátil, por API y base de datos; la revisión visual la hace el usuario)**: los tres
+  reportes contables responden y exportan a PDF y Excel (200, content-type correcto, tamaño > 0) solo para ADMIN y
+  CONTABILIDAD; la valorización (1.720 unidades, $105.508.200 a costo) coincide con el SQL; el libro y la rentabilidad
+  concilian (diferencia igual a los bordes del rango: −543.500 de neto en 731 días; −1.025.000 en el tercer trimestre de
+  2026). Cifras en `docs/ppi/datos-demostracion.md`.
 - **«Almacenado»** (poscondición): los reportes se generan bajo demanda y no se guardan.
 - Los reportes son consultas del estado actual, no cierres contables: llevan la marca de tiempo de generación. La
   valorización usa el costo actual (ADR-006).
