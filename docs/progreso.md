@@ -111,7 +111,7 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
 ## Próximos pasos
 
 1. Revisión visual por la interfaz con los 4 roles (paso 4 de la guía T2); la base de demo quedó cargada.
-2. Ensayo cronometrado con `docs/ppi/guion-sustentacion.md` (sus cifras «T2-f7» ya se pueden llenar con las de arriba).
+2. Ensayo cronometrado con `docs/ppi/guion-sustentacion.md` (ya tiene las cifras de esta T2).
 3. La víspera de la demo, regenerar la semilla (pasos 1–2 de la guía) para alinear reservas y SIN_ROTACION con la fecha.
 
 ## Prueba T2 — fase 7 en el portátil (PowerShell 5, MySQL nativo, perfiles `dev,local` y `dev,local,seed`)
