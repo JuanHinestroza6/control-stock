@@ -5,6 +5,7 @@ listos para renderizar y pegar en el documento Word del PPI.
 
 - [`requisitos/`](requisitos/) — fichas FO-ERS individuales: REQ-01 a REQ-14 (REQ-03 y REQ-07, reportes de la fase 7; REQ-09 «Analizar Tendencias Históricas de Venta»; REQ-10 con CU-01 del Word y CU-16, CU-17 y CU-18 nuevos; REQ-13 y REQ-14, requisitos nuevos) y RNF-03 (rendimiento).
 - [`trazabilidad.md`](trazabilidad.md) — matriz final requisito → caso de uso → ficha → módulos → diagramas → estado, con los no funcionales y las correcciones al Word.
+- [`guion-sustentacion.md`](guion-sustentacion.md) — guion de 15 min para la sustentación (T3): bloques por expositor, demo por rol, mensajes clave, limitaciones y preguntas probables.
 - `datos-demostracion.md` — sección "Datos de demostración" (Fases 4 a 6): propósito, generación, modelo de demanda, reposición por planes de compra y resultados de las corridas T1 (Fase 4), T2 (Fase 5, con la analítica) y T2 de la Fase 6 (2026-10-21, por API y base de datos).
 - `diagramas/*.puml` — clases, secuencia, casos de uso, despliegue, componentes, paquetes. Fase 5 (analítica): `casos-uso-cu08-mas-vendidos.puml`, `casos-uso-cu15-clasificacion-abc.puml`, `clases-fase5-analitica.puml`.
 
