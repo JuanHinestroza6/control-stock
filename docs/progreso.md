@@ -88,7 +88,8 @@ Bitácora viva del proyecto. Se actualiza con `/cerrar-sesion`. Mantener corto: 
       preparación de la prueba. Backend 905 + 493 omitidas (Testcontainers), frontend 642
 
 - [x] Fase 7 — T3: guía T2 adaptada al portátil (vaciar la base con el cliente nativo, carga `dev,local,seed`,
-      verificación por rol, cifras contra SQL, `Measure-Command`) y guion de sustentación de 15 min para 5 expositores
+      verificación por rol, cifras contra SQL, `Measure-Command`) y guion de sustentación de 15 min para 3 expositores (Juan Francisco Hinestroza, Juan David Quinto y
+      Santiago Granada Baena)
       (`docs/ppi/guion-sustentacion.md`). Comprobado que `dev,local,seed` arranca y, con datos, no hace nada
 
 ## En curso
